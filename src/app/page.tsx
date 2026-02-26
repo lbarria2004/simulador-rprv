@@ -464,26 +464,72 @@ export default function SimuladorPensiones() {
           }
         }
 
-        // Pensión de invalidez
-        const response = await fetch('/api/pension', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            tipo: 'invalidez',
-            datos: {
-              fondos: formData.fondosAcumulados,
-              edad: formData.edad,
-              sexo: formData.sexo,
-              gradoInvalidez: formData.gradoInvalidez,
-              ingresoBase: formData.ingresoBase,
-              cubiertoSIS: formData.cubiertoSIS,
-              beneficiarios: beneficiariosAPI
-            }
+        // Escenarios de RV para Invalidez
+        for (const escenario of formData.escenariosRV) {
+          let tipoAPI: string;
+          
+          switch (escenario.tipo) {
+            case 'inmediata':
+              tipoAPI = 'invalidez_rv_inmediata';
+              break;
+            case 'periodo_garantizado':
+              tipoAPI = 'invalidez_rv_garantizado';
+              break;
+            case 'aumento_temporal':
+              tipoAPI = 'invalidez_rv_aumento';
+              break;
+            case 'ambas':
+              tipoAPI = 'invalidez_rv_ambas';
+              break;
+            default:
+              continue;
+          }
+          
+          const response = await fetch('/api/pension', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              tipo: tipoAPI,
+              datos: {
+                fondos: formData.fondosAcumulados,
+                edad: formData.edad,
+                sexo: formData.sexo,
+                mesesGarantizados: escenario.mesesGarantizados,
+                mesesAumento: escenario.mesesAumento,
+                porcentajeAumento: escenario.porcentajeAumento,
+                beneficiarios: beneficiariosAPI,
+                tasaInteres: tasas.tasaRV
+              }
+            })
           })
-        })
-        const data = await response.json()
-        if (data.success) {
-          escenariosCalculados.push(data.resultado)
+          const data = await response.json()
+          if (data.success) {
+            escenariosCalculados.push(data.resultado)
+          }
+        }
+
+        // Pensión de invalidez básica (solo si no hay escenarios RV)
+        if (formData.escenariosRV.length === 0 && !formData.calcularRP) {
+          const response = await fetch('/api/pension', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              tipo: 'invalidez',
+              datos: {
+                fondos: formData.fondosAcumulados,
+                edad: formData.edad,
+                sexo: formData.sexo,
+                gradoInvalidez: formData.gradoInvalidez,
+                ingresoBase: formData.ingresoBase,
+                cubiertoSIS: formData.cubiertoSIS,
+                beneficiarios: beneficiariosAPI
+              }
+            })
+          })
+          const data = await response.json()
+          if (data.success) {
+            escenariosCalculados.push(data.resultado)
+          }
         }
       }
 

@@ -340,7 +340,10 @@ export async function POST(request: NextRequest) {
     // ========== PENSIÓN DE INVALIDEZ ==========
     if (tipoPension === 'invalidez') {
       const retiroProgramado = resultados.find(r => r.nombre.includes('Retiro Programado'));
-      const pensionInvalidez = resultados.find(r => r.nombre.includes('Invalidez'));
+      const rvInmediata = resultados.find(r => r.nombre.includes('RV Inmediata') && r.nombre.includes('Invalidez'));
+      const rvGarantizados = resultados.filter(r => r.nombre.includes('RV Invalidez Garantía'));
+      const rvAumentos = resultados.filter(r => r.nombre.includes('RV Invalidez +') && r.nombre.includes('x'));
+      const pensionInvalidez = resultados.find(r => r.nombre.includes('Pensión Invalidez'));
 
       // Información del grado de invalidez
       if (afiliado.gradoInvalidez || pensionInvalidez?.gradoInvalidez) {
@@ -378,9 +381,97 @@ export async function POST(request: NextRequest) {
         y = drawTable(page, rpData, 50, y, colWidths, { regular: fontRegular, bold: fontBold });
       }
 
-      // Pensión de Invalidez
-      if (pensionInvalidez) {
-        drawText(page, '2. Pensión de Invalidez', 50, y, { 
+      // RV Inmediata Invalidez
+      if (rvInmediata) {
+        drawText(page, '2. Renta Vitalicia Inmediata (Invalidez)', 50, y, { 
+          size: 11, 
+          font: fontBold, 
+          color: { r: 0.122, g: 0.306, b: 0.475 } 
+        });
+        y -= 15;
+        drawText(page, `Tasa: ${(rvInmediata.tasaInteres * 100).toFixed(2)}% - Tabla de inválidos`, 50, y, { size: 9, font: fontRegular });
+        y -= 20;
+
+        const pensionBruto = rvInmediata.pensionMensual;
+        const pensionUF = rvInmediata.pensionEnUF.toFixed(2);
+        const descuentoSalud = Math.round(pensionBruto * 0.07);
+        const pensionLiquida = pensionBruto - descuentoSalud;
+
+        const rvData = [
+          ['Modalidad', 'Pensión (UF)', 'Pensión M. Bruto', 'Dscto. 7% Salud', 'Pensión Líquida'],
+          ['RV INMEDIATA INVALIDEZ', `${pensionUF} UF`, `$${formatNumber(pensionBruto)}`, `-$${formatNumber(descuentoSalud)}`, `$${formatNumber(pensionLiquida)}`]
+        ];
+        const colWidths = [130, 80, 100, 90, 100];
+        y = drawTable(page, rvData, 50, y, colWidths, { regular: fontRegular, bold: fontBold });
+      }
+
+      // RV Garantizados
+      for (let i = 0; i < rvGarantizados.length; i++) {
+        const rv = rvGarantizados[i];
+        const num = rvInmediata ? 3 + i : 2 + i;
+        const meses = rv.periodoGarantizado || 0;
+        const anos = Math.floor(meses / 12);
+
+        drawText(page, `${num}. RV Invalidez con Garantía ${anos} años`, 50, y, { 
+          size: 11, 
+          font: fontBold, 
+          color: { r: 0.122, g: 0.306, b: 0.475 } 
+        });
+        y -= 20;
+
+        const pensionBruto = rv.pensionMensual;
+        const pensionUF = rv.pensionEnUF.toFixed(2);
+        const descuentoSalud = Math.round(pensionBruto * 0.07);
+        const pensionLiquida = pensionBruto - descuentoSalud;
+
+        const rvgData = [
+          ['Modalidad', 'Pensión (UF)', 'Pensión M. Bruto', 'Dscto. 7% Salud', 'Pensión Líquida'],
+          [`RV GARANTÍA ${anos} AÑOS`, `${pensionUF} UF`, `$${formatNumber(pensionBruto)}`, `-$${formatNumber(descuentoSalud)}`, `$${formatNumber(pensionLiquida)}`]
+        ];
+        const colWidths = [130, 80, 100, 90, 100];
+        y = drawTable(page, rvgData, 50, y, colWidths, { regular: fontRegular, bold: fontBold });
+      }
+
+      // RV con Aumento Temporal
+      for (let i = 0; i < rvAumentos.length; i++) {
+        const rv = rvAumentos[i];
+        const baseNum = rvInmediata ? 3 : 2;
+        const num = baseNum + rvGarantizados.length + i;
+        const meses = rv.aumentoTemporal?.meses || 0;
+        const anosAumento = Math.floor(meses / 12);
+
+        drawText(page, `${num}. RV Invalidez con Aumento Temporal`, 50, y, { 
+          size: 11, 
+          font: fontBold, 
+          color: { r: 0.122, g: 0.306, b: 0.475 } 
+        });
+        y -= 15;
+        drawText(page, `Aumento ${rv.aumentoTemporal?.porcentaje || 0}% por ${anosAumento} años`, 50, y, { size: 9, font: fontRegular });
+        y -= 20;
+
+        const pensionBruto = rv.pensionMensual;
+        const pensionUF = rv.pensionEnUF.toFixed(2);
+        const descuentoSalud = Math.round(pensionBruto * 0.07);
+        const pensionLiquida = pensionBruto - descuentoSalud;
+
+        const pensionBase = rv.aumentoTemporal?.pensionFinal || pensionBruto;
+        const pensionBaseUF = (pensionBase / 38500).toFixed(2);
+        const descBase = Math.round(pensionBase * 0.07);
+        const pensionBaseLiq = pensionBase - descBase;
+
+        const rvaData = [
+          ['Modalidad', 'Pensión (UF)', 'Pensión M. Bruto', 'Dscto. 7% Salud', 'Pensión Líquida'],
+          [`RV AUMENTADA ${meses} MESES`, `${pensionUF} UF`, `$${formatNumber(pensionBruto)}`, `-$${formatNumber(descuentoSalud)}`, `$${formatNumber(pensionLiquida)}`],
+          [`PENSIÓN BASE (desde mes ${meses + 1})`, `${pensionBaseUF} UF`, `$${formatNumber(pensionBase)}`, `-$${formatNumber(descBase)}`, `$${formatNumber(pensionBaseLiq)}`]
+        ];
+        const colWidths = [140, 70, 100, 90, 100];
+        y = drawTable(page, rvaData, 50, y, colWidths, { regular: fontRegular, bold: fontBold });
+      }
+
+      // Pensión de Invalidez básica (si no hay escenarios RV)
+      if (pensionInvalidez && resultados.length === 1) {
+        const num = retiroProgramado ? 2 : 1;
+        drawText(page, `${num}. Pensión de Invalidez`, 50, y, { 
           size: 11, 
           font: fontBold, 
           color: { r: 0.122, g: 0.306, b: 0.475 } 
@@ -388,7 +479,6 @@ export async function POST(request: NextRequest) {
         y -= 15;
         
         const grado = pensionInvalidez.gradoInvalidez || 'total';
-        const porcentaje = pensionInvalidez.porcentajeInvalidez || 0.70;
         drawText(page, `Grado: ${GRADO_INVALIDEZ_LABELS[grado]} - Tasa: ${(pensionInvalidez.tasaInteres * 100).toFixed(2)}%`, 50, y, { size: 9, font: fontRegular });
         y -= 20;
 

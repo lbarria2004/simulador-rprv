@@ -857,6 +857,250 @@ export function calcularRetiroProgramadoInvalidez(
 }
 
 // ==========================================
+// RENTA VITALICIA PARA INVALIDEZ
+// ==========================================
+
+/**
+ * Calcula RV Inmediata para pensionado por invalidez
+ * Usa tabla de mortalidad de inválidos y tasa de invalidez
+ */
+export function calcularRVInmediataInvalidez(
+  fondos: number,
+  edad: number,
+  sexo: Sexo,
+  tasaInteres: number = TASAS_INTERES.RENTA_VITALICIA_INVALIDEZ,
+  beneficiarios?: BeneficiarioPension[]
+): ResultadoEscenario {
+  // CNU con tabla de inválidos
+  const cnu = calcularCNU(edad, sexo, tasaInteres, beneficiarios, true);
+  const primaSeguro = fondos * 0.03;
+  const fondoDisponible = fondos - primaSeguro;
+  const pensionMensual = fondoDisponible / cnu;
+  const expectativaVida = calcularExpectativaVida(edad, sexo, true);
+  
+  return {
+    nombre: 'RV Inmediata (Invalidez)',
+    pensionMensual: Math.round(pensionMensual),
+    pensionEnUF: pensionMensual / UF_ACTUAL,
+    pensionAnual: pensionMensual * 12,
+    cnu,
+    tasaInteres,
+    expectativaVida,
+    advertencias: [
+      'Usa tabla de mortalidad de inválidos (I-H/I-M-2020)',
+      'Tasa de interés para invalidez: ' + (tasaInteres * 100).toFixed(2) + '%',
+      'Pensión fija de por vida'
+    ]
+  };
+}
+
+/**
+ * Calcula RV con Período Garantizado para invalidez
+ */
+export function calcularRVPeriodoGarantizadoInvalidez(
+  fondos: number,
+  edad: number,
+  sexo: Sexo,
+  mesesGarantizados: number,
+  tasaInteres: number = TASAS_INTERES.RENTA_VITALICIA_INVALIDEZ,
+  beneficiarios?: BeneficiarioPension[]
+): ResultadoEscenario {
+  const rvBase = calcularRVInmediataInvalidez(fondos, edad, sexo, tasaInteres, beneficiarios);
+  const factorAjuste = calcularFactorGarantizado(mesesGarantizados);
+  const pensionAjustada = rvBase.pensionMensual * factorAjuste;
+  
+  const anosGarantizados = Math.floor(mesesGarantizados / 12);
+  const mesesRestantes = mesesGarantizados % 12;
+  let nombreMeses = '';
+  if (anosGarantizados > 0 && mesesRestantes > 0) {
+    nombreMeses = `${anosGarantizados}a ${mesesRestantes}m`;
+  } else if (anosGarantizados > 0) {
+    nombreMeses = `${anosGarantizados} ${anosGarantizados === 1 ? 'año' : 'años'}`;
+  } else {
+    nombreMeses = `${mesesGarantizados} meses`;
+  }
+  
+  return {
+    nombre: `RV Invalidez Garantía ${nombreMeses}`,
+    pensionMensual: Math.round(pensionAjustada),
+    pensionEnUF: pensionAjustada / UF_ACTUAL,
+    pensionAnual: pensionAjustada * 12,
+    cnu: rvBase.cnu,
+    tasaInteres,
+    expectativaVida: rvBase.expectativaVida,
+    periodoGarantizado: mesesGarantizados,
+    advertencias: [
+      `Período garantizado: ${nombreMeses} (${mesesGarantizados} meses)`,
+      `Si fallece antes, beneficiarios reciben el 100% de la pensión`,
+      `Factor aplicado: ${(factorAjuste * 100).toFixed(1)}%`,
+      'Usa tabla de mortalidad de inválidos (I-H/I-M-2020)'
+    ]
+  };
+}
+
+/**
+ * Calcula RV con Aumento Temporal para invalidez
+ */
+export function calcularRVAumentoTemporalInvalidez(
+  fondos: number,
+  edad: number,
+  sexo: Sexo,
+  mesesAumento: number,
+  porcentajeAumento: number,
+  tasaInteres: number = TASAS_INTERES.RENTA_VITALICIA_INVALIDEZ,
+  beneficiarios?: BeneficiarioPension[]
+): ResultadoEscenario {
+  const porcentajeNormalizado = porcentajeAumento > 1 ? porcentajeAumento / 100 : porcentajeAumento;
+  const rvBase = calcularRVInmediataInvalidez(fondos, edad, sexo, tasaInteres, beneficiarios);
+  const pensionVitalicia = rvBase.pensionMensual;
+  const pensionAumentada = pensionVitalicia * (1 + porcentajeNormalizado);
+  const incrementoMensual = pensionVitalicia * porcentajeNormalizado;
+  
+  let costoAumento = 0;
+  for (let mes = 1; mes <= mesesAumento; mes++) {
+    const factorDescuento = 1 / Math.pow(1 + tasaInteres, mes / 12);
+    costoAumento += incrementoMensual * factorDescuento;
+  }
+  
+  const factorAjuste = 1 - (costoAumento / (fondos * 0.97));
+  const pensionBaseAjustada = pensionVitalicia * Math.max(factorAjuste, 0.5);
+  const pensionAumentadaFinal = pensionBaseAjustada * (1 + porcentajeNormalizado);
+  
+  const anosAumento = Math.floor(mesesAumento / 12);
+  const mesesRestantes = mesesAumento % 12;
+  let nombrePeriodo = '';
+  if (anosAumento > 0 && mesesRestantes > 0) {
+    nombrePeriodo = `${anosAumento}a ${mesesRestantes}m`;
+  } else if (anosAumento > 0) {
+    nombrePeriodo = `${anosAumento} ${anosAumento === 1 ? 'año' : 'años'}`;
+  } else {
+    nombrePeriodo = `${mesesAumento} meses`;
+  }
+  
+  const proyeccion: ProyeccionAnual[] = [];
+  const anosAumentoInt = Math.ceil(mesesAumento / 12);
+  const maxAnos = Math.min(30, 81 - edad);
+  
+  for (let año = 0; año < maxAnos; año++) {
+    const edadActual = edad + año;
+    const enPeriodoAumento = año < anosAumentoInt;
+    
+    proyeccion.push({
+      año: año + 1,
+      edad: edadActual,
+      pensionMensual: enPeriodoAumento 
+        ? Math.round(pensionAumentadaFinal)
+        : Math.round(pensionBaseAjustada),
+      saldoAcumulado: 0,
+      retiroAcumulado: 0,
+      fase: enPeriodoAumento ? 'aumento' : 'normal'
+    });
+  }
+  
+  return {
+    nombre: `RV Invalidez +${porcentajeAumento > 1 ? porcentajeAumento : porcentajeAumento * 100}% x ${nombrePeriodo}`,
+    pensionMensual: Math.round(pensionAumentadaFinal),
+    pensionEnUF: pensionAumentadaFinal / UF_ACTUAL,
+    pensionAnual: pensionAumentadaFinal * 12,
+    cnu: rvBase.cnu,
+    tasaInteres,
+    expectativaVida: rvBase.expectativaVida,
+    aumentoTemporal: {
+      meses: mesesAumento,
+      porcentaje: porcentajeAumento,
+      pensionAumentada: Math.round(pensionAumentadaFinal),
+      pensionFinal: Math.round(pensionBaseAjustada)
+    },
+    proyeccion,
+    advertencias: [
+      `Aumento del ${(porcentajeAumento > 1 ? porcentajeAumento : porcentajeAumento * 100).toFixed(0)}% por ${nombrePeriodo}`,
+      `Pensión durante aumento: ${formatearPesos(pensionAumentadaFinal)}`,
+      `Pensión después del período: ${formatearPesos(pensionBaseAjustada)}`,
+      'Usa tabla de mortalidad de inválidos (I-H/I-M-2020)'
+    ]
+  };
+}
+
+/**
+ * Calcula RV con ambas cláusulas para invalidez
+ */
+export function calcularRVConAmbasClausulasInvalidez(
+  fondos: number,
+  edad: number,
+  sexo: Sexo,
+  mesesGarantizados: number,
+  mesesAumento: number,
+  porcentajeAumento: number,
+  tasaInteres: number = TASAS_INTERES.RENTA_VITALICIA_INVALIDEZ,
+  beneficiarios?: BeneficiarioPension[]
+): ResultadoEscenario {
+  const porcentajeNormalizado = porcentajeAumento > 1 ? porcentajeAumento / 100 : porcentajeAumento;
+  const rvBase = calcularRVInmediataInvalidez(fondos, edad, sexo, tasaInteres, beneficiarios);
+  const factorGarantizado = calcularFactorGarantizado(mesesGarantizados);
+  const pensionBase = rvBase.pensionMensual * factorGarantizado;
+  const pensionAumentada = pensionBase * (1 + porcentajeNormalizado);
+  const incrementoMensual = pensionBase * porcentajeNormalizado;
+  
+  let costoAumento = 0;
+  for (let mes = 1; mes <= mesesAumento; mes++) {
+    const factorDescuento = 1 / Math.pow(1 + tasaInteres, mes / 12);
+    costoAumento += incrementoMensual * factorDescuento;
+  }
+  
+  const factorAjusteTotal = Math.max(factorGarantizado - (costoAumento / (fondos * 0.97)), 0.45);
+  const pensionBaseFinal = rvBase.pensionMensual * factorAjusteTotal;
+  const pensionAumentadaFinal = pensionBaseFinal * (1 + porcentajeNormalizado);
+  
+  const anosGarantia = Math.floor(mesesGarantizados / 12);
+  const anosAumento = Math.floor(mesesAumento / 12);
+  
+  const proyeccion: ProyeccionAnual[] = [];
+  const anosAumentoInt = Math.ceil(mesesAumento / 12);
+  const maxAnos = Math.min(30, 81 - edad);
+  
+  for (let año = 0; año < maxAnos; año++) {
+    const edadActual = edad + año;
+    const enPeriodoAumento = año < anosAumentoInt;
+    
+    proyeccion.push({
+      año: año + 1,
+      edad: edadActual,
+      pensionMensual: enPeriodoAumento 
+        ? Math.round(pensionAumentadaFinal)
+        : Math.round(pensionBaseFinal),
+      saldoAcumulado: 0,
+      retiroAcumulado: 0,
+      fase: enPeriodoAumento ? 'aumento' : 'normal'
+    });
+  }
+  
+  return {
+    nombre: `RV Invalidez +${(porcentajeNormalizado * 100).toFixed(0)}% x ${anosAumento}a + Garantía ${anosGarantia}a`,
+    pensionMensual: Math.round(pensionAumentadaFinal),
+    pensionEnUF: pensionAumentadaFinal / UF_ACTUAL,
+    pensionAnual: pensionAumentadaFinal * 12,
+    cnu: rvBase.cnu,
+    tasaInteres,
+    expectativaVida: rvBase.expectativaVida,
+    periodoGarantizado: mesesGarantizados,
+    aumentoTemporal: {
+      meses: mesesAumento,
+      porcentaje: porcentajeAumento,
+      pensionAumentada: Math.round(pensionAumentadaFinal),
+      pensionFinal: Math.round(pensionBaseFinal)
+    },
+    proyeccion,
+    advertencias: [
+      `Aumento ${(porcentajeAumento > 1 ? porcentajeAumento : porcentajeAumento * 100).toFixed(0)}% por ${anosAumento} años`,
+      `Garantía ${anosGarantia} años`,
+      `Pensión aumento: ${formatearPesos(pensionAumentadaFinal)}`,
+      `Pensión final: ${formatearPesos(pensionBaseFinal)}`,
+      'Usa tabla de mortalidad de inválidos (I-H/I-M-2020)'
+    ]
+  };
+}
+
+// ==========================================
 // CÁLCULO PENSIÓN DE SOBREVIVENCIA
 // ==========================================
 
