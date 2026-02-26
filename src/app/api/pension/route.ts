@@ -9,10 +9,13 @@ import {
   calcularRetiroProgramadoInvalidez,
   calcularRVInmediataInvalidez,
   calcularRVPeriodoGarantizadoInvalidez,
-  calcularRVAumentoTemporalInvalidez,
-  calcularRVConAmbasClausulasInvalidez,
   calcularPensionSobrevivencia,
   calcularOpcionesSobrevivencia,
+  calcularRVInmediataSobrevivencia,
+  calcularRVGarantizadoSobrevivencia,
+  calcularRVAumentoSobrevivencia,
+  calcularRVAmbasSobrevivencia,
+  calcularRetiroProgramadoSobrevivencia,
   calcularExpectativaVida,
   Sexo,
   GradoInvalidez,
@@ -133,31 +136,6 @@ export async function POST(request: NextRequest) {
         );
         break;
 
-      case 'invalidez_rv_aumento':
-        resultado = calcularRVAumentoTemporalInvalidez(
-          fondos,
-          edad,
-          sexo,
-          datos.mesesAumento as MesesAumento,
-          datos.porcentajeAumento as number,
-          datos.tasaInteres ?? TASAS_INTERES.RENTA_VITALICIA_INVALIDEZ,
-          beneficiarios
-        );
-        break;
-
-      case 'invalidez_rv_ambas':
-        resultado = calcularRVConAmbasClausulasInvalidez(
-          fondos,
-          edad,
-          sexo,
-          datos.mesesGarantizados as MesesGarantizados,
-          datos.mesesAumento as MesesAumento,
-          datos.porcentajeAumento as number,
-          datos.tasaInteres ?? TASAS_INTERES.RENTA_VITALICIA_INVALIDEZ,
-          beneficiarios
-        );
-        break;
-
       // ========== SOBREVIVENCIA ==========
       case 'sobrevivencia':
         resultado = calcularPensionSobrevivencia(
@@ -183,6 +161,72 @@ export async function POST(request: NextRequest) {
           datos.ingresoBaseCausante
         );
         return NextResponse.json({ success: true, resultados: opciones });
+
+      case 'sobrevivencia_rp':
+        resultado = calcularRetiroProgramadoSobrevivencia(
+          fondos,
+          edad,
+          sexo,
+          beneficiarios || [],
+          datos.pensionReferenciaCausante,
+          datos.ingresoBaseCausante,
+          datos.tasaInteres ?? TASAS_INTERES.RETIRO_PROGRAMADO
+        );
+        break;
+
+      case 'sobrevivencia_rv_inmediata':
+        resultado = calcularRVInmediataSobrevivencia(
+          fondos,
+          edad,
+          sexo,
+          beneficiarios || [],
+          datos.pensionReferenciaCausante,
+          datos.ingresoBaseCausante,
+          datos.tasaInteres ?? TASAS_INTERES.SOBREVIVENCIA
+        );
+        break;
+
+      case 'sobrevivencia_rv_garantizado':
+        resultado = calcularRVGarantizadoSobrevivencia(
+          fondos,
+          edad,
+          sexo,
+          beneficiarios || [],
+          datos.mesesGarantizados as MesesGarantizados,
+          datos.pensionReferenciaCausante,
+          datos.ingresoBaseCausante,
+          datos.tasaInteres ?? TASAS_INTERES.SOBREVIVENCIA
+        );
+        break;
+
+      case 'sobrevivencia_rv_aumento':
+        resultado = calcularRVAumentoSobrevivencia(
+          fondos,
+          edad,
+          sexo,
+          beneficiarios || [],
+          datos.mesesAumento as MesesAumento,
+          datos.porcentajeAumento as number,
+          datos.pensionReferenciaCausante,
+          datos.ingresoBaseCausante,
+          datos.tasaInteres ?? TASAS_INTERES.SOBREVIVENCIA
+        );
+        break;
+
+      case 'sobrevivencia_rv_ambas':
+        resultado = calcularRVAmbasSobrevivencia(
+          fondos,
+          edad,
+          sexo,
+          beneficiarios || [],
+          datos.mesesGarantizados as MesesGarantizados,
+          datos.mesesAumento as MesesAumento,
+          datos.porcentajeAumento as number,
+          datos.pensionReferenciaCausante,
+          datos.ingresoBaseCausante,
+          datos.tasaInteres ?? TASAS_INTERES.SOBREVIVENCIA
+        );
+        break;
 
       default:
         return NextResponse.json(

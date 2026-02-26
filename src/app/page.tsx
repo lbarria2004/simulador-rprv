@@ -464,9 +464,14 @@ export default function SimuladorPensiones() {
           }
         }
 
-        // Escenarios de RV para Invalidez
+        // Escenarios de RV para Invalidez (SOLO Inmediata y Garantizada - según normativa)
         for (const escenario of formData.escenariosRV) {
           let tipoAPI: string;
+          
+          // En Invalidez NO se permite RV con Aumento Temporal (normativa SUSESO/SPensiones)
+          if (escenario.tipo === 'aumento_temporal' || escenario.tipo === 'ambas') {
+            continue; // Saltar estos escenarios
+          }
           
           switch (escenario.tipo) {
             case 'inmediata':
@@ -474,12 +479,6 @@ export default function SimuladorPensiones() {
               break;
             case 'periodo_garantizado':
               tipoAPI = 'invalidez_rv_garantizado';
-              break;
-            case 'aumento_temporal':
-              tipoAPI = 'invalidez_rv_aumento';
-              break;
-            case 'ambas':
-              tipoAPI = 'invalidez_rv_ambas';
               break;
             default:
               continue;
@@ -495,8 +494,6 @@ export default function SimuladorPensiones() {
                 edad: formData.edad,
                 sexo: formData.sexo,
                 mesesGarantizados: escenario.mesesGarantizados,
-                mesesAumento: escenario.mesesAumento,
-                porcentajeAumento: escenario.porcentajeAumento,
                 beneficiarios: beneficiariosAPI,
                 tasaInteres: tasas.tasaRV
               }
@@ -508,7 +505,7 @@ export default function SimuladorPensiones() {
           }
         }
 
-        // Pensión de invalidez básica (solo si no hay escenarios RV)
+        // Pensión de invalidez básica (solo si no hay escenarios RV ni RP)
         if (formData.escenariosRV.length === 0 && !formData.calcularRP) {
           const response = await fetch('/api/pension', {
             method: 'POST',
@@ -535,26 +532,100 @@ export default function SimuladorPensiones() {
 
       // ========== SOBREVIVENCIA ==========
       if (formData.tipoPension === 'sobrevivencia') {
-        // Obtener todas las opciones de sobrevivencia
-        const response = await fetch('/api/pension', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            tipo: 'sobrevivencia_opciones',
-            datos: {
-              fondos: formData.fondosAcumulados,
-              edad: formData.edad,
-              sexo: formData.sexo,
-              pensionReferenciaCausante: formData.pensionReferenciaCausante || undefined,
-              ingresoBaseCausante: formData.ingresoBaseCausante || undefined,
-              cubiertoSIS: formData.cubiertoSIS,
-              beneficiarios: beneficiariosAPI
-            }
+        // Retiro Programado Sobrevivencia
+        if (formData.calcularRP) {
+          const response = await fetch('/api/pension', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              tipo: 'sobrevivencia_rp',
+              datos: {
+                fondos: formData.fondosAcumulados,
+                edad: formData.edad,
+                sexo: formData.sexo,
+                pensionReferenciaCausante: formData.pensionReferenciaCausante || undefined,
+                ingresoBaseCausante: formData.ingresoBaseCausante || undefined,
+                cubiertoSIS: formData.cubiertoSIS,
+                beneficiarios: beneficiariosAPI,
+                tasaInteres: tasas.tasaRP
+              }
+            })
           })
-        })
-        const data = await response.json()
-        if (data.success && data.resultados) {
-          escenariosCalculados.push(...data.resultados)
+          const data = await response.json()
+          if (data.success) {
+            escenariosCalculados.push(data.resultado)
+          }
+        }
+
+        // Escenarios de RV para Sobrevivencia
+        for (const escenario of formData.escenariosRV) {
+          let tipoAPI: string;
+          
+          switch (escenario.tipo) {
+            case 'inmediata':
+              tipoAPI = 'sobrevivencia_rv_inmediata';
+              break;
+            case 'periodo_garantizado':
+              tipoAPI = 'sobrevivencia_rv_garantizado';
+              break;
+            case 'aumento_temporal':
+              tipoAPI = 'sobrevivencia_rv_aumento';
+              break;
+            case 'ambas':
+              tipoAPI = 'sobrevivencia_rv_ambas';
+              break;
+            default:
+              continue;
+          }
+          
+          const response = await fetch('/api/pension', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              tipo: tipoAPI,
+              datos: {
+                fondos: formData.fondosAcumulados,
+                edad: formData.edad,
+                sexo: formData.sexo,
+                mesesGarantizados: escenario.mesesGarantizados,
+                mesesAumento: escenario.mesesAumento,
+                porcentajeAumento: escenario.porcentajeAumento,
+                pensionReferenciaCausante: formData.pensionReferenciaCausante || undefined,
+                ingresoBaseCausante: formData.ingresoBaseCausante || undefined,
+                cubiertoSIS: formData.cubiertoSIS,
+                beneficiarios: beneficiariosAPI,
+                tasaInteres: tasas.tasaRV
+              }
+            })
+          })
+          const data = await response.json()
+          if (data.success) {
+            escenariosCalculados.push(data.resultado)
+          }
+        }
+
+        // Si no hay RP ni escenarios RV, calcular opciones básicas
+        if (escenariosCalculados.length === 0) {
+          const response = await fetch('/api/pension', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              tipo: 'sobrevivencia_opciones',
+              datos: {
+                fondos: formData.fondosAcumulados,
+                edad: formData.edad,
+                sexo: formData.sexo,
+                pensionReferenciaCausante: formData.pensionReferenciaCausante || undefined,
+                ingresoBaseCausante: formData.ingresoBaseCausante || undefined,
+                cubiertoSIS: formData.cubiertoSIS,
+                beneficiarios: beneficiariosAPI
+              }
+            })
+          })
+          const data = await response.json()
+          if (data.success && data.resultados) {
+            escenariosCalculados.push(...data.resultados)
+          }
         }
       }
 
@@ -1403,25 +1474,35 @@ export default function SimuladorPensiones() {
                     <Shield className="h-3 w-3 mr-1 text-blue-500" />
                     Con Garantía
                   </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => agregarEscenarioRV('aumento_temporal')}
-                    className="h-auto py-2"
-                  >
-                    <ArrowUpRight className="h-3 w-3 mr-1 text-green-500" />
-                    Con Aumento
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => agregarEscenarioRV('ambas')}
-                    className="h-auto py-2"
-                  >
-                    <Shield className="h-3 w-3 mr-1 text-purple-500" />
-                    Ambas Cláusulas
-                  </Button>
+                  {/* Solo mostrar opciones de Aumento para Vejez y Sobrevivencia (NO para Invalidez por normativa) */}
+                  {formData.tipoPension !== 'invalidez' && (
+                    <>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => agregarEscenarioRV('aumento_temporal')}
+                        className="h-auto py-2"
+                      >
+                        <ArrowUpRight className="h-3 w-3 mr-1 text-green-500" />
+                        Con Aumento
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => agregarEscenarioRV('ambas')}
+                        className="h-auto py-2"
+                      >
+                        <Shield className="h-3 w-3 mr-1 text-purple-500" />
+                        Ambas Cláusulas
+                      </Button>
+                    </>
+                  )}
                 </div>
+                {formData.tipoPension === 'invalidez' && (
+                  <p className="text-xs text-amber-600 mt-2">
+                    ⚠️ Por normativa, en Invalidez solo se permite RV Inmediata y con Garantía
+                  </p>
+                )}
               </CardContent>
             </Card>
 
