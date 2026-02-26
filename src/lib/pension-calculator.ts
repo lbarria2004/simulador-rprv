@@ -929,6 +929,11 @@ export function calcularCNUSobrevivencia(
   let cnuTotal = 0;
   const detallePorBeneficiario: { tipo: string; cnu: number; porcentaje: number }[] = [];
   
+  // Si no hay beneficiarios válidos, retornar valores por defecto
+  if (porcentajes.length === 0) {
+    return { cnuTotal: 0, detallePorBeneficiario: [] };
+  }
+  
   for (const ben of porcentajes) {
     // CNU individual del beneficiario
     const cnuIndividual = calcularCNUIndividual(ben.edad, ben.sexo, tasaInteres);
@@ -1053,6 +1058,24 @@ export function calcularOpcionesSobrevivencia(
 ): ResultadoEscenario[] {
   const resultados: ResultadoEscenario[] = [];
   
+  // Validar que existan beneficiarios
+  const porcentajes = calcularPorcentajesBeneficiarios(beneficiarios);
+  
+  if (porcentajes.length === 0) {
+    // Retornar resultado con error si no hay beneficiarios
+    resultados.push({
+      nombre: 'Error: Sin Beneficiarios',
+      pensionMensual: 0,
+      pensionEnUF: 0,
+      pensionAnual: 0,
+      cnu: 0,
+      tasaInteres: tasaRP,
+      expectativaVida: 0,
+      advertencias: ['⚠️ DEBE AGREGAR AL MENOS UN BENEFICIARIO', 'Los beneficiarios son requeridos para pensión de sobrevivencia']
+    });
+    return resultados;
+  }
+  
   // Calcular pensión de referencia
   let pensionReferencia: number;
   
@@ -1066,12 +1089,27 @@ export function calcularOpcionesSobrevivencia(
   }
   
   // Porcentajes
-  const porcentajes = calcularPorcentajesBeneficiarios(beneficiarios);
   const porcentajeTotal = porcentajes.reduce((sum, b) => sum + b.porcentaje, 0);
   const factorAjuste = porcentajeTotal > 1 ? 1 / porcentajeTotal : 1;
   
   // 1. RETIRO PROGRAMADO DE SOBREVIVENCIA
   const { cnuTotal: cnuRP } = calcularCNUSobrevivencia(beneficiarios, tasaRP);
+  
+  // Validar que el CNU sea válido
+  if (cnuRP <= 0) {
+    resultados.push({
+      nombre: 'Error en CNU',
+      pensionMensual: 0,
+      pensionEnUF: 0,
+      pensionAnual: 0,
+      cnu: 0,
+      tasaInteres: tasaRP,
+      expectativaVida: 0,
+      advertencias: ['⚠️ Error en el cálculo del CNU', 'Verifique los datos de los beneficiarios']
+    });
+    return resultados;
+  }
+  
   const pensionRP = fondosCausante / cnuRP;
   
   const pensionPorBenRP = porcentajes.map(b => ({
@@ -1086,6 +1124,8 @@ export function calcularOpcionesSobrevivencia(
   
   for (let año = 0; año <= 30; año++) {
     const { cnuTotal: cnuAnual } = calcularCNUSobrevivencia(beneficiarios, tasaRP);
+    if (cnuAnual <= 0) break;
+    
     const pensionAnual = saldoRP / cnuAnual * 12;
     
     proyeccionRP.push({
@@ -1108,7 +1148,7 @@ export function calcularOpcionesSobrevivencia(
     pensionAnual: pensionRP * 12,
     cnu: cnuRP,
     tasaInteres: tasaRP,
-    expectativaVida: calcularExpectativaVida(beneficiarios[0]?.edad || 60, beneficiarios[0]?.sexo || 'F'),
+    expectativaVida: calcularExpectativaVida(porcentajes[0]?.edad || 60, porcentajes[0]?.sexo || 'F'),
     pensionPorBeneficiario: pensionPorBenRP,
     pensionReferencia,
     proyeccion: proyeccionRP,
@@ -1117,6 +1157,21 @@ export function calcularOpcionesSobrevivencia(
   
   // 2. RENTA VITALICIA DE SOBREVIVENCIA
   const { cnuTotal: cnuRV } = calcularCNUSobrevivencia(beneficiarios, tasaRV);
+  
+  if (cnuRV <= 0) {
+    resultados.push({
+      nombre: 'Error en CNU RV',
+      pensionMensual: 0,
+      pensionEnUF: 0,
+      pensionAnual: 0,
+      cnu: 0,
+      tasaInteres: tasaRV,
+      expectativaVida: 0,
+      advertencias: ['⚠️ Error en el cálculo del CNU para RV']
+    });
+    return resultados;
+  }
+  
   const primaSeguro = fondosCausante * 0.03;
   const pensionRV = (fondosCausante - primaSeguro) / cnuRV;
   
@@ -1133,7 +1188,7 @@ export function calcularOpcionesSobrevivencia(
     pensionAnual: pensionRV * 12,
     cnu: cnuRV,
     tasaInteres: tasaRV,
-    expectativaVida: calcularExpectativaVida(beneficiarios[0]?.edad || 60, beneficiarios[0]?.sexo || 'F'),
+    expectativaVida: calcularExpectativaVida(porcentajes[0]?.edad || 60, porcentajes[0]?.sexo || 'F'),
     pensionPorBeneficiario: pensionPorBenRV,
     pensionReferencia,
     advertencias: ['Pensión fija de por vida', 'Distribución según Art. 58 DL 3500']
