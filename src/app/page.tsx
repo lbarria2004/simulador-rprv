@@ -464,14 +464,9 @@ export default function SimuladorPensiones() {
           }
         }
 
-        // Escenarios de RV para Invalidez (SOLO Inmediata y Garantizada - según normativa)
+        // Escenarios de RV para Invalidez (Inmediata, Garantizada, Aumento y Ambas - todas permitidas)
         for (const escenario of formData.escenariosRV) {
           let tipoAPI: string;
-          
-          // En Invalidez NO se permite RV con Aumento Temporal (normativa SUSESO/SPensiones)
-          if (escenario.tipo === 'aumento_temporal' || escenario.tipo === 'ambas') {
-            continue; // Saltar estos escenarios
-          }
           
           switch (escenario.tipo) {
             case 'inmediata':
@@ -479,6 +474,12 @@ export default function SimuladorPensiones() {
               break;
             case 'periodo_garantizado':
               tipoAPI = 'invalidez_rv_garantizado';
+              break;
+            case 'aumento_temporal':
+              tipoAPI = 'invalidez_rv_aumento';
+              break;
+            case 'ambas':
+              tipoAPI = 'invalidez_rv_ambas';
               break;
             default:
               continue;
@@ -494,6 +495,8 @@ export default function SimuladorPensiones() {
                 edad: formData.edad,
                 sexo: formData.sexo,
                 mesesGarantizados: escenario.mesesGarantizados,
+                mesesAumento: escenario.mesesAumento,
+                porcentajeAumento: escenario.porcentajeAumento,
                 beneficiarios: beneficiariosAPI,
                 tasaInteres: tasas.tasaRV
               }
@@ -557,9 +560,14 @@ export default function SimuladorPensiones() {
           }
         }
 
-        // Escenarios de RV para Sobrevivencia
+        // Escenarios de RV para Sobrevivencia (SOLO Inmediata y Garantizada - por normativa)
         for (const escenario of formData.escenariosRV) {
           let tipoAPI: string;
+          
+          // En Sobrevivencia NO se permite RV con Aumento Temporal (normativa)
+          if (escenario.tipo === 'aumento_temporal' || escenario.tipo === 'ambas') {
+            continue; // Saltar estos escenarios
+          }
           
           switch (escenario.tipo) {
             case 'inmediata':
@@ -567,12 +575,6 @@ export default function SimuladorPensiones() {
               break;
             case 'periodo_garantizado':
               tipoAPI = 'sobrevivencia_rv_garantizado';
-              break;
-            case 'aumento_temporal':
-              tipoAPI = 'sobrevivencia_rv_aumento';
-              break;
-            case 'ambas':
-              tipoAPI = 'sobrevivencia_rv_ambas';
               break;
             default:
               continue;
@@ -588,8 +590,6 @@ export default function SimuladorPensiones() {
                 edad: formData.edad,
                 sexo: formData.sexo,
                 mesesGarantizados: escenario.mesesGarantizados,
-                mesesAumento: escenario.mesesAumento,
-                porcentajeAumento: escenario.porcentajeAumento,
                 pensionReferenciaCausante: formData.pensionReferenciaCausante || undefined,
                 ingresoBaseCausante: formData.ingresoBaseCausante || undefined,
                 cubiertoSIS: formData.cubiertoSIS,
@@ -1474,8 +1474,8 @@ export default function SimuladorPensiones() {
                     <Shield className="h-3 w-3 mr-1 text-blue-500" />
                     Con Garantía
                   </Button>
-                  {/* Solo mostrar opciones de Aumento para Vejez y Sobrevivencia (NO para Invalidez por normativa) */}
-                  {formData.tipoPension !== 'invalidez' && (
+                  {/* Solo mostrar opciones de Aumento para Vejez e Invalidez (NO para Sobrevivencia por normativa) */}
+                  {formData.tipoPension !== 'sobrevivencia' && (
                     <>
                       <Button 
                         variant="outline" 
@@ -1498,9 +1498,9 @@ export default function SimuladorPensiones() {
                     </>
                   )}
                 </div>
-                {formData.tipoPension === 'invalidez' && (
+                {formData.tipoPension === 'sobrevivencia' && (
                   <p className="text-xs text-amber-600 mt-2">
-                    ⚠️ Por normativa, en Invalidez solo se permite RV Inmediata y con Garantía
+                    ⚠️ Por normativa, en Sobrevivencia solo se permite RV Inmediata y con Garantía
                   </p>
                 )}
               </CardContent>

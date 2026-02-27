@@ -9,6 +9,8 @@ import {
   calcularRetiroProgramadoInvalidez,
   calcularRVInmediataInvalidez,
   calcularRVPeriodoGarantizadoInvalidez,
+  calcularRVAumentoTemporalInvalidez,
+  calcularRVConAmbasClausulasInvalidez,
   calcularPensionSobrevivencia,
   calcularOpcionesSobrevivencia,
   calcularRVInmediataSobrevivencia,
@@ -131,6 +133,31 @@ export async function POST(request: NextRequest) {
           edad,
           sexo,
           datos.mesesGarantizados as MesesGarantizados,
+          datos.tasaInteres ?? TASAS_INTERES.RENTA_VITALICIA_INVALIDEZ,
+          beneficiarios
+        );
+        break;
+
+      case 'invalidez_rv_aumento':
+        resultado = calcularRVAumentoTemporalInvalidez(
+          fondos,
+          edad,
+          sexo,
+          datos.mesesAumento as MesesAumento,
+          datos.porcentajeAumento as number,
+          datos.tasaInteres ?? TASAS_INTERES.RENTA_VITALICIA_INVALIDEZ,
+          beneficiarios
+        );
+        break;
+
+      case 'invalidez_rv_ambas':
+        resultado = calcularRVConAmbasClausulasInvalidez(
+          fondos,
+          edad,
+          sexo,
+          datos.mesesGarantizados as MesesGarantizados,
+          datos.mesesAumento as MesesAumento,
+          datos.porcentajeAumento as number,
           datos.tasaInteres ?? TASAS_INTERES.RENTA_VITALICIA_INVALIDEZ,
           beneficiarios
         );
