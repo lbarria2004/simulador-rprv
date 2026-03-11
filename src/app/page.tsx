@@ -134,6 +134,8 @@ interface ParametrosSistema {
   incluirBAC: boolean
   mesesAdicionalesBAC: number
   afpSeleccionada: AFP
+  usarProyeccionUF: boolean
+  incrementoAnualUF: number
 }
 
 interface PensionPorBeneficiario {
@@ -237,7 +239,9 @@ export default function SimuladorPensiones() {
     incluirPGU: false,
     incluirBAC: false,
     mesesAdicionalesBAC: 0,
-    afpSeleccionada: 'HABITAT'
+    afpSeleccionada: 'HABITAT',
+    usarProyeccionUF: false,
+    incrementoAnualUF: 900
   })
 
   // Cargar UF automática al iniciar
@@ -849,7 +853,10 @@ export default function SimuladorPensiones() {
             tasaRV: parametros.tasaRV,
             incluirPGU: parametros.incluirPGU,
             incluirBAC: parametros.incluirBAC,
-            mesesAdicionalesBAC: parametros.mesesAdicionalesBAC
+            mesesAdicionalesBAC: parametros.mesesAdicionalesBAC,
+            afpSeleccionada: parametros.afpSeleccionada,
+            usarProyeccionUF: parametros.usarProyeccionUF,
+            incrementoAnualUF: parametros.incrementoAnualUF
           },
           resultados: resultados,
           beneficiarios: formData.beneficiarios,
@@ -1496,6 +1503,42 @@ export default function SimuladorPensiones() {
                   </Select>
                   <p className="text-[10px] text-muted-foreground">
                     Comisión {AFP_OPTIONS.find(a => a.value === parametros.afpSeleccionada)?.label}: {AFP_OPTIONS.find(a => a.value === parametros.afpSeleccionada)?.comision} sobre pensión bruta
+                  </p>
+                </div>
+
+                <Separator />
+
+                {/* Proyección de UF */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs font-medium">Proyección de UF Futura</Label>
+                    <Switch
+                      checked={parametros.usarProyeccionUF}
+                      onCheckedChange={(v) => setParametros(prev => ({ ...prev, usarProyeccionUF: v }))}
+                    />
+                  </div>
+                  {parametros.usarProyeccionUF && (
+                    <div className="space-y-2 p-2 bg-amber-50 rounded border border-amber-200">
+                      <div className="flex items-center gap-2">
+                        <Label className="text-[10px] text-amber-700">Incremento anual:</Label>
+                        <Input
+                          type="number"
+                          min={0}
+                          max={5000}
+                          step={100}
+                          value={parametros.incrementoAnualUF}
+                          onChange={(e) => setParametros(prev => ({ ...prev, incrementoAnualUF: parseInt(e.target.value) || 900 }))}
+                          className="h-7 w-20 text-xs"
+                        />
+                        <span className="text-xs text-amber-700">$/año</span>
+                      </div>
+                      <p className="text-[10px] text-amber-600">
+                        La UF futura se calculará: UF actual + (años del período × ${parametros.incrementoAnualUF})
+                      </p>
+                    </div>
+                  )}
+                  <p className="text-[10px] text-muted-foreground">
+                    Proyecta la pensión después del período aumentado con UF futura
                   </p>
                 </div>
               </CardContent>

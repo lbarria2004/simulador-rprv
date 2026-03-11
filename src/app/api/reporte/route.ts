@@ -20,6 +20,8 @@ interface ParametrosData {
   incluirBAC?: boolean;
   mesesAdicionalesBAC?: number;
   afpSeleccionada?: string;
+  usarProyeccionUF?: boolean;
+  incrementoAnualUF?: number;
 }
 
 // Constantes actualizadas
@@ -444,15 +446,41 @@ export async function POST(request: NextRequest) {
           const pensionBaseLiq = pensionBase - descSaludBase;
           const pensionBaseConPGU = pensionBaseLiq + 231732;
 
+          // Calcular UF proyectada si está activado
+          let ufFutura = parametros.uf;
+          let pensionBaseProyectada = pensionBase;
+          let pensionBaseProyectadaUF = pensionBaseUF;
+          let pensionBaseLiqProyectada = pensionBaseLiq;
+          let pensionBaseConPGUProyectada = pensionBaseConPGU;
+          
+          if (parametros.usarProyeccionUF && parametros.incrementoAnualUF) {
+            const anosAumento = mesesAumento / 12;
+            ufFutura = parametros.uf + (anosAumento * parametros.incrementoAnualUF);
+            pensionBaseProyectada = pensionBaseUF * ufFutura;
+            pensionBaseProyectadaUF = pensionBaseUF; // UF se mantiene igual
+            const descSaludProyectada = Math.round(pensionBaseProyectada * 0.07);
+            pensionBaseLiqProyectada = pensionBaseProyectada - descSaludProyectada;
+            pensionBaseConPGUProyectada = pensionBaseLiqProyectada + 231732;
+          }
+
           // Tabla con dos períodos
           const tablaRV = [
             ['Periodo', 'Pension (UF)', 'Bruto', '-7% Salud', 'Liquido', '+ PGU'],
             [`Primeros ${mesesAumento} meses`, `${pensionAumentadaUF} UF`, `$${formatNumber(pensionAumentada)}`, `-$${formatNumber(descSaludAum)}`, `$${formatNumber(pensionAumentadaLiq)}`, `$${formatNumber(pensionAumConPGU)}`],
-            [`Desde el mes ${mesesAumento + 1}`, `${pensionBaseUF} UF`, `$${formatNumber(pensionBase)}`, `-$${formatNumber(descSaludBase)}`, `$${formatNumber(pensionBaseLiq)}`, `$${formatNumber(pensionBaseConPGU)}`]
+            [`Desde el mes ${mesesAumento + 1}`, `${pensionBaseUF} UF`, `$${formatNumber(pensionBaseProyectada)}`, `-$${formatNumber(Math.round(pensionBaseProyectada * 0.07))}`, `$${formatNumber(pensionBaseLiqProyectada)}`, `$${formatNumber(pensionBaseConPGUProyectada)}`]
           ];
           const colWidthsRV = [110, 70, 75, 70, 75, 80];
           y = drawTable(page, tablaRV, 50, y, colWidthsRV, { regular: fontRegular, bold: fontBold });
-          y -= 8;
+          
+          // Nota de UF proyectada si está activado
+          if (parametros.usarProyeccionUF && parametros.incrementoAnualUF) {
+            drawText(page, `Valor UF proyectada: $${formatNumber(Math.round(ufFutura))} pesos`, 50, y, { 
+              size: 7, font: fontRegular, color: { r: 0.6, g: 0.4, b: 0.2 } 
+            });
+            y -= 10;
+          } else {
+            y -= 8;
+          }
         }
 
         y -= 5;
