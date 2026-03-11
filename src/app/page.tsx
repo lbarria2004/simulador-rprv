@@ -27,7 +27,9 @@ import {
   FileText,
   RefreshCw,
   Settings,
-  Gift
+  Gift,
+  Check,
+  X
 } from 'lucide-react'
 import {
   LineChart,
@@ -304,6 +306,11 @@ export default function SimuladorPensiones() {
     }))
   }, [])
 
+  // Estados para selección rápida combinada
+  const [periodosGarantizadosSeleccionados, setPeriodosGarantizadosSeleccionados] = useState<number[]>([])
+  const [periodosAumentoSeleccionados, setPeriodosAumentoSeleccionados] = useState<number[]>([])
+  const [porcentajeAumentoRapido, setPorcentajeAumentoRapido] = useState(100)
+
   // Funciones para selección rápida de períodos múltiples
   const agregarMultiplesPeriodosGarantizados = useCallback((meses: number[]) => {
     const nuevosEscenarios: EscenarioRV[] = meses.map((m, idx) => ({
@@ -331,6 +338,95 @@ export default function SimuladorPensiones() {
       ...prev,
       escenariosRV: [...prev.escenariosRV, ...nuevosEscenarios]
     }))
+  }, [])
+
+  // Toggle para selección de período garantizado
+  const togglePeriodoGarantizado = useCallback((meses: number) => {
+    setPeriodosGarantizadosSeleccionados(prev => 
+      prev.includes(meses) 
+        ? prev.filter(m => m !== meses)
+        : [...prev, meses]
+    )
+  }, [])
+
+  // Toggle para selección de período de aumento
+  const togglePeriodoAumento = useCallback((meses: number) => {
+    setPeriodosAumentoSeleccionados(prev => 
+      prev.includes(meses) 
+        ? prev.filter(m => m !== meses)
+        : [...prev, meses]
+    )
+  }, [])
+
+  // Agregar combinaciones seleccionadas (garantizado + aumento)
+  const agregarCombinacionesSeleccionadas = useCallback(() => {
+    const nuevosEscenarios: EscenarioRV[] = []
+    let contador = 0
+
+    // Si hay ambos tipos de períodos seleccionados, crear combinaciones
+    if (periodosGarantizadosSeleccionados.length > 0 && periodosAumentoSeleccionados.length > 0) {
+      for (const pg of periodosGarantizadosSeleccionados) {
+        for (const pa of periodosAumentoSeleccionados) {
+          nuevosEscenarios.push({
+            id: (Date.now() + contador++).toString(),
+            tipo: 'ambas',
+            mesesGarantizados: pg,
+            mesesAumento: pa,
+            porcentajeAumento: porcentajeAumentoRapido
+          })
+        }
+      }
+    }
+    // Si solo hay períodos garantizados
+    else if (periodosGarantizadosSeleccionados.length > 0) {
+      for (const pg of periodosGarantizadosSeleccionados) {
+        nuevosEscenarios.push({
+          id: (Date.now() + contador++).toString(),
+          tipo: 'periodo_garantizado',
+          mesesGarantizados: pg,
+          mesesAumento: 36,
+          porcentajeAumento: porcentajeAumentoRapido
+        })
+      }
+    }
+    // Si solo hay períodos de aumento
+    else if (periodosAumentoSeleccionados.length > 0) {
+      for (const pa of periodosAumentoSeleccionados) {
+        nuevosEscenarios.push({
+          id: (Date.now() + contador++).toString(),
+          tipo: 'aumento_temporal',
+          mesesGarantizados: 120,
+          mesesAumento: pa,
+          porcentajeAumento: porcentajeAumentoRapido
+        })
+      }
+    }
+
+    if (nuevosEscenarios.length > 0) {
+      setFormData(prev => ({
+        ...prev,
+        escenariosRV: [...prev.escenariosRV, ...nuevosEscenarios]
+      }))
+      // Limpiar selecciones
+      setPeriodosGarantizadosSeleccionados([])
+      setPeriodosAumentoSeleccionados([])
+    }
+  }, [periodosGarantizadosSeleccionados, periodosAumentoSeleccionados, porcentajeAumentoRapido])
+
+  // Seleccionar todos los períodos garantizados
+  const seleccionarTodosGarantizados = useCallback(() => {
+    setPeriodosGarantizadosSeleccionados([...PERIODOS_GARANTIZADOS_RAPIDOS])
+  }, [])
+
+  // Seleccionar todos los períodos de aumento
+  const seleccionarTodosAumento = useCallback(() => {
+    setPeriodosAumentoSeleccionados([...PERIODOS_AUMENTO_RAPIDOS])
+  }, [])
+
+  // Limpiar selecciones
+  const limpiarSelecciones = useCallback(() => {
+    setPeriodosGarantizadosSeleccionados([])
+    setPeriodosAumentoSeleccionados([])
   }, [])
 
   // Handlers para beneficiarios
@@ -1725,47 +1821,159 @@ export default function SimuladorPensiones() {
 
                 <Separator />
 
-                {/* Grillas de selección rápida */}
-                <div className="space-y-3">
-                  {/* Períodos Garantizados */}
-                  <div className="space-y-1">
-                    <Label className="text-xs font-medium text-blue-700">Períodos Garantizados (selección múltiple)</Label>
-                    <div className="flex gap-1 flex-wrap">
-                      {[120, 180, 240].map(meses => (
-                        <Button
-                          key={meses}
-                          variant="outline"
-                          size="sm"
-                          onClick={() => agregarEscenarioRV('periodo_garantizado')}
-                          className="h-7 text-xs"
-                        >
-                          {Math.floor(meses/12)} años
-                        </Button>
-                      ))}
+                {/* Grillas de selección rápida combinada */}
+                <div className="space-y-3 p-3 bg-slate-50 rounded-lg border">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs font-medium text-slate-700">Selección Rápida Combinada</Label>
+                    <div className="flex gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={limpiarSelecciones}
+                        className="h-6 px-2 text-xs text-slate-500"
+                      >
+                        <X className="h-3 w-3 mr-1" />
+                        Limpiar
+                      </Button>
                     </div>
-                    <p className="text-[10px] text-muted-foreground">Click para agregar RV con período garantizado</p>
+                  </div>
+
+                  {/* Períodos Garantizados */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs font-medium text-blue-700">Períodos Garantizados</Label>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={seleccionarTodosGarantizados}
+                        className="h-6 px-2 text-xs text-blue-600"
+                      >
+                        <Check className="h-3 w-3 mr-1" />
+                        Todos
+                      </Button>
+                    </div>
+                    <div className="flex gap-1 flex-wrap">
+                      {PERIODOS_GARANTIZADOS_RAPIDOS.map(meses => {
+                        const isSelected = periodosGarantizadosSeleccionados.includes(meses)
+                        return (
+                          <Button
+                            key={meses}
+                            variant={isSelected ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => togglePeriodoGarantizado(meses)}
+                            className={`h-8 text-xs ${isSelected ? 'bg-blue-600 hover:bg-blue-700' : 'border-blue-300 text-blue-700'}`}
+                          >
+                            {isSelected && <Check className="h-3 w-3 mr-1" />}
+                            {Math.floor(meses/12)} años
+                          </Button>
+                        )
+                      })}
+                    </div>
+                    <p className="text-[10px] text-muted-foreground">
+                      Seleccionados: {periodosGarantizadosSeleccionados.length} de {PERIODOS_GARANTIZADOS_RAPIDOS.length}
+                    </p>
                   </div>
 
                   {/* Períodos de Aumento - Solo para Vejez e Invalidez */}
                   {formData.tipoPension !== 'sobrevivencia' && (
-                    <div className="space-y-1">
-                      <Label className="text-xs font-medium text-green-700">Períodos de Aumento Temporal (selección múltiple)</Label>
-                      <div className="flex gap-1 flex-wrap">
-                        {[12, 24, 36, 48, 60].map(meses => (
-                          <Button
-                            key={meses}
-                            variant="outline"
-                            size="sm"
-                            onClick={() => agregarEscenarioRV('aumento_temporal')}
-                            className="h-7 text-xs"
-                          >
-                            {Math.floor(meses/12)} {meses < 12 ? 'mes' : meses === 12 ? 'año' : 'años'}
-                          </Button>
-                        ))}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs font-medium text-green-700">Períodos de Aumento Temporal</Label>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={seleccionarTodosAumento}
+                          className="h-6 px-2 text-xs text-green-600"
+                        >
+                          <Check className="h-3 w-3 mr-1" />
+                          Todos
+                        </Button>
                       </div>
-                      <p className="text-[10px] text-muted-foreground">Click para agregar RV con aumento temporal</p>
+                      <div className="flex gap-1 flex-wrap">
+                        {PERIODOS_AUMENTO_RAPIDOS.map(meses => {
+                          const isSelected = periodosAumentoSeleccionados.includes(meses)
+                          return (
+                            <Button
+                              key={meses}
+                              variant={isSelected ? "default" : "outline"}
+                              size="sm"
+                              onClick={() => togglePeriodoAumento(meses)}
+                              className={`h-8 text-xs ${isSelected ? 'bg-green-600 hover:bg-green-700' : 'border-green-300 text-green-700'}`}
+                            >
+                              {isSelected && <Check className="h-3 w-3 mr-1" />}
+                              {Math.floor(meses/12)} {meses < 12 ? 'mes' : meses === 12 ? 'año' : 'años'}
+                            </Button>
+                          )
+                        })}
+                      </div>
+                      <p className="text-[10px] text-muted-foreground">
+                        Seleccionados: {periodosAumentoSeleccionados.length} de {PERIODOS_AUMENTO_RAPIDOS.length}
+                      </p>
                     </div>
                   )}
+
+                  {/* Porcentaje de Aumento */}
+                  {formData.tipoPension !== 'sobrevivencia' && (
+                    <div className="space-y-1">
+                      <Label className="text-xs font-medium text-amber-700">Porcentaje de Aumento</Label>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="number"
+                          min={1}
+                          max={100}
+                          step={5}
+                          value={porcentajeAumentoRapido}
+                          onChange={(e) => setPorcentajeAumentoRapido(parseFloat(e.target.value) || 100)}
+                          className="h-8 w-20 text-sm"
+                        />
+                        <span className="text-sm text-muted-foreground">%</span>
+                      </div>
+                      <p className="text-[10px] text-muted-foreground">
+                        Porcentaje de aumento aplicado durante el período
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Resumen de combinaciones */}
+                  {(() => {
+                    const pgCount = periodosGarantizadosSeleccionados.length
+                    const paCount = periodosAumentoSeleccionados.length
+                    let combinaciones = 0
+                    let descripcion = ''
+                    
+                    if (pgCount > 0 && paCount > 0) {
+                      combinaciones = pgCount * paCount
+                      descripcion = `${pgCount} garantizado × ${paCount} aumento = ${combinaciones} combinaciones (RV con Ambas Cláusulas)`
+                    } else if (pgCount > 0) {
+                      combinaciones = pgCount
+                      descripcion = `${pgCount} RV con Período Garantizado`
+                    } else if (paCount > 0) {
+                      combinaciones = paCount
+                      descripcion = `${paCount} RV con Aumento Temporal`
+                    }
+                    
+                    return combinaciones > 0 ? (
+                      <div className="p-2 bg-purple-50 rounded border border-purple-200">
+                        <div className="text-xs font-medium text-purple-800">
+                          Se agregarán {combinaciones} escenario(s):
+                        </div>
+                        <div className="text-[10px] text-purple-600 mt-1">
+                          {descripcion}
+                        </div>
+                      </div>
+                    ) : null
+                  })()}
+
+                  {/* Botón para agregar combinaciones */}
+                  <Button
+                    onClick={agregarCombinacionesSeleccionadas}
+                    disabled={periodosGarantizadosSeleccionados.length === 0 && periodosAumentoSeleccionados.length === 0}
+                    className="w-full h-9"
+                    size="sm"
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Agregar Selecciones ({periodosGarantizadosSeleccionados.length + periodosAumentoSeleccionados.length} tipos)
+                  </Button>
                 </div>
 
                 <Separator />
