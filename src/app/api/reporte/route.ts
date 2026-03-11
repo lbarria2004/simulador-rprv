@@ -344,11 +344,8 @@ export async function POST(request: NextRequest) {
         }
         
         const meses = rv.periodoGarantizado || 0;
-        const anos = Math.floor(meses / 12);
-        const mesesRestantes = meses % 12;
-        const garantiaTxt = mesesRestantes > 0 ? `${anos}a ${mesesRestantes}m` : `${anos} anos`;
         
-        drawText(page, `${numSeccion}. RV con Garantia ${garantiaTxt} (${meses} meses)`, 50, y, { 
+        drawText(page, `${numSeccion}. RV con Garantia ${meses} Meses`, 50, y, { 
           size: 11, 
           font: fontBold, 
           color: { r: 0.122, g: 0.306, b: 0.475 } 
@@ -367,7 +364,7 @@ export async function POST(request: NextRequest) {
 
         const rvgData = [
           ['Modalidad', 'Tasa (%)', 'Pension (UF)', 'Pension M. Bruto', 'Dscto. 7% Salud', 'Pension Liquida'],
-          [`RV GARANTIZADA ${garantiaTxt}`, `${tasa}%`, `${pensionUF} UF`, `$${formatNumber(pensionBruto)}`, `-$${formatNumber(descuentoSalud)}`, `$${formatNumber(pensionLiquida)}`],
+          [`RV GARANTIA ${meses} MESES`, `${tasa}%`, `${pensionUF} UF`, `$${formatNumber(pensionBruto)}`, `-$${formatNumber(descuentoSalud)}`, `$${formatNumber(pensionLiquida)}`],
           ['Pension + PGU ($231.732)', '', '', '', '', `$${formatNumber(pensionConPGU)}`]
         ];
         const colWidths = [120, 55, 70, 85, 75, 85];
@@ -376,75 +373,101 @@ export async function POST(request: NextRequest) {
         numSeccion++;
       }
 
-      // 4. RV con Aumento Temporal (con o sin garantía)
+      // 4. RV con Aumento Temporal - AGRUPADOS POR PERÍODO DE AUMENTO
+      // Primero, agrupar por meses de aumento
+      const rvAumentoPorMeses: Record<number, ResultadoData[]> = {};
       for (const rv of rvConAumento) {
+        const mesesAumento = rv.aumentoTemporal?.meses || 0;
+        if (!rvAumentoPorMeses[mesesAumento]) {
+          rvAumentoPorMeses[mesesAumento] = [];
+        }
+        rvAumentoPorMeses[mesesAumento].push(rv);
+      }
+
+      // Ordenar cada grupo: primero sin garantía, luego por meses de garantía ascendente
+      for (const mesesAumento of Object.keys(rvAumentoPorMeses).map(Number).sort((a, b) => a - b)) {
+        const rvGrupo = rvAumentoPorMeses[mesesAumento];
+        
+        // Ordenar: sin garantía primero, luego por meses de garantía
+        rvGrupo.sort((a, b) => {
+          const ga = a.periodoGarantizado || 0;
+          const gb = b.periodoGarantizado || 0;
+          return ga - gb;
+        });
+
         // Verificar si necesitamos nueva página
-        if (y < 150) {
+        if (y < 200) {
           nuevaPagina();
         }
-        
-        const mesesAumento = rv.aumentoTemporal?.meses || 0;
-        const anosAumento = Math.floor(mesesAumento / 12);
-        const mesesRestantesAumento = mesesAumento % 12;
-        const aumentoTxt = mesesRestantesAumento > 0 ? `${anosAumento}a ${mesesRestantesAumento}m` : `${anosAumento} anos`;
-        
-        const tieneGarantia = rv.periodoGarantizado && rv.periodoGarantizado > 0;
-        const mesesGarantia = rv.periodoGarantizado || 0;
-        const anosGarantia = Math.floor(mesesGarantia / 12);
-        const garantiaTxt = tieneGarantia ? ` + Garantia ${anosGarantia} anos` : '';
-        
-        const porcentajeAumento = rv.aumentoTemporal?.porcentaje || 0;
-        const porcentajeTxt = porcentajeAumento > 1 ? porcentajeAumento : porcentajeAumento * 100;
-        
-        // Título del escenario
-        drawText(page, `${numSeccion}. RV CON AUMENTO TEMPORAL`, 50, y, { 
+
+        // Título del grupo
+        drawText(page, `${numSeccion}. RV AUMENTADA ${mesesAumento} MESES`, 50, y, { 
           size: 11, 
           font: fontBold, 
           color: { r: 0.122, g: 0.306, b: 0.475 } 
         });
-        y -= 14;
-        drawText(page, `Aumento ${porcentajeTxt}% por ${aumentoTxt}${garantiaTxt}`, 50, y, { size: 9, font: fontRegular });
         y -= 18;
 
-        // Cálculos
-        const pensionAumentada = rv.pensionMensual;
-        const pensionAumentadaUF = rv.pensionEnUF.toFixed(2);
-        const descSaludAum = Math.round(pensionAumentada * 0.07);
-        const pensionAumentadaLiq = pensionAumentada - descSaludAum;
-        const pensionAumConPGU = pensionAumentadaLiq + 231732;
+        // Tabla consolidada para todas las variantes de este período de aumento
+        const tablaGrupo: string[][] = [
+          ['Modalidad', 'Pension (UF)', 'Bruto', '-7% Salud', 'Liquido', '+ PGU']
+        ];
 
-        const pensionBase = rv.aumentoTemporal?.pensionFinal || pensionAumentada;
+        // Procesar cada RV del grupo (sin garantía primero, luego con garantías)
+        for (const rv of rvGrupo) {
+          const tieneGarantia = rv.periodoGarantizado && rv.periodoGarantizado > 0;
+          const mesesGarantia = rv.periodoGarantizado || 0;
+          
+          // Nombre de la modalidad
+          let modalidad = '';
+          if (!tieneGarantia) {
+            modalidad = 'Simple (sin garantia)';
+          } else {
+            modalidad = `Garantia ${mesesGarantia} meses`;
+          }
+
+          // Cálculos
+          const pensionAumentada = rv.pensionMensual;
+          const pensionAumentadaUF = rv.pensionEnUF.toFixed(2);
+          const descSaludAum = Math.round(pensionAumentada * 0.07);
+          const pensionAumentadaLiq = pensionAumentada - descSaludAum;
+          const pensionAumConPGU = pensionAumentadaLiq + 231732;
+
+          tablaGrupo.push([
+            modalidad,
+            `${pensionAumentadaUF} UF`,
+            `$${formatNumber(pensionAumentada)}`,
+            `-$${formatNumber(descSaludAum)}`,
+            `$${formatNumber(pensionAumentadaLiq)}`,
+            `$${formatNumber(pensionAumConPGU)}`
+          ]);
+        }
+
+        // Dibujar tabla del grupo
+        const colWidthsGrupo = [120, 65, 70, 70, 70, 80];
+        y = drawTable(page, tablaGrupo, 50, y, colWidthsGrupo, { regular: fontRegular, bold: fontBold });
+
+        // Información adicional del grupo
+        const porcentajeAumento = rvGrupo[0].aumentoTemporal?.porcentaje || 0;
+        const porcentajeTxt = porcentajeAumento > 1 ? porcentajeAumento : porcentajeAumento * 100;
+        
+        drawText(page, `Aumento del ${porcentajeTxt}% durante ${mesesAumento} meses`, 50, y, { 
+          size: 8, font: fontRegular, color: { r: 0.4, g: 0.4, b: 0.4 } 
+        });
+        y -= 12;
+
+        // Pensión después del período de aumento
+        const pensionBase = rvGrupo[0].aumentoTemporal?.pensionFinal || rvGrupo[0].pensionMensual;
         const pensionBaseUF = (pensionBase / parametros.uf).toFixed(2);
         const descSaludBase = Math.round(pensionBase * 0.07);
         const pensionBaseLiq = pensionBase - descSaludBase;
         const pensionBaseConPGU = pensionBaseLiq + 231732;
 
-        // TABLA CONSOLIDADA: Ambos períodos en una sola tabla con PGU integrada
-        const tablaConsolidada = [
-          ['Periodo', 'Pension (UF)', 'Bruto', '-7% Salud', 'Liquido', '+ PGU'],
-          [`DURANTE ${aumentoTxt.toUpperCase()}`, `${pensionAumentadaUF} UF`, `$${formatNumber(pensionAumentada)}`, `-$${formatNumber(descSaludAum)}`, `$${formatNumber(pensionAumentadaLiq)}`, `$${formatNumber(pensionAumConPGU)}`],
-          [`DESPUES (${aumentoTxt})`, `${pensionBaseUF} UF`, `$${formatNumber(pensionBase)}`, `-$${formatNumber(descSaludBase)}`, `$${formatNumber(pensionBaseLiq)}`, `$${formatNumber(pensionBaseConPGU)}`]
-        ];
-        const colWidthsCons = [95, 65, 75, 70, 75, 80];
-        y = drawTable(page, tablaConsolidada, 50, y, colWidthsCons, { regular: fontRegular, bold: fontBold });
-
-        // Diferencia entre períodos
-        const diferencia = pensionAumentadaLiq - pensionBaseLiq;
-        const porcentajeDif = ((diferencia / pensionBaseLiq) * 100).toFixed(1);
-        drawText(page, `Diferencia: $${formatNumber(diferencia)}/menos (${porcentajeDif}% menos despues del aumento)`, 50, y, { 
-          size: 8, 
-          font: fontRegular, 
-          color: { r: 0.5, g: 0.5, b: 0.5 } 
+        drawText(page, `Pension DESPUES de ${mesesAumento} meses: ${pensionBaseUF} UF | Liquido: $${formatNumber(pensionBaseLiq)} | + PGU: $${formatNumber(pensionBaseConPGU)}`, 50, y, { 
+          size: 8, font: fontRegular, color: { r: 0.5, g: 0.5, b: 0.5 } 
         });
         y -= 15;
-        
-        if (tieneGarantia) {
-          drawText(page, `Garantia: ${anosGarantia} anos - Si fallece, beneficiarios reciben el 100%`, 50, y, { 
-            size: 8, font: fontRegular, color: { r: 0.3, g: 0.3, b: 0.3 } 
-          });
-          y -= 12;
-        }
-        
+
         numSeccion++;
       }
     }
