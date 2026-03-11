@@ -46,6 +46,33 @@ type TipoPension = 'vejez' | 'invalidez' | 'sobrevivencia'
 
 type TipoBeneficiario = 'conyuge' | 'conviviente' | 'hijo' | 'padre' | 'madre'
 
+type AFP = 'PLANVITAL' | 'HABITAT' | 'CAPITAL' | 'CUPRUM' | 'MODELO' | 'PROVIDA' | 'UNO'
+
+// Comisiones por AFP (porcentaje sobre pensión bruta)
+const COMISIONES_AFP: Record<AFP, number> = {
+  PLANVITAL: 0.0000,  // 0,00%
+  HABITAT: 0.0095,    // 0,95%
+  CAPITAL: 0.0125,    // 1,25%
+  CUPRUM: 0.0125,     // 1,25%
+  MODELO: 0.0120,     // 1,20%
+  PROVIDA: 0.0125,    // 1,25%
+  UNO: 0.0120         // 1,20%
+}
+
+const AFP_OPTIONS: { value: AFP; label: string; comision: string }[] = [
+  { value: 'PLANVITAL', label: 'PlanVital', comision: '0,00%' },
+  { value: 'HABITAT', label: 'Habitat', comision: '0,95%' },
+  { value: 'CAPITAL', label: 'Capital', comision: '1,25%' },
+  { value: 'CUPRUM', label: 'Cuprum', comision: '1,25%' },
+  { value: 'MODELO', label: 'Modelo', comision: '1,20%' },
+  { value: 'PROVIDA', label: 'Provida', comision: '1,25%' },
+  { value: 'UNO', label: 'Uno', comision: '1,20%' }
+]
+
+// Opciones para selección rápida de períodos
+const PERIODOS_GARANTIZADOS_RAPIDOS = [120, 180, 240]  // 10, 15, 20 años
+const PERIODOS_AUMENTO_RAPIDOS = [12, 24, 36, 48, 60]  // 1, 2, 3, 4, 5 años
+
 interface Beneficiario {
   id: string
   tipo: TipoBeneficiario
@@ -104,6 +131,7 @@ interface ParametrosSistema {
   incluirPGU: boolean
   incluirBAC: boolean
   mesesAdicionalesBAC: number
+  afpSeleccionada: AFP
 }
 
 interface PensionPorBeneficiario {
@@ -206,7 +234,8 @@ export default function SimuladorPensiones() {
     ufManual: 38500,
     incluirPGU: false,
     incluirBAC: false,
-    mesesAdicionalesBAC: 0
+    mesesAdicionalesBAC: 0,
+    afpSeleccionada: 'HABITAT'
   })
 
   // Cargar UF automática al iniciar
@@ -272,6 +301,35 @@ export default function SimuladorPensiones() {
       escenariosRV: prev.escenariosRV.map(e => 
         e.id === id ? { ...e, [field]: value } : e
       )
+    }))
+  }, [])
+
+  // Funciones para selección rápida de períodos múltiples
+  const agregarMultiplesPeriodosGarantizados = useCallback((meses: number[]) => {
+    const nuevosEscenarios: EscenarioRV[] = meses.map((m, idx) => ({
+      id: (Date.now() + idx).toString(),
+      tipo: 'periodo_garantizado' as const,
+      mesesGarantizados: m,
+      mesesAumento: 36,
+      porcentajeAumento: 30
+    }))
+    setFormData(prev => ({
+      ...prev,
+      escenariosRV: [...prev.escenariosRV, ...nuevosEscenarios]
+    }))
+  }, [])
+
+  const agregarMultiplesPeriodosAumento = useCallback((meses: number[]) => {
+    const nuevosEscenarios: EscenarioRV[] = meses.map((m, idx) => ({
+      id: (Date.now() + idx).toString(),
+      tipo: 'aumento_temporal' as const,
+      mesesGarantizados: 120,
+      mesesAumento: m,
+      porcentajeAumento: 30
+    }))
+    setFormData(prev => ({
+      ...prev,
+      escenariosRV: [...prev.escenariosRV, ...nuevosEscenarios]
     }))
   }, [])
 
@@ -1316,6 +1374,31 @@ export default function SimuladorPensiones() {
                     </div>
                   )}
                 </div>
+
+                <Separator />
+
+                {/* Selector de AFP */}
+                <div className="space-y-2">
+                  <Label className="text-xs font-medium">AFP para Retiro Programado</Label>
+                  <Select
+                    value={parametros.afpSeleccionada}
+                    onValueChange={(v: AFP) => setParametros(prev => ({ ...prev, afpSeleccionada: v }))}
+                  >
+                    <SelectTrigger className="h-8">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {AFP_OPTIONS.map(afp => (
+                        <SelectItem key={afp.value} value={afp.value}>
+                          {afp.label} (Comisión: {afp.comision})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-[10px] text-muted-foreground">
+                    Comisión {AFP_OPTIONS.find(a => a.value === parametros.afpSeleccionada)?.label}: {AFP_OPTIONS.find(a => a.value === parametros.afpSeleccionada)?.comision} sobre pensión bruta
+                  </p>
+                </div>
               </CardContent>
             </Card>
 
@@ -1639,6 +1722,51 @@ export default function SimuladorPensiones() {
                     {formData.escenariosRV.map((escenario, idx) => renderEscenarioRV(escenario, idx))}
                   </div>
                 )}
+
+                <Separator />
+
+                {/* Grillas de selección rápida */}
+                <div className="space-y-3">
+                  {/* Períodos Garantizados */}
+                  <div className="space-y-1">
+                    <Label className="text-xs font-medium text-blue-700">Períodos Garantizados (selección múltiple)</Label>
+                    <div className="flex gap-1 flex-wrap">
+                      {[120, 180, 240].map(meses => (
+                        <Button
+                          key={meses}
+                          variant="outline"
+                          size="sm"
+                          onClick={() => agregarEscenarioRV('periodo_garantizado')}
+                          className="h-7 text-xs"
+                        >
+                          {Math.floor(meses/12)} años
+                        </Button>
+                      ))}
+                    </div>
+                    <p className="text-[10px] text-muted-foreground">Click para agregar RV con período garantizado</p>
+                  </div>
+
+                  {/* Períodos de Aumento - Solo para Vejez e Invalidez */}
+                  {formData.tipoPension !== 'sobrevivencia' && (
+                    <div className="space-y-1">
+                      <Label className="text-xs font-medium text-green-700">Períodos de Aumento Temporal (selección múltiple)</Label>
+                      <div className="flex gap-1 flex-wrap">
+                        {[12, 24, 36, 48, 60].map(meses => (
+                          <Button
+                            key={meses}
+                            variant="outline"
+                            size="sm"
+                            onClick={() => agregarEscenarioRV('aumento_temporal')}
+                            className="h-7 text-xs"
+                          >
+                            {Math.floor(meses/12)} {meses < 12 ? 'mes' : meses === 12 ? 'año' : 'años'}
+                          </Button>
+                        ))}
+                      </div>
+                      <p className="text-[10px] text-muted-foreground">Click para agregar RV con aumento temporal</p>
+                    </div>
+                  )}
+                </div>
 
                 <Separator />
 

@@ -19,6 +19,7 @@ interface ParametrosData {
   incluirPGU?: boolean;
   incluirBAC?: boolean;
   mesesAdicionalesBAC?: number;
+  afpSeleccionada?: string;
 }
 
 // Constantes actualizadas
@@ -26,6 +27,27 @@ const PGU_MONTO = 231732;  // Actualizado enero 2025
 const PGU_TOPE = 1054000;  // Tope de ingreso para PGU
 const BAC_UF_POR_ANO = 0.1; // 0,1 UF por año cotizado
 const BAC_TOPE_UF = 2.5;    // Tope máximo de 2,5 UF
+
+// Comisiones por AFP (porcentaje sobre pensión bruta)
+const COMISIONES_AFP: Record<string, number> = {
+  PLANVITAL: 0.0000,  // 0,00%
+  HABITAT: 0.0095,    // 0,95%
+  CAPITAL: 0.0125,    // 1,25%
+  CUPRUM: 0.0125,     // 1,25%
+  MODELO: 0.0120,     // 1,20%
+  PROVIDA: 0.0125,    // 1,25%
+  UNO: 0.0120         // 1,20%
+}
+
+const AFP_LABELS: Record<string, string> = {
+  PLANVITAL: 'AFP PlanVital (0,00%)',
+  HABITAT: 'AFP Habitat (0,95%)',
+  CAPITAL: 'AFP Capital (1,25%)',
+  CUPRUM: 'AFP Cuprum (1,25%)',
+  MODELO: 'AFP Modelo (1,20%)',
+  PROVIDA: 'AFP Provida (1,25%)',
+  UNO: 'AFP Uno (1,20%)'
+}
 
 interface AumentoTemporal {
   meses: number;
@@ -251,6 +273,12 @@ export async function POST(request: NextRequest) {
       // Número de sección dinámico
       let numSeccion = 1;
 
+      // Obtener comisión AFP seleccionada
+      const afpSeleccionada = parametros.afpSeleccionada || 'HABITAT';
+      const comisionAFP = COMISIONES_AFP[afpSeleccionada] ?? 0.0095;
+      const comisionAFPPct = (comisionAFP * 100).toFixed(2).replace('.', ',');
+      const afpLabel = AFP_LABELS[afpSeleccionada] || 'AFP Habitat (0,95%)';
+
       // 1. Retiro Programado
       if (retiroProgramado) {
         drawText(page, `${numSeccion}. Retiro Programado`, 50, y, { 
@@ -259,17 +287,17 @@ export async function POST(request: NextRequest) {
           color: { r: 0.122, g: 0.306, b: 0.475 } 
         });
         y -= 15;
-        drawText(page, '(AFP HABITAT - 0.95%)', 50, y, { size: 9, font: fontRegular });
+        drawText(page, `(${afpLabel})`, 50, y, { size: 9, font: fontRegular });
         y -= 20;
 
         const pensionBruto = retiroProgramado.pensionMensual;
         const pensionUF = retiroProgramado.pensionEnUF.toFixed(2);
-        const descuentoAFP = Math.round(pensionBruto * 0.0095);
+        const descuentoAFP = Math.round(pensionBruto * comisionAFP);
         const descuentoSalud = Math.round(pensionBruto * 0.07);
         const pensionLiquida = pensionBruto - descuentoAFP - descuentoSalud;
 
         const rpData = [
-          ['Modalidad', 'Pension (UF)', 'Pension M. Bruto', 'Desc. 0.95%', 'Dscto. 7% Salud', 'Pension Liquida'],
+          ['Modalidad', 'Pension (UF)', 'Pension M. Bruto', `Desc. ${comisionAFPPct}%`, 'Dscto. 7% Salud', 'Pension Liquida'],
           ['RETIRO PROGRAMADO', `${pensionUF} UF`, `$${formatNumber(pensionBruto)}`, `-$${formatNumber(descuentoAFP)}`, `-$${formatNumber(descuentoSalud)}`, `$${formatNumber(pensionLiquida)}`]
         ];
         const colWidths = [110, 70, 90, 70, 80, 85];
@@ -448,17 +476,17 @@ export async function POST(request: NextRequest) {
           color: { r: 0.122, g: 0.306, b: 0.475 } 
         });
         y -= 15;
-        drawText(page, '(Usa tabla de mortalidad de invalidos I-H/I-M-2020)', 50, y, { size: 9, font: fontRegular });
+        drawText(page, `(${afpLabel} - Tabla de mortalidad de invalidos I-H/I-M-2020)`, 50, y, { size: 9, font: fontRegular });
         y -= 20;
 
         const pensionBruto = retiroProgramado.pensionMensual;
         const pensionUF = retiroProgramado.pensionEnUF.toFixed(2);
-        const descuentoAFP = Math.round(pensionBruto * 0.0095);
+        const descuentoAFP = Math.round(pensionBruto * comisionAFP);
         const descuentoSalud = Math.round(pensionBruto * 0.07);
         const pensionLiquida = pensionBruto - descuentoAFP - descuentoSalud;
 
         const rpData = [
-          ['Modalidad', 'Pension (UF)', 'Pension M. Bruto', 'Desc. 0.95%', 'Dscto. 7% Salud', 'Pension Liquida'],
+          ['Modalidad', 'Pension (UF)', 'Pension M. Bruto', `Desc. ${comisionAFPPct}%`, 'Dscto. 7% Salud', 'Pension Liquida'],
           ['RP INVALIDEZ', `${pensionUF} UF`, `$${formatNumber(pensionBruto)}`, `-$${formatNumber(descuentoAFP)}`, `-$${formatNumber(descuentoSalud)}`, `$${formatNumber(pensionLiquida)}`]
         ];
         const colWidths = [110, 70, 90, 70, 80, 85];
