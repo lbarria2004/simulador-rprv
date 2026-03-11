@@ -1,0 +1,90 @@
+{
+  "Media Mercado": {
+    "vejez": 2.79,
+    "vejez_anticipada": 2.82,
+    "invalidez_total": 2.96,
+    "invalidez_parcial": 2.6,
+    "sobrevivencia": 2.88,
+    "media": 2.82
+  },
+  "4LIFE": {
+    "vejez": 2.98,
+    "vejez_anticipada": 3.03,
+    "invalidez_total": 3.03,
+    "invalidez_parcial": 0.0,
+    "sobrevivencia": 3.01,
+    "media": 2.98
+  },
+  "AUGUSTAR": {
+    "vejez": 2.99,
+    "vejez_anticipada": 2.96,
+    "invalidez_total": 0.0,
+    "invalidez_parcial": 0.0,
+    "sobrevivencia": 3.09,
+    "media": 2.99
+  },
+  "BICE": {
+    "vejez": 2.56,
+    "vejez_anticipada": 2.73,
+    "invalidez_total": 2.78,
+    "invalidez_parcial": 2.65,
+    "sobrevivencia": 2.56,
+    "media": 2.62
+  },
+  "CN LIFE": {
+    "vejez": 2.87,
+    "vejez_anticipada": 2.87,
+    "invalidez_total": 3.04,
+    "invalidez_parcial": 0.0,
+    "sobrevivencia": 3.09,
+    "media": 2.96
+  },
+  "CONFUTURO": {
+    "vejez": 2.91,
+    "vejez_anticipada": 2.85,
+    "invalidez_total": 2.98,
+    "invalidez_parcial": 2.46,
+    "sobrevivencia": 2.93,
+    "media": 2.91
+  },
+  "CONSORCIO NACIONAL": {
+    "vejez": 2.64,
+    "vejez_anticipada": 2.77,
+    "invalidez_total": 3.09,
+    "invalidez_parcial": 2.5,
+    "sobrevivencia": 2.95,
+    "media": 2.77
+  },
+  "EUROAMERICA": {
+    "vejez": 2.92,
+    "vejez_anticipada": 3.0,
+    "invalidez_total": 2.96,
+    "invalidez_parcial": 0.0,
+    "sobrevivencia": 2.82,
+    "media": 2.93
+  },
+  "METLIFE": {
+    "vejez": 2.62,
+    "vejez_anticipada": 2.72,
+    "invalidez_total": 2.96,
+    "invalidez_parcial": 2.05,
+    "sobrevivencia": 2.9,
+    "media": 2.74
+  },
+  "PENTA": {
+    "vejez": 2.88,
+    "vejez_anticipada": 2.91,
+    "invalidez_total": 2.96,
+    "invalidez_parcial": 2.82,
+    "sobrevivencia": 2.9,
+    "media": 2.89
+  },
+  "RENTA NACIONAL": {
+    "vejez": 2.92,
+    "vejez_anticipada": 3.01,
+    "invalidez_total": 2.87,
+    "invalidez_parcial": 2.81,
+    "sobrevivencia": 2.84,
+    "media": 2.9
+  }
+}
