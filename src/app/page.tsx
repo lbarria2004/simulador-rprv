@@ -72,7 +72,7 @@ const AFP_OPTIONS: { value: AFP; label: string; comision: string }[] = [
 ]
 
 // Opciones para selección rápida de períodos
-const PERIODOS_GARANTIZADOS_RAPIDOS = [120, 180, 240]  // 10, 15, 20 años
+const PERIODOS_GARANTIZADOS_RAPIDOS = [0, 120, 180, 240]  // 0=Simple, 10, 15, 20 años
 const PERIODOS_AUMENTO_RAPIDOS = [12, 24, 36, 48, 60]  // 1, 2, 3, 4, 5 años
 
 interface Beneficiario {
@@ -367,9 +367,10 @@ export default function SimuladorPensiones() {
     if (periodosGarantizadosSeleccionados.length > 0 && periodosAumentoSeleccionados.length > 0) {
       for (const pg of periodosGarantizadosSeleccionados) {
         for (const pa of periodosAumentoSeleccionados) {
+          // Si pg=0 (Simple), es solo aumento_temporal, no ambas
           nuevosEscenarios.push({
             id: (Date.now() + contador++).toString(),
-            tipo: 'ambas',
+            tipo: pg === 0 ? 'aumento_temporal' : 'ambas',
             mesesGarantizados: pg,
             mesesAumento: pa,
             porcentajeAumento: porcentajeAumentoRapido
@@ -380,6 +381,8 @@ export default function SimuladorPensiones() {
     // Si solo hay períodos garantizados
     else if (periodosGarantizadosSeleccionados.length > 0) {
       for (const pg of periodosGarantizadosSeleccionados) {
+        // Si pg=0 (Simple), no tiene sentido sin aumento, lo saltamos
+        if (pg === 0) continue
         nuevosEscenarios.push({
           id: (Date.now() + contador++).toString(),
           tipo: 'periodo_garantizado',
@@ -395,7 +398,7 @@ export default function SimuladorPensiones() {
         nuevosEscenarios.push({
           id: (Date.now() + contador++).toString(),
           tipo: 'aumento_temporal',
-          mesesGarantizados: 120,
+          mesesGarantizados: 0,
           mesesAumento: pa,
           porcentajeAumento: porcentajeAumentoRapido
         })
@@ -1864,7 +1867,7 @@ export default function SimuladorPensiones() {
                             className={`h-8 text-xs ${isSelected ? 'bg-blue-600 hover:bg-blue-700' : 'border-blue-300 text-blue-700'}`}
                           >
                             {isSelected && <Check className="h-3 w-3 mr-1" />}
-                            {Math.floor(meses/12)} años
+                            {meses === 0 ? 'Simple' : `${Math.floor(meses/12)} años`}
                           </Button>
                         )
                       })}
