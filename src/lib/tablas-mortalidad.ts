@@ -1,11 +1,11 @@
 /**
  * Tablas de Mortalidad Oficiales TM-2020
- * Fuente: Superintendencia de Pensiones y CMF
- * Fecha: 2020 (con factores de mejoramiento hasta 2036)
+ * Fuente: Superintendencia de Pensiones (SP) y Comisión para el Mercado Financiero (CMF)
+ * Normativa: D.L. 3.500 y Compendio de Pensiones (Libro III)
  */
 
 // CB-H-2020: Causantes y Beneficiarios no inválidos - HOMBRES
-// Usar para: Retiro Programado Hombres, Vejez
+// Usar para: Retiro Programado y Renta Vitalicia Hombres (Vejez y Sobrevivencia)
 export const TABLA_CB_H_2020: Record<number, number> = {
   0: 0.006154, 1: 0.000331, 2: 0.000200, 3: 0.000143, 4: 0.000096,
   5: 0.000092, 6: 0.000075, 7: 0.000066, 8: 0.000060, 9: 0.000056,
@@ -33,7 +33,7 @@ export const TABLA_CB_H_2020: Record<number, number> = {
 };
 
 // B-M-2020: Beneficiarias no inválidas - MUJERES
-// Usar para: Beneficiarias de sobrevivencia mujeres
+// Usar para: Retiro Programado Mujeres y Beneficiarias de sobrevivencia mujeres
 export const TABLA_B_M_2020: Record<number, number> = {
   0: 0.005207, 1: 0.000268, 2: 0.000182, 3: 0.000128, 4: 0.000088,
   5: 0.000071, 6: 0.000059, 7: 0.000051, 8: 0.000044, 9: 0.000040,
@@ -117,7 +117,7 @@ export const TABLA_MI_M_2020: Record<number, number> = {
 };
 
 // RV-M-2020: Causantes no inválidas (Rentas Vitalicias) - MUJERES
-// Usar para: Renta Vitalicia Mujeres
+// Usar para: Renta Vitalicia Mujeres (Vejez)
 export const TABLA_RV_M_2020: Record<number, number> = {
   20: 0.000300, 21: 0.000306, 22: 0.000316, 23: 0.000330, 24: 0.000349,
   25: 0.000372, 26: 0.000399, 27: 0.000430, 28: 0.000465, 29: 0.000505,
@@ -140,51 +140,48 @@ export const TABLA_RV_M_2020: Record<number, number> = {
   110: 1.000000
 };
 
-// Para RV Hombres, se usa CB-H-2020 (no hay tabla RV-H separada en los archivos)
-
 /**
- * Tasas de Renta Vitalicia por Compañía de Seguros
- * Fuente: Superintendencia de Pensiones - SVTAS RV
- * Valores en porcentaje (ej: 2.79 = 2.79%)
+ * Tasas de Renta Vitalicia por Compañía de Seguros (CMF / SCOMP)
  */
 export const TASAS_RENTA_VITALICIA = {
+  fecha_actualizacion: 'Agosto 2026 (CMF Chile)',
+  fuente: 'https://www.cmfchile.cl/institucional/estadisticas/svtas_param.php?p=tas_int_med_rvp',
   media_mercado: {
-    vejez: 0.0279,
-    vejez_anticipada: 0.0282,
-    invalidez_total: 0.0296,
-    invalidez_parcial: 0.0260,
-    sobrevivencia: 0.0288,
+    vejez: 0.0280,
+    vejez_anticipada: 0.0283,
+    invalidez_total: 0.0295,
+    invalidez_parcial: 0.0253,
+    sobrevivencia: 0.0289,
     media: 0.0282
   },
   companias: {
-    '4LIFE': { vejez: 0.0298, vejez_anticipada: 0.0303, invalidez_total: 0.0303, invalidez_parcial: 0, sobrevivencia: 0.0301, media: 0.0298 },
-    'AUGUSTAR': { vejez: 0.0299, vejez_anticipada: 0.0296, invalidez_total: 0, invalidez_parcial: 0, sobrevivencia: 0.0309, media: 0.0299 },
-    'BICE': { vejez: 0.0256, vejez_anticipada: 0.0273, invalidez_total: 0.0278, invalidez_parcial: 0.0265, sobrevivencia: 0.0256, media: 0.0262 },
-    'CN_LIFE': { vejez: 0.0287, vejez_anticipada: 0.0287, invalidez_total: 0.0304, invalidez_parcial: 0, sobrevivencia: 0.0309, media: 0.0296 },
-    'CONFUTURO': { vejez: 0.0291, vejez_anticipada: 0.0285, invalidez_total: 0.0298, invalidez_parcial: 0.0246, sobrevivencia: 0.0293, media: 0.0291 },
-    'CONSORCIO_NACIONAL': { vejez: 0.0264, vejez_anticipada: 0.0277, invalidez_total: 0.0309, invalidez_parcial: 0.0250, sobrevivencia: 0.0295, media: 0.0277 },
-    'EUROAMERICA': { vejez: 0.0292, vejez_anticipada: 0.0300, invalidez_total: 0.0296, invalidez_parcial: 0, sobrevivencia: 0.0282, media: 0.0293 },
-    'METLIFE': { vejez: 0.0262, vejez_anticipada: 0.0272, invalidez_total: 0.0296, invalidez_parcial: 0.0205, sobrevivencia: 0.0290, media: 0.0274 },
-    'PENTA': { vejez: 0.0288, vejez_anticipada: 0.0291, invalidez_total: 0.0296, invalidez_parcial: 0.0282, sobrevivencia: 0.0290, media: 0.0289 },
-    'RENTA_NACIONAL': { vejez: 0.0292, vejez_anticipada: 0.0301, invalidez_total: 0.0287, invalidez_parcial: 0.0281, sobrevivencia: 0.0284, media: 0.0290 }
+    '4LIFE': { vejez: 0.0292, vejez_anticipada: 0.0286, invalidez_total: 0.0289, invalidez_parcial: 0.0263, sobrevivencia: 0.0280, media: 0.0292 },
+    'AUGUSTAR': { vejez: 0.0296, vejez_anticipada: 0.0297, invalidez_total: 0, invalidez_parcial: 0, sobrevivencia: 0.0298, media: 0.0296 },
+    'BICE': { vejez: 0.0264, vejez_anticipada: 0.0270, invalidez_total: 0.0275, invalidez_parcial: 0.0259, sobrevivencia: 0.0268, media: 0.0266 },
+    'CN_LIFE': { vejez: 0.0294, vejez_anticipada: 0.0293, invalidez_total: 0.0305, invalidez_parcial: 0.0273, sobrevivencia: 0.0293, media: 0.0298 },
+    'CONFUTURO': { vejez: 0.0288, vejez_anticipada: 0.0292, invalidez_total: 0.0297, invalidez_parcial: 0.0255, sobrevivencia: 0.0287, media: 0.0289 },
+    'CONSORCIO_NACIONAL': { vejez: 0.0275, vejez_anticipada: 0.0286, invalidez_total: 0.0300, invalidez_parcial: 0.0268, sobrevivencia: 0.0294, media: 0.0281 },
+    'EUROAMERICA': { vejez: 0.0291, vejez_anticipada: 0.0293, invalidez_total: 0.0295, invalidez_parcial: 0, sobrevivencia: 0.0288, media: 0.0291 },
+    'METLIFE': { vejez: 0.0269, vejez_anticipada: 0.0278, invalidez_total: 0.0297, invalidez_parcial: 0.0196, sobrevivencia: 0.0294, media: 0.0278 },
+    'PENTA': { vejez: 0.0286, vejez_anticipada: 0.0282, invalidez_total: 0.0295, invalidez_parcial: 0.0261, sobrevivencia: 0.0277, media: 0.0286 },
+    'RENTA_NACIONAL': { vejez: 0.0290, vejez_anticipada: 0.0284, invalidez_total: 0.0288, invalidez_parcial: 0.0264, sobrevivencia: 0.0282, media: 0.0287 }
   }
 } as const;
 
+export const COMPANIAS_SEGUROS = Object.keys(TASAS_RENTA_VITALICIA.companias);
+
 /**
- * Tasas de interés técnica para Retiro Programado
- * Fuente: Superintendencia de Pensiones
- * Actualizado: Octubre 2025
+ * Tasas de interés técnica de referencia para Retiro Programado (SP)
  */
 export const TASAS_INTERES_TECNICAS = {
-  retiro_programado: 0.0341, // 3.41% - Circular SP Oct 2025
-  spot_rate_10y: 0.0311,     // Tasa 10 años oct-2025
-  spot_rate_15y: 0.0307,     // Tasa 15 años oct-2025
-  spot_rate_20y: 0.0303      // Tasa 20 años oct-2025
+  retiro_programado: 0.0341, // 3.41% - Tasa oficial de referencia SP
+  spot_rate_10y: 0.0311,
+  spot_rate_15y: 0.0307,
+  spot_rate_20y: 0.0303
 } as const;
 
 /**
- * Función auxiliar para obtener la tasa qx correcta
- * según tipo de pensión, sexo y condición
+ * Obtiene la tasa de mortalidad qx según sexo, tipo de pensión y modalidad
  */
 export function getTasaMortalidad(
   edad: number,
@@ -192,62 +189,77 @@ export function getTasaMortalidad(
   tipoPension: 'vejez' | 'invalidez' | 'sobrevivencia',
   modalidad: 'retiro_programado' | 'renta_vitalicia' = 'retiro_programado'
 ): number {
-  // Validar edad
   if (edad < 0 || edad > 110) {
     return 1.0;
   }
   
-  // Seleccionar tabla según criterios
   let tabla: Record<number, number>;
   
   if (tipoPension === 'invalidez') {
-    // Invalidez usa tablas MI (mayor mortalidad)
     tabla = sexo === 'M' ? TABLA_MI_H_2020 : TABLA_MI_M_2020;
   } else if (modalidad === 'renta_vitalicia' && sexo === 'F') {
-    // RV Mujeres usa tabla específica RV-M-2020
     tabla = TABLA_RV_M_2020;
   } else if (sexo === 'M') {
-    // Hombres usan CB-H-2020 para RP y RV
     tabla = TABLA_CB_H_2020;
   } else {
-    // Mujeres para RP usan B-M-2020
     tabla = TABLA_B_M_2020;
   }
   
-  // Retornar qx, o 1.0 si no existe
   return tabla[edad] ?? tabla[Math.min(edad, 110)] ?? 1.0;
 }
 
 /**
- * Obtener la mejor tasa de RV disponible por tipo
+ * Alias para getQx compatible con el motor de cálculo
  */
-export function getMejorTasaRV(tipo: 'vejez' | 'invalidez_total' | 'invalidez_parcial' | 'sobrevivencia'): number {
-  const tasasCompanias = Object.values(TASAS_RENTA_VITALICIA.companias);
-  let mejorTasa = 0;
-  
-  for (const t of tasasCompanias) {
-    const tasa = t[tipo];
-    if (tasa > 0 && tasa > mejorTasa) {
-      mejorTasa = tasa;
-    }
-  }
-  
-  return mejorTasa || TASAS_RENTA_VITALICIA.media_mercado[tipo];
+export function getQx(
+  edad: number,
+  sexo: 'M' | 'F',
+  esInvalido: boolean = false,
+  modalidad: 'retiro_programado' | 'renta_vitalicia' = 'retiro_programado'
+): number {
+  return getTasaMortalidad(
+    edad,
+    sexo,
+    esInvalido ? 'invalidez' : 'vejez',
+    modalidad
+  );
 }
 
 /**
- * Obtener la peor tasa de RV disponible por tipo (más conservadora)
+ * Calcula sobrevivientes lx a una edad dada (raíz de cohorte 100.000)
  */
-export function getPeorTasaRV(tipo: 'vejez' | 'invalidez_total' | 'invalidez_parcial' | 'sobrevivencia'): number {
-  const tasasCompanias = Object.values(TASAS_RENTA_VITALICIA.companias);
-  let peorTasa = Infinity;
+export function calcularLx(
+  edadObjetivo: number,
+  sexo: 'M' | 'F',
+  esInvalido: boolean = false,
+  modalidad: 'retiro_programado' | 'renta_vitalicia' = 'retiro_programado'
+): number {
+  let lx = 100000;
+  const edadMinima = esInvalido ? 18 : 0;
   
-  for (const t of tasasCompanias) {
-    const tasa = t[tipo];
-    if (tasa > 0 && tasa < peorTasa) {
-      peorTasa = tasa;
-    }
+  for (let edad = edadMinima; edad < edadObjetivo; edad++) {
+    lx = lx * (1 - getQx(edad, sexo, esInvalido, modalidad));
+  }
+  return lx;
+}
+
+/**
+ * Calcula expectativa de vida abreviada
+ */
+export function calcularExpectativaVida(
+  edad: number,
+  sexo: 'M' | 'F',
+  esInvalido: boolean = false,
+  modalidad: 'retiro_programado' | 'renta_vitalicia' = 'retiro_programado'
+): number {
+  let expectativa = 0;
+  let probSupervivencia = 1;
+  const maxEdad = 110;
+  
+  for (let t = 1; t <= (maxEdad - edad); t++) {
+    probSupervivencia *= (1 - getQx(edad + t - 1, sexo, esInvalido, modalidad));
+    expectativa += probSupervivencia;
   }
   
-  return peorTasa === Infinity ? TASAS_RENTA_VITALICIA.media_mercado[tipo] : peorTasa;
+  return Math.round(expectativa * 10) / 10;
 }

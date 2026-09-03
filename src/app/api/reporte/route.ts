@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
+import { calcularPGU, PGU } from '@/lib/pension-calculator';
 
 interface AfiliadoData {
   nombre: string;
@@ -25,8 +26,6 @@ interface ParametrosData {
 }
 
 // Constantes actualizadas
-const PGU_MONTO = 231732;  // Actualizado enero 2025
-const PGU_TOPE = 1054000;  // Tope de ingreso para PGU
 const BAC_UF_POR_ANO = 0.1; // 0,1 UF por año cotizado
 const BAC_TOPE_UF = 2.5;    // Tope máximo de 2,5 UF
 
@@ -754,20 +753,18 @@ export async function POST(request: NextRequest) {
       });
       y -= 20;
 
-      drawText(page, `Monto Base 2025: $${formatNumber(PGU_MONTO)}/mes`, 50, y, { size: 9, font: fontRegular });
+      drawText(page, `Monto Base 2025: $${formatNumber(PGU.MONTO_BASE)}/mes`, 50, y, { size: 9, font: fontRegular });
       y -= 12;
-      drawText(page, `Tope de Ingreso: $${formatNumber(PGU_TOPE)}/mes`, 50, y, { size: 9, font: fontRegular });
+      drawText(page, `Tope Máximo: $${formatNumber(PGU.TOPE_INGRESO)}/mes (100% PGU bajo $${formatNumber(PGU.UMBRAL_INFERIOR)})`, 50, y, { size: 9, font: fontRegular });
       y -= 15;
 
       // Calcular PGU
-      if (afiliado.edad >= 65 && mejorPension < PGU_TOPE) {
+      const pguResultado = calcularPGU(mejorPension, afiliado.edad);
+      if (pguResultado.aplica) {
         pguAplica = true;
-        const factor = mejorPension / PGU_TOPE;
-        pguMonto = Math.round(PGU_MONTO * (1 - factor));
+        pguMonto = pguResultado.montoMensual;
         
-        drawText(page, `Factor de descuento: ${(factor * 100).toFixed(2)}%`, 50, y, { size: 9, font: fontRegular, color: { r: 0.4, g: 0.4, b: 0.4 } });
-        y -= 12;
-        drawText(page, `Calculo: $${formatNumber(PGU_MONTO)} x (1 - ${(factor * 100).toFixed(2)}%)`, 50, y, { size: 8, font: fontRegular, color: { r: 0.5, g: 0.5, b: 0.5 } });
+        drawText(page, pguResultado.explicacion, 50, y, { size: 8, font: fontRegular, color: { r: 0.4, g: 0.4, b: 0.4 } });
         y -= 15;
         
         const pguData = [
@@ -777,18 +774,10 @@ export async function POST(request: NextRequest) {
         const colWidthsPGU = [300, 150];
         y = drawTable(page, pguData, 50, y, colWidthsPGU, { regular: fontRegular, bold: fontBold });
       } else {
-        if (afiliado.edad < 65) {
-          drawText(page, 'No aplica: Requiere 65 anos de edad o mas', 50, y, { 
-            size: 9, font: fontRegular, color: { r: 0.7, g: 0.3, b: 0.3 } 
-          });
-          y -= 12;
-        }
-        if (mejorPension >= PGU_TOPE) {
-          drawText(page, `No aplica: Pension ($${formatNumber(mejorPension)}) supera tope de $${formatNumber(PGU_TOPE)}`, 50, y, { 
-            size: 9, font: fontRegular, color: { r: 0.7, g: 0.3, b: 0.3 } 
-          });
-          y -= 12;
-        }
+        drawText(page, `No aplica: ${pguResultado.explicacion}`, 50, y, { 
+          size: 9, font: fontRegular, color: { r: 0.7, g: 0.3, b: 0.3 } 
+        });
+        y -= 12;
       }
       y -= 10;
     }

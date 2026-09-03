@@ -20,6 +20,19 @@
  * - Aumento Temporal de Pensión: incremento temporal por un período
  */
 
+import {
+  TABLA_CB_H_2020,
+  TABLA_B_M_2020,
+  TABLA_MI_H_2020,
+  TABLA_MI_M_2020,
+  TABLA_RV_M_2020,
+  TASAS_RENTA_VITALICIA,
+  TASAS_INTERES_TECNICAS,
+  getQx,
+  calcularLx,
+  calcularExpectativaVida
+} from './tablas-mortalidad.ts';
+
 // ==========================================
 // TIPOS E INTERFACES
 // ==========================================
@@ -208,10 +221,11 @@ export const PORCENTAJES_INVALIDEZ: Record<GradoInvalidez, number> = {
 } as const;
 
 // PGU (Pensión Garantizada Universal)
-// Actualizado según valor vigente 2025
+// Actualizado según valor vigente 2025 y Ley 21.419
 export const PGU = {
-  MONTO_BASE: 231732,  // Valor actualizado enero 2025
-  TOPE_INGRESO: 1054000,
+  MONTO_BASE: 231732,        // Valor actualizado enero 2025
+  UMBRAL_INFERIOR: 729764,   // Pensión base hasta la cual se recibe el 100% de la PGU
+  TOPE_INGRESO: 1158355,     // Límite superior sobre el cual la PGU se extingue
   FECHA_ACTUALIZACION: 'Enero 2025'
 } as const;
 
@@ -228,150 +242,22 @@ export const BAC = {
 } as const;
 
 // ==========================================
-// TABLAS DE MORTALIDAD TM-2020
-// CB-H-2020 para hombres (Cargas de Beneficiarios - Hombres)
-// B-M-2020 para mujeres (Beneficiarios - Mujeres)
-// I-H-2020 e I-M-2020 para inválidos
+// TABLAS DE MORTALIDAD Y FUNCIONES ACTUARIALES
+// Fuente única consolidada: src/lib/tablas-mortalidad.ts
 // ==========================================
 
-export const TABLA_CB_H_2020: Record<number, number> = {
-  0: 0.006154, 1: 0.000331, 2: 0.000200, 3: 0.000163, 4: 0.000139,
-  5: 0.000127, 6: 0.000118, 7: 0.000114, 8: 0.000112, 9: 0.000111,
-  10: 0.000116, 11: 0.000130, 12: 0.000155, 13: 0.000195, 14: 0.000255,
-  15: 0.000344, 16: 0.000457, 17: 0.000581, 18: 0.000692, 19: 0.000771,
-  20: 0.000822, 21: 0.000855, 22: 0.000882, 23: 0.000906, 24: 0.000923,
-  25: 0.000946, 26: 0.000977, 27: 0.001019, 28: 0.001054, 29: 0.001078,
-  30: 0.001100, 31: 0.001134, 32: 0.001181, 33: 0.001227, 34: 0.001261,
-  35: 0.001287, 36: 0.001312, 37: 0.001350, 38: 0.001400, 39: 0.001463,
-  40: 0.001528, 41: 0.001599, 42: 0.001671, 43: 0.001750, 44: 0.001817,
-  45: 0.001887, 46: 0.001961, 47: 0.002069, 48: 0.002200, 49: 0.002361,
-  50: 0.002532, 51: 0.002700, 52: 0.002849, 53: 0.002986, 54: 0.003412,
-  55: 0.003834, 56: 0.004264, 57: 0.004709, 58: 0.005168, 59: 0.005635,
-  60: 0.006097, 61: 0.006550, 62: 0.007003, 63: 0.007490, 64: 0.008083,
-  65: 0.008874, 66: 0.009942, 67: 0.011303, 68: 0.012916, 69: 0.014716,
-  70: 0.016636, 71: 0.018630, 72: 0.020684, 73: 0.022820, 74: 0.025095,
-  75: 0.027591, 76: 0.030421, 77: 0.033701, 78: 0.037531, 79: 0.041974,
-  80: 0.047053, 81: 0.052766, 82: 0.059097, 83: 0.066038, 84: 0.073594,
-  85: 0.081792, 86: 0.090667, 87: 0.100267, 88: 0.110644, 89: 0.121853,
-  90: 0.133946, 91: 0.146940, 92: 0.160891, 93: 0.175894, 94: 0.192038,
-  95: 0.209426, 96: 0.227967, 97: 0.247762, 98: 0.268848, 99: 0.291255,
-  100: 0.315002, 101: 0.340099, 102: 0.366537, 103: 0.394293, 104: 0.423326,
-  105: 0.453570, 106: 0.483734, 107: 0.514750, 108: 0.546470, 109: 0.578719,
-  110: 1.000000
+export {
+  TABLA_CB_H_2020,
+  TABLA_B_M_2020,
+  TABLA_MI_H_2020,
+  TABLA_MI_M_2020,
+  TABLA_RV_M_2020,
+  TASAS_RENTA_VITALICIA,
+  TASAS_INTERES_TECNICAS,
+  getQx,
+  calcularLx,
+  calcularExpectativaVida
 };
-
-export const TABLA_B_M_2020: Record<number, number> = {
-  0: 0.005207, 1: 0.000268, 2: 0.000183, 3: 0.000144, 4: 0.000123,
-  5: 0.000111, 6: 0.000102, 7: 0.000096, 8: 0.000092, 9: 0.000090,
-  10: 0.000093, 11: 0.000104, 12: 0.000120, 13: 0.000146, 14: 0.000184,
-  15: 0.000223, 16: 0.000251, 17: 0.000268, 18: 0.000283, 19: 0.000291,
-  20: 0.000300, 21: 0.000306, 22: 0.000316, 23: 0.000323, 24: 0.000325,
-  25: 0.000319, 26: 0.000319, 27: 0.000329, 28: 0.000350, 29: 0.000371,
-  30: 0.000392, 31: 0.000413, 32: 0.000444, 33: 0.000478, 34: 0.000511,
-  35: 0.000547, 36: 0.000591, 37: 0.000647, 38: 0.000701, 39: 0.000752,
-  40: 0.000805, 41: 0.000868, 42: 0.000940, 43: 0.001018, 44: 0.001107,
-  45: 0.001206, 46: 0.001315, 47: 0.001420, 48: 0.001528, 49: 0.001649,
-  50: 0.001789, 51: 0.001927, 52: 0.002140, 53: 0.002299, 54: 0.002458,
-  55: 0.002644, 56: 0.002859, 57: 0.003090, 58: 0.003327, 59: 0.003581,
-  60: 0.003883, 61: 0.004262, 62: 0.004733, 63: 0.005295, 64: 0.005939,
-  65: 0.006647, 66: 0.007397, 67: 0.008187, 68: 0.009031, 69: 0.009941,
-  70: 0.010928, 71: 0.012009, 72: 0.013221, 73: 0.014602, 74: 0.016187,
-  75: 0.018012, 76: 0.020121, 77: 0.022564, 78: 0.025386, 79: 0.028615,
-  80: 0.032266, 81: 0.036339, 82: 0.040838, 83: 0.045792, 84: 0.051262,
-  85: 0.057336, 86: 0.064119, 87: 0.071721, 88: 0.080243, 89: 0.089768,
-  90: 0.100358, 91: 0.112188, 92: 0.125167, 93: 0.139302, 94: 0.154590,
-  95: 0.171021, 96: 0.188599, 97: 0.207367, 98: 0.227259, 99: 0.248101,
-  100: 0.269652, 101: 0.291802, 102: 0.314360, 103: 0.337119, 104: 0.359868,
-  105: 0.382398, 106: 0.403098, 107: 0.423059, 108: 0.442133, 109: 0.460204,
-  110: 1.000000
-};
-
-// Tabla de mortalidad para inválidos (I-H-2020 e I-M-2020)
-export const TABLA_I_H_2020: Record<number, number> = {
-  18: 0.0125, 19: 0.0132, 20: 0.0140, 21: 0.0148, 22: 0.0157,
-  23: 0.0166, 24: 0.0176, 25: 0.0187, 26: 0.0199, 27: 0.0212,
-  28: 0.0226, 29: 0.0241, 30: 0.0257, 31: 0.0274, 32: 0.0293,
-  33: 0.0313, 34: 0.0335, 35: 0.0359, 36: 0.0385, 37: 0.0413,
-  38: 0.0443, 39: 0.0475, 40: 0.0510, 41: 0.0548, 42: 0.0589,
-  43: 0.0633, 44: 0.0681, 45: 0.0733, 46: 0.0789, 47: 0.0850,
-  48: 0.0915, 49: 0.0986, 50: 0.1063, 51: 0.1146, 52: 0.1236,
-  53: 0.1333, 54: 0.1438, 55: 0.1551, 56: 0.1673, 57: 0.1805,
-  58: 0.1947, 59: 0.2100, 60: 0.2264, 61: 0.2441, 62: 0.2631,
-  63: 0.2835, 64: 0.3054, 65: 0.3289, 66: 0.3540, 67: 0.3810,
-  68: 0.4098, 69: 0.4407, 70: 0.4737, 71: 0.5090, 72: 0.5467,
-  73: 0.5868, 74: 0.6296, 75: 0.6751, 76: 0.7234, 77: 0.7747,
-  78: 0.8290, 79: 0.8865, 80: 0.9472, 81: 1.0000
-};
-
-export const TABLA_I_M_2020: Record<number, number> = {
-  18: 0.0095, 19: 0.0101, 20: 0.0108, 21: 0.0115, 22: 0.0123,
-  23: 0.0131, 24: 0.0140, 25: 0.0149, 26: 0.0159, 27: 0.0170,
-  28: 0.0182, 29: 0.0195, 30: 0.0209, 31: 0.0224, 32: 0.0240,
-  33: 0.0257, 34: 0.0276, 35: 0.0296, 36: 0.0318, 37: 0.0342,
-  38: 0.0368, 39: 0.0396, 40: 0.0426, 41: 0.0459, 42: 0.0494,
-  43: 0.0533, 44: 0.0574, 45: 0.0619, 46: 0.0668, 47: 0.0720,
-  48: 0.0777, 49: 0.0838, 50: 0.0904, 51: 0.0975, 52: 0.1052,
-  53: 0.1135, 54: 0.1224, 55: 0.1320, 56: 0.1424, 57: 0.1536,
-  58: 0.1656, 59: 0.1786, 60: 0.1925, 61: 0.2075, 62: 0.2236,
-  63: 0.2409, 64: 0.2595, 65: 0.2794, 66: 0.3008, 67: 0.3237,
-  68: 0.3483, 69: 0.3746, 70: 0.4028, 71: 0.4329, 72: 0.4651,
-  73: 0.4994, 74: 0.5360, 75: 0.5750, 76: 0.6164, 77: 0.6604,
-  78: 0.7071, 79: 0.7566, 80: 0.8090, 81: 1.0000
-};
-
-// ==========================================
-// FUNCIONES DE CÁLCULO ACTUARIAL
-// ==========================================
-
-/**
- * Obtiene la tasa de mortalidad (qx) para una edad y sexo
- */
-export function getQx(edad: number, sexo: Sexo, esInvalido: boolean = false): number {
-  const edadValida = Math.max(0, Math.min(edad, 110));
-  
-  if (esInvalido) {
-    const edadMin = 18;
-    const edadInv = Math.max(edadMin, Math.min(edadValida, 81));
-    if (sexo === 'M') {
-      return TABLA_I_H_2020[edadInv] ?? TABLA_CB_H_2020[edadValida] ?? 1.0;
-    } else {
-      return TABLA_I_M_2020[edadInv] ?? TABLA_B_M_2020[edadValida] ?? 1.0;
-    }
-  }
-  
-  return sexo === 'M' 
-    ? (TABLA_CB_H_2020[edadValida] ?? 1.0)
-    : (TABLA_B_M_2020[edadValida] ?? 1.0);
-}
-
-/**
- * Calcula el número de sobrevivientes lx a una edad dada
- */
-export function calcularLx(edadObjetivo: number, sexo: Sexo, esInvalido: boolean = false): number {
-  let lx = 100000;
-  const edadMinima = esInvalido ? 18 : 0;
-  
-  for (let edad = edadMinima; edad < edadObjetivo; edad++) {
-    lx = lx * (1 - getQx(edad, sexo, esInvalido));
-  }
-  return lx;
-}
-
-/**
- * Calcula la expectativa de vida
- */
-export function calcularExpectativaVida(edad: number, sexo: Sexo, esInvalido: boolean = false): number {
-  let expectativa = 0;
-  let probSupervivencia = 1;
-  const maxEdad = esInvalido ? 81 : 110;
-  
-  for (let t = 1; t <= (maxEdad - edad); t++) {
-    probSupervivencia *= (1 - getQx(edad + t - 1, sexo, esInvalido));
-    expectativa += probSupervivencia;
-  }
-  
-  return Math.round(expectativa * 10) / 10;
-}
 
 /**
  * Calcula el Capital Necesario Unitario (CNU) - Versión básica para un individuo
@@ -474,6 +360,32 @@ export function calcularCNUIndividual(
   return cnu * 12;
 }
 
+/**
+ * Calcula el Capital Necesario Unitario Temporal para un período de meses dado
+ * Se utiliza para calcular el costo actuarial exacto del aumento temporal de pensión
+ * Fórmula: CNU_temp = Σ_{t=0}^{m-1} [lx+t / lx] × [1 / (1+i)^(t+0.5)] × 12
+ */
+export function calcularCNUTemporal(
+  edad: number,
+  sexo: Sexo,
+  meses: number,
+  tasaInteres: number,
+  esInvalido: boolean = false
+): number {
+  const anos = Math.ceil(meses / 12);
+  const lxInicial = calcularLx(edad, sexo, esInvalido);
+  let cnuTemporal = 0;
+
+  for (let t = 0; t < anos; t++) {
+    const lxFutura = calcularLx(edad + t, sexo, esInvalido);
+    const factorSupervivencia = lxFutura / lxInicial;
+    const factorDescuento = 1 / Math.pow(1 + tasaInteres, t + 0.5);
+    cnuTemporal += factorSupervivencia * factorDescuento;
+  }
+
+  return cnuTemporal * 12;
+}
+
 // ==========================================
 // CÁLCULO PENSIÓN DE VEJEZ
 // ==========================================
@@ -534,9 +446,7 @@ export function calcularRVInmediata(
   beneficiarios?: BeneficiarioPension[]
 ): ResultadoEscenario {
   const cnu = calcularCNU(edad, sexo, tasaInteres, beneficiarios);
-  const primaSeguro = fondos * 0.03;
-  const fondoDisponible = fondos - primaSeguro;
-  const pensionMensual = fondoDisponible / cnu;
+  const pensionMensual = fondos / cnu;
   const expectativaVida = calcularExpectativaVida(edad, sexo);
   
   return {
@@ -600,20 +510,14 @@ export function calcularRVAumentoTemporal(
   beneficiarios?: BeneficiarioPension[]
 ): ResultadoEscenario {
   const porcentajeNormalizado = porcentajeAumento > 1 ? porcentajeAumento / 100 : porcentajeAumento;
-  const rvBase = calcularRVInmediata(fondos, edad, sexo, tasaInteres, beneficiarios);
-  const pensionVitalicia = rvBase.pensionMensual;
-  const pensionAumentada = pensionVitalicia * (1 + porcentajeNormalizado);
-  const incrementoMensual = pensionVitalicia * porcentajeNormalizado;
+  const cnuVitalicio = calcularCNU(edad, sexo, tasaInteres, beneficiarios);
+  const cnuTemporal = calcularCNUTemporal(edad, sexo, mesesAumento, tasaInteres);
   
-  let costoAumento = 0;
-  for (let mes = 1; mes <= mesesAumento; mes++) {
-    const factorDescuento = 1 / Math.pow(1 + tasaInteres, mes / 12);
-    costoAumento += incrementoMensual * factorDescuento;
-  }
-  
-  const factorAjuste = 1 - (costoAumento / (fondos * 0.97));
-  const pensionBaseAjustada = pensionVitalicia * Math.max(factorAjuste, 0.5);
+  // Equivalencia actuarial:
+  // Fondos = PensionBase * CNU_vitalicio + (porcentaje * PensionBase) * CNU_temporal
+  const pensionBaseAjustada = fondos / (cnuVitalicio + porcentajeNormalizado * cnuTemporal);
   const pensionAumentadaFinal = pensionBaseAjustada * (1 + porcentajeNormalizado);
+  const expectativaVida = calcularExpectativaVida(edad, sexo);
   
   const anosAumento = Math.floor(mesesAumento / 12);
   const mesesRestantes = mesesAumento % 12;
@@ -650,9 +554,9 @@ export function calcularRVAumentoTemporal(
     pensionMensual: Math.round(pensionAumentadaFinal),
     pensionEnUF: pensionAumentadaFinal / UF_ACTUAL,
     pensionAnual: pensionAumentadaFinal * 12,
-    cnu: rvBase.cnu,
+    cnu: cnuVitalicio,
     tasaInteres,
-    expectativaVida: rvBase.expectativaVida,
+    expectativaVida,
     aumentoTemporal: {
       meses: mesesAumento,
       porcentaje: porcentajeAumento,
@@ -679,21 +583,14 @@ export function calcularRVConAmbasClausulas(
   beneficiarios?: BeneficiarioPension[]
 ): ResultadoEscenario {
   const porcentajeNormalizado = porcentajeAumento > 1 ? porcentajeAumento / 100 : porcentajeAumento;
-  const rvBase = calcularRVInmediata(fondos, edad, sexo, tasaInteres, beneficiarios);
+  const cnuVitalicio = calcularCNU(edad, sexo, tasaInteres, beneficiarios);
   const factorGarantizado = calcularFactorGarantizado(mesesGarantizados);
-  const pensionBase = rvBase.pensionMensual * factorGarantizado;
-  const pensionAumentada = pensionBase * (1 + porcentajeNormalizado);
-  const incrementoMensual = pensionBase * porcentajeNormalizado;
+  const cnuEfectivoGarantizado = cnuVitalicio / (factorGarantizado > 0 ? factorGarantizado : 1);
+  const cnuTemporal = calcularCNUTemporal(edad, sexo, mesesAumento, tasaInteres);
   
-  let costoAumento = 0;
-  for (let mes = 1; mes <= mesesAumento; mes++) {
-    const factorDescuento = 1 / Math.pow(1 + tasaInteres, mes / 12);
-    costoAumento += incrementoMensual * factorDescuento;
-  }
-  
-  const factorAjusteTotal = Math.max(factorGarantizado - (costoAumento / (fondos * 0.97)), 0.45);
-  const pensionBaseFinal = rvBase.pensionMensual * factorAjusteTotal;
+  const pensionBaseFinal = fondos / (cnuEfectivoGarantizado + porcentajeNormalizado * cnuTemporal);
   const pensionAumentadaFinal = pensionBaseFinal * (1 + porcentajeNormalizado);
+  const expectativaVida = calcularExpectativaVida(edad, sexo);
   
   const anosGarantia = Math.floor(mesesGarantizados / 12);
   const anosAumento = Math.floor(mesesAumento / 12);
@@ -722,9 +619,9 @@ export function calcularRVConAmbasClausulas(
     pensionMensual: Math.round(pensionAumentadaFinal),
     pensionEnUF: pensionAumentadaFinal / UF_ACTUAL,
     pensionAnual: pensionAumentadaFinal * 12,
-    cnu: rvBase.cnu,
+    cnu: cnuVitalicio,
     tasaInteres,
-    expectativaVida: rvBase.expectativaVida,
+    expectativaVida,
     periodoGarantizado: mesesGarantizados,
     aumentoTemporal: {
       meses: mesesAumento,
@@ -911,9 +808,7 @@ export function calcularRVInmediataInvalidez(
 ): ResultadoEscenario {
   // CNU con tabla de inválidos
   const cnu = calcularCNU(edad, sexo, tasaInteres, beneficiarios, true);
-  const primaSeguro = fondos * 0.03;
-  const fondoDisponible = fondos - primaSeguro;
-  const pensionMensual = fondoDisponible / cnu;
+  const pensionMensual = fondos / cnu;
   const expectativaVida = calcularExpectativaVida(edad, sexo, true);
   
   return {
@@ -1994,17 +1889,29 @@ export function calcularPGU(
     };
   }
 
-  // Calcular PGU
-  const factorDescuento = pensionMensual / PGU.TOPE_INGRESO;
-  const montoPGU = Math.round(PGU.MONTO_BASE * (1 - factorDescuento));
-  
+  // Si la pensión base es inferior o igual al umbral inferior, recibe el 100% de la PGU
+  if (pensionMensual <= PGU.UMBRAL_INFERIOR) {
+    return {
+      aplica: true,
+      montoMensual: PGU.MONTO_BASE,
+      montoAnual: PGU.MONTO_BASE * 12,
+      pensionBase: pensionMensual,
+      factorDescuento: 0,
+      explicacion: `Pensión inferior a $${PGU.UMBRAL_INFERIOR.toLocaleString('es-CL')}, recibe 100% PGU: $${PGU.MONTO_BASE.toLocaleString('es-CL')}`
+    };
+  }
+
+  // Tramo decreciente entre umbral inferior y tope
+  const factor = (PGU.TOPE_INGRESO - pensionMensual) / (PGU.TOPE_INGRESO - PGU.UMBRAL_INFERIOR);
+  const montoPGU = Math.round(PGU.MONTO_BASE * factor);
+
   return {
     aplica: true,
     montoMensual: montoPGU,
     montoAnual: montoPGU * 12,
     pensionBase: pensionMensual,
-    factorDescuento,
-    explicacion: `PGU = $${PGU.MONTO_BASE.toLocaleString('es-CL')} × (1 - ${pensionMensual.toLocaleString('es-CL')}/${PGU.TOPE_INGRESO.toLocaleString('es-CL')}) = $${montoPGU.toLocaleString('es-CL')}`
+    factorDescuento: 1 - factor,
+    explicacion: `Pensión en tramo decreciente. PGU = $${PGU.MONTO_BASE.toLocaleString('es-CL')} × [(${PGU.TOPE_INGRESO.toLocaleString('es-CL')} - ${pensionMensual.toLocaleString('es-CL')}) / (${PGU.TOPE_INGRESO.toLocaleString('es-CL')} - ${PGU.UMBRAL_INFERIOR.toLocaleString('es-CL')})] = $${montoPGU.toLocaleString('es-CL')}`
   };
 }
 

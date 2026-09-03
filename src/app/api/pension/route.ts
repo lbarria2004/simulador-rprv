@@ -41,8 +41,8 @@ export async function POST(request: NextRequest) {
     const beneficiarios = datos.beneficiarios as BeneficiarioPension[] | undefined;
     
     // Permitir tasas personalizadas o usar las por defecto
-    const tasaInteres = datos.tasaInteres ?? TASAS_INTERES.RETIRO_PROGRAMADO;
-    const tasaRV = datos.tasaInteres ?? TASAS_INTERES.RENTA_VITALICIA_VEJEZ;
+    const tasaInteres = datos.tasaRP ?? datos.tasaInteres ?? TASAS_INTERES.RETIRO_PROGRAMADO;
+    const tasaRV = datos.tasaRV ?? datos.tasaInteres ?? TASAS_INTERES.RENTA_VITALICIA_VEJEZ;
 
     let resultado: ResultadoEscenario;
 
