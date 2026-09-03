@@ -57,14 +57,34 @@ export const TASAS_INTERES_TECNICAS = {
 } as const;
 
 export const TASAS_RENTA_VITALICIA = {
-  media_mercado: 0.0305,
+  fecha_actualizacion: '2026-03-01',
+  media_mercado: {
+    vejez: 0.0305,
+    vejez_anticipada: 0.0298,
+    invalidez_total: 0.0295,
+    invalidez_parcial: 0.0260,
+    sobrevivencia: 0.0290,
+    media: 0.0305
+  },
+  companias: {
+    '4LIFE': { vejez: 0.0308, vejez_anticipada: 0.0303, invalidez_total: 0.0303, invalidez_parcial: 0, sobrevivencia: 0.0301, media: 0.0308 },
+    'AUGUSTAR': { vejez: 0.0299, vejez_anticipada: 0.0296, invalidez_total: 0, invalidez_parcial: 0, sobrevivencia: 0.0309, media: 0.0299 },
+    'BICE': { vejez: 0.0315, vejez_anticipada: 0.0290, invalidez_total: 0.0285, invalidez_parcial: 0.0265, sobrevivencia: 0.0280, media: 0.0305 },
+    'CN_LIFE': { vejez: 0.0287, vejez_anticipada: 0.0287, invalidez_total: 0.0304, invalidez_parcial: 0, sobrevivencia: 0.0309, media: 0.0296 },
+    'CONFUTURO': { vejez: 0.0305, vejez_anticipada: 0.0295, invalidez_total: 0.0298, invalidez_parcial: 0.0246, sobrevivencia: 0.0293, media: 0.0301 },
+    'CONSORCIO_NACIONAL': { vejez: 0.0308, vejez_anticipada: 0.0290, invalidez_total: 0.0309, invalidez_parcial: 0.0250, sobrevivencia: 0.0295, media: 0.0300 },
+    'EUROAMERICA': { vejez: 0.0292, vejez_anticipada: 0.0300, invalidez_total: 0.0296, invalidez_parcial: 0.0282, sobrevivencia: 0.0282, media: 0.0293 },
+    'METLIFE': { vejez: 0.0310, vejez_anticipada: 0.0285, invalidez_total: 0.0296, invalidez_parcial: 0.0205, sobrevivencia: 0.0290, media: 0.0300 },
+    'PENTA': { vejez: 0.0298, vejez_anticipada: 0.0291, invalidez_total: 0.0296, invalidez_parcial: 0.0282, sobrevivencia: 0.0290, media: 0.0295 },
+    'RENTA_NACIONAL': { vejez: 0.0292, vejez_anticipada: 0.0301, invalidez_total: 0.0287, invalidez_parcial: 0.0281, sobrevivencia: 0.0284, media: 0.0290 }
+  },
   bice_vida: 0.0315,
   metlife: 0.0310,
   consorcio: 0.0308,
   confuturo: 0.0305,
   security: 0.0300,
   principal: 0.0298,
-  penta: 0.0295,
+  penta: 0.0298,
   spot_rate_10y: 0.0285,
   spot_rate_20y: 0.0303
 } as const;

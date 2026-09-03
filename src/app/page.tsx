@@ -306,7 +306,7 @@ export default function SimuladorPage() {
       const fondosBase = afiliado.fondosCLP;
       const fondosRP = afiliado.conAsesor ? fondosBase * (1 - 0.012) : fondosBase;
       const fondosRV = afiliado.conAsesor ? fondosBase * (1 - 0.015) : fondosBase;
-      const tasaRVSimple = TASAS_RENTA_VITALICIA.companias['4LIFE']?.vejez || 0.0292;
+      const tasaRVSimple = TASAS_RENTA_VITALICIA?.companias?.['4LIFE']?.vejez || 0.0308;
 
       const activas = modalidades.filter(m => m.activa);
       const resultados = activas.map(mod =>
@@ -362,7 +362,7 @@ export default function SimuladorPage() {
     const fondosRV = afiliado.conAsesor ? fondosBase * (1 - 0.015) : fondosBase;
 
     const ranking: CompaniasRankingItem[] = [];
-    for (const [key, item] of Object.entries(TASAS_RENTA_VITALICIA.companias)) {
+    for (const [key, item] of Object.entries(TASAS_RENTA_VITALICIA?.companias || {})) {
       if (!item.vejez) continue;
       const rvComp = calcularRVInmediata(
         fondosRV,
@@ -403,7 +403,7 @@ export default function SimuladorPage() {
           parametros: {
             uf: valorUF,
             tasaRP: 0.0358,
-            tasaRV: TASAS_RENTA_VITALICIA.media_mercado.vejez,
+            tasaRV: TASAS_RENTA_VITALICIA?.media_mercado?.vejez || 0.0305,
             incluirPGU: clausulas.incluirPGU,
             incluirBAC: clausulas.incluirBAC,
             afpSeleccionada: clausulas.afpSeleccionada
