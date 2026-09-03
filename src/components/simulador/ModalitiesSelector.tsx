@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -50,35 +51,35 @@ export function ModalitiesSelector({
   // Manejar incorporación de combinación a la lista
   const handleAgregarCombinacion = () => {
     if (tipoClausula === 'garantizada') {
-      const anos = Math.round(mesesGarantizados / 12);
+      const anos = (mesesGarantizados / 12).toFixed(1).replace('.0', '');
       onAgregarModalidad({
         tipo: 'rv_garantizada',
-        nombre: `RV Garantizada ${anos} años (${mesesGarantizados} meses)`,
-        descripcion: `Pensión vitalicia fija en UF con garantía de pago por ${anos} años a beneficiarios o herederos.`,
+        nombre: `RV Garantizada ${mesesGarantizados} meses (${anos}a)`,
+        descripcion: `Pensión vitalicia fija en UF con garantía de pago por ${mesesGarantizados} meses (${anos} años) a beneficiarios o herederos.`,
         mesesGarantizados,
         activa: true,
         esPersonalizada: true
       });
     } else if (tipoClausula === 'aumento') {
-      const anos = Math.round(mesesAumento / 12);
+      const anos = (mesesAumento / 12).toFixed(1).replace('.0', '');
       const pct = Math.round(porcentajeAumento * 100);
       onAgregarModalidad({
         tipo: 'rv_aumento_temporal',
-        nombre: `RV Aumento Temporal +${pct}% (${anos} ${anos === 1 ? 'año' : 'años'})`,
-        descripcion: `Pensión aumentada al doble durante los primeros ${anos} años, luego pensión vitalicia constante.`,
+        nombre: `RV Aumento Temporal +${pct}% (${mesesAumento} meses / ${anos}a)`,
+        descripcion: `Pensión aumentada en +${pct}% durante los primeros ${mesesAumento} meses (${anos} años), luego pensión vitalicia constante.`,
         mesesAumento,
         porcentajeAumento,
         activa: true,
         esPersonalizada: true
       });
     } else {
-      const anosG = Math.round(mesesGarantizados / 12);
-      const anosA = Math.round(mesesAumento / 12);
+      const anosG = (mesesGarantizados / 12).toFixed(1).replace('.0', '');
+      const anosA = (mesesAumento / 12).toFixed(1).replace('.0', '');
       const pct = Math.round(porcentajeAumento * 100);
       onAgregarModalidad({
         tipo: 'rv_combinada',
-        nombre: `RV Combinada (Garantía ${anosG}a + Aumento +${pct}%)`,
-        descripcion: `Máxima protección: garantía de ${anosG} años y pensión aumentada por ${anosA} años simultáneamente.`,
+        nombre: `RV Combinada (Garantía ${mesesGarantizados}m + Aumento +${pct}%)`,
+        descripcion: `Máxima protección: garantía de ${mesesGarantizados} meses (${anosG}a) y pensión aumentada por ${mesesAumento} meses (${anosA}a) simultáneamente.`,
         mesesGarantizados,
         mesesAumento,
         porcentajeAumento,
@@ -217,46 +218,89 @@ export function ModalitiesSelector({
               </Select>
             </div>
 
-            {/* Parámetro 1: Garantía (si aplica) */}
+            {/* Parámetro 1: Garantía (en meses manual) */}
             {(tipoClausula === 'garantizada' || tipoClausula === 'combinada') && (
               <div className="space-y-1">
-                <Label className="text-xs text-slate-600">Período Garantizado</Label>
-                <Select
-                  value={String(mesesGarantizados)}
-                  onValueChange={val => setMesesGarantizados(Number(val))}
-                >
-                  <SelectTrigger className="h-9 text-xs bg-white">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="120">10 años (120 meses)</SelectItem>
-                    <SelectItem value="180">15 años (180 meses - Estándar)</SelectItem>
-                    <SelectItem value="240">20 años (240 meses)</SelectItem>
-                    <SelectItem value="300">25 años (300 meses)</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs text-slate-600 font-medium">Garantía (meses)</Label>
+                  <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-800 border-amber-200 py-0 h-4 font-semibold">
+                    {(mesesGarantizados / 12).toFixed(1).replace('.0', '')} años
+                  </Badge>
+                </div>
+                <div className="relative">
+                  <Input
+                    type="number"
+                    min={1}
+                    max={360}
+                    step={1}
+                    value={mesesGarantizados || ''}
+                    onChange={e => setMesesGarantizados(Math.max(0, parseInt(e.target.value) || 0))}
+                    placeholder="180"
+                    className="h-9 text-xs bg-white pr-14 font-semibold text-slate-900 font-mono"
+                  />
+                  <span className="absolute right-2.5 top-2.5 text-[10px] text-slate-400 font-semibold pointer-events-none">
+                    meses
+                  </span>
+                </div>
+                <div className="flex items-center gap-1 pt-0.5">
+                  {[120, 180, 240, 300].map(m => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => setMesesGarantizados(m)}
+                      className={`text-[9px] px-1.5 py-0.5 rounded border transition-colors ${
+                        mesesGarantizados === m
+                          ? 'bg-amber-100 text-amber-900 border-amber-300 font-bold'
+                          : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
+                      }`}
+                    >
+                      {m / 12}a ({m}m)
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
 
-            {/* Parámetro 2: Plazo Aumento (si aplica) */}
+            {/* Parámetro 2: Plazo Aumento (en meses manual) */}
             {(tipoClausula === 'aumento' || tipoClausula === 'combinada') && (
               <div className="space-y-1">
-                <Label className="text-xs text-slate-600">Plazo de Aumento</Label>
-                <Select
-                  value={String(mesesAumento)}
-                  onValueChange={val => setMesesAumento(Number(val))}
-                >
-                  <SelectTrigger className="h-9 text-xs bg-white">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="12">1 año (12 meses)</SelectItem>
-                    <SelectItem value="24">2 años (24 meses)</SelectItem>
-                    <SelectItem value="36">3 años (36 meses - Recomendado)</SelectItem>
-                    <SelectItem value="48">4 años (48 meses)</SelectItem>
-                    <SelectItem value="60">5 años (60 meses)</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs text-slate-600 font-medium">Plazo Aumento (meses)</Label>
+                  <Badge variant="outline" className="text-[10px] bg-rose-50 text-rose-800 border-rose-200 py-0 h-4 font-semibold">
+                    {(mesesAumento / 12).toFixed(1).replace('.0', '')} años
+                  </Badge>
+                </div>
+                <div className="relative">
+                  <Input
+                    type="number"
+                    min={1}
+                    max={120}
+                    step={1}
+                    value={mesesAumento || ''}
+                    onChange={e => setMesesAumento(Math.max(0, parseInt(e.target.value) || 0))}
+                    placeholder="36"
+                    className="h-9 text-xs bg-white pr-14 font-semibold text-slate-900 font-mono"
+                  />
+                  <span className="absolute right-2.5 top-2.5 text-[10px] text-slate-400 font-semibold pointer-events-none">
+                    meses
+                  </span>
+                </div>
+                <div className="flex items-center gap-1 pt-0.5">
+                  {[12, 24, 36, 48, 60].map(m => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => setMesesAumento(m)}
+                      className={`text-[9px] px-1.5 py-0.5 rounded border transition-colors ${
+                        mesesAumento === m
+                          ? 'bg-rose-100 text-rose-900 border-rose-300 font-bold'
+                          : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
+                      }`}
+                    >
+                      {m / 12}a ({m}m)
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
 

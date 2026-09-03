@@ -19,7 +19,7 @@ interface AffiliateSidebarProps {
   fuenteUF: string;
   onRefreshUF: () => void;
   isLoadingUF: boolean;
-  onApplyPreset: (presetKey: 'zamora' | 'spuler' | 'soltero') => void;
+  onApplyPreset?: (presetKey: 'zamora' | 'spuler' | 'soltero') => void;
 }
 
 export function AffiliateSidebar({
@@ -55,43 +55,6 @@ export function AffiliateSidebar({
 
   return (
     <div className="space-y-4">
-      {/* Tarjeta de Presets SCOMP Rápidos */}
-      <Card className="border-blue-200/60 bg-gradient-to-br from-blue-50/50 to-indigo-50/30 shadow-sm">
-        <CardHeader className="pb-2 pt-3 px-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5 text-xs font-semibold text-blue-900">
-              <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-              <span>Cargar Casos SCOMP Reales</span>
-            </div>
-            <Badge variant="outline" className="text-[10px] bg-white text-blue-700 border-blue-200">
-              1-Clic
-            </Badge>
-          </div>
-        </CardHeader>
-        <CardContent className="px-4 pb-3 pt-0">
-          <div className="grid grid-cols-2 gap-1.5 pt-1">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => onApplyPreset('zamora')}
-              className="text-xs h-8 bg-white hover:bg-blue-100/60 hover:text-blue-900 border-blue-200 justify-start px-2 font-medium"
-            >
-              👨 Juan Z. (1.035 UF)
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => onApplyPreset('spuler')}
-              className="text-xs h-8 bg-white hover:bg-blue-100/60 hover:text-blue-900 border-blue-200 justify-start px-2 font-medium"
-            >
-              👩 Mónica S. (2.177 UF)
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
       {/* Tarjeta de Datos del Afiliado */}
       <Card className="shadow-sm border-slate-200">
         <CardHeader className="pb-3 pt-4 px-4">

@@ -488,7 +488,6 @@ export default function SimuladorPage() {
               fuenteUF={fuenteUF}
               onRefreshUF={fetchUF}
               isLoadingUF={isLoadingUF}
-              onApplyPreset={handleApplyPreset}
             />
           </div>
 
