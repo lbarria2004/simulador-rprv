@@ -25,6 +25,16 @@ interface MultiQuotationResultsProps {
   isGeneratingPDF?: boolean;
 }
 
+function formatCLP(val: number): string {
+  if (val === undefined || val === null || isNaN(val)) return '$0';
+  return `$${Math.round(val).toLocaleString('es-CL')}`;
+}
+
+function formatUF(val: number): string {
+  if (val === undefined || val === null || isNaN(val)) return '0.00 UF';
+  return `${Number(val).toFixed(2)} UF`;
+}
+
 export function MultiQuotationResults({
   items,
   valorUF,
@@ -135,17 +145,17 @@ export function MultiQuotationResults({
                   </span>
                   <div className="flex items-baseline gap-1.5 mt-0.5">
                     <span className="text-xl font-black text-slate-900">
-                      ${item.totalConBeneficiosCLP.toLocaleString('es-CL')}
+                      {formatCLP(item.totalConBeneficiosCLP)}
                     </span>
                     <span className="text-xs font-semibold text-blue-700 font-mono">
-                      ({item.totalConBeneficiosUF.toFixed(2)} UF)
+                      ({formatUF(item.totalConBeneficiosUF)})
                     </span>
                   </div>
                   {(item.pguMensual > 0 || item.bacMensual > 0) && (
                     <div className="text-[10px] text-slate-500 mt-1 flex flex-wrap gap-1">
-                      <span>Base: ${(item.resultado.pensionMensual).toLocaleString('es-CL')}</span>
-                      {item.pguMensual > 0 && <span className="text-emerald-700 font-medium">+ PGU</span>}
-                      {item.bacMensual > 0 && <span className="text-indigo-700 font-medium">+ BAC</span>}
+                      <span>Base: {formatCLP(item.resultado.pensionMensual)}</span>
+                      {item.pguMensual > 0 && <span className="text-emerald-700 font-medium">+ PGU ({formatCLP(item.pguMensual)})</span>}
+                      {item.bacMensual > 0 && <span className="text-indigo-700 font-medium">+ BAC ({formatCLP(item.bacMensual)})</span>}
                     </div>
                   )}
                 </div>
@@ -214,10 +224,10 @@ export function MultiQuotationResults({
                       {isRP ? 'AFP (Fondo C)' : 'Compañía de Seguros'}
                     </td>
                     <td className="py-2.5 px-3 text-right font-mono font-medium text-blue-900">
-                      {item.resultado.pensionEnUF.toFixed(2)} UF
+                      {formatUF(item.resultado.pensionEnUF)}
                     </td>
                     <td className="py-2.5 px-3 text-right font-bold text-slate-900">
-                      ${item.totalConBeneficiosCLP.toLocaleString('es-CL')}
+                      {formatCLP(item.totalConBeneficiosCLP)}
                     </td>
                     <td className="py-2.5 px-3 text-slate-600">
                       {item.config.mesesGarantizados && item.config.mesesAumento ? (

@@ -268,15 +268,16 @@ export default function SimuladorPage() {
 
     const pguObj = clausulas.incluirPGU 
       ? calcularPGU(resultado.pensionMensual, edad) 
-      : { montoBeneficioCLP: 0, cumpleRequisitos: false, descripcion: '' };
-    const pguMensual = pguObj.montoBeneficioCLP;
+      : null;
+    const pguMensual = (pguObj && pguObj.aplica) ? (pguObj.montoMensual || 0) : 0;
 
     const bacObj = clausulas.incluirBAC 
       ? calcularBAC(afiliado.anosCotizados, 0, valorUF) 
-      : { beneficioCLP: 0, beneficioUF: 0, cumpleRequisitos: false, descripcion: '' };
-    const bacMensual = bacObj.beneficioCLP;
+      : null;
+    const bacMensual = (bacObj && bacObj.aplica) ? (bacObj.beneficioMensualPesos || 0) : 0;
 
-    const totalCLP = resultado.pensionMensual + pguMensual + bacMensual;
+    const baseCLP = Number(resultado.pensionMensual) || 0;
+    const totalCLP = baseCLP + pguMensual + bacMensual;
     const totalUF = valorUF > 0 ? totalCLP / valorUF : 0;
 
     return {
