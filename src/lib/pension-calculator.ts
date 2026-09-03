@@ -261,37 +261,40 @@ export {
 };
 
 /**
- * Calcula el Capital Necesario Unitario (CNU) - Versión básica para un individuo
+ * Calcula el Capital Necesario Unitario (CNU) - Versión oficial del Sistema de Pensiones
  * 
- * FÓRMULA OFICIAL (Nota Técnica N°5 SP):
- * CNU = Σ [lx+t / lx] × [1 / (1+i)^(t+0.5)] × 12
+ * FÓRMULA OFICIAL GENERACIONAL (Nota Técnica N°5 SP y NCG Conjunta SP N° 2.164 / CMF N° 2.272):
+ * CNU = Σ [ _t p_x ] × [ 1 / (1+i)^(t+0.5) ] × 12
+ * Donde _t p_x = Π_{k=0}^{t-1} [ 1 - q(x+k, año + k) ]
  */
 export function calcularCNU(
   edad: number,
   sexo: Sexo,
   tasaInteres: number,
   beneficiarios?: BeneficiarioPension[],
-  esInvalido: boolean = false
+  esInvalido: boolean = false,
+  modalidad: ModalidadPension = 'retiro_programado',
+  anoCalculo: number = 2026
 ): number {
-  const lxInicial = calcularLx(edad, sexo, esInvalido);
   let cnu = 0;
   const maxEdad = esInvalido ? 81 : 110;
   
-  // CNU del titular
+  // CNU del titular con proyección generacional dinámica
+  let factorSupervivencia = 1.0;
   for (let t = 0; t <= (maxEdad - edad); t++) {
-    const lxFutura = calcularLx(edad + t, sexo, esInvalido);
-    const factorSupervivencia = lxFutura / lxInicial;
     const factorDescuento = 1 / Math.pow(1 + tasaInteres, t + 0.5);
     cnu += factorSupervivencia * factorDescuento;
+    const qx = getQx(edad + t, sexo, esInvalido, modalidad, anoCalculo + t);
+    factorSupervivencia *= (1 - qx);
   }
   
   // Agregar CNU de beneficiarios (para vejez con cargas)
   if (beneficiarios && beneficiarios.length > 0) {
     for (const ben of beneficiarios) {
-      // CNU de carga: beneficios por sobrevivencia del beneficiario tras fallecimiento del titular
       const cnuBen = calcularCNUSobrevivenciaBeneficiario(
         edad, sexo, tasaInteres,
-        ben.edad, ben.sexo, ben.porcentajePension, esInvalido
+        ben.edad, ben.sexo, ben.porcentajePension, esInvalido,
+        modalidad, anoCalculo
       );
       cnu += cnuBen;
     }
@@ -311,27 +314,36 @@ function calcularCNUSobrevivenciaBeneficiario(
   edadBeneficiario: number,
   sexoBeneficiario: Sexo,
   porcentaje: number,
-  esInvalidoTitular: boolean = false
+  esInvalidoTitular: boolean = false,
+  modalidad: ModalidadPension = 'retiro_programado',
+  anoCalculo: number = 2026
 ): number {
-  const lxTitular = calcularLx(edadTitular, sexoTitular, esInvalidoTitular);
-  const lxBeneficiario = calcularLx(edadBeneficiario, sexoBeneficiario, false);
   let cnu = 0;
   const maxEdad = Math.max(110 - edadTitular, 110 - edadBeneficiario);
   
+  let probTitularVivo = 1.0;
+  let probBeneficiarioVivo = 1.0;
+
   for (let t = 0; t <= maxEdad; t++) {
-    // Probabilidad de que el titular haya fallecido en el año t
-    const lxTitularFutura = calcularLx(edadTitular + t, sexoTitular, esInvalidoTitular);
-    const probTitularFallecido = 1 - (lxTitularFutura / lxTitular);
-    
-    // Probabilidad de que el beneficiario esté vivo en el año t
-    const lxBeneficiarioFutura = calcularLx(edadBeneficiario + t, sexoBeneficiario, false);
-    const probBeneficiarioVivo = lxBeneficiarioFutura / lxBeneficiario;
-    
-    // Probabilidad conjunta: titular fallecido y beneficiario vivo
+    const probTitularFallecido = 1.0 - probTitularVivo;
     const probConjunta = probTitularFallecido * probBeneficiarioVivo;
     const factorDescuento = 1 / Math.pow(1 + tasaInteres, t + 0.5);
     
     cnu += probConjunta * factorDescuento * porcentaje;
+
+    if (edadTitular + t < 110) {
+      const qxTitular = getQx(edadTitular + t, sexoTitular, esInvalidoTitular, modalidad, anoCalculo + t);
+      probTitularVivo *= (1 - qxTitular);
+    } else {
+      probTitularVivo = 0;
+    }
+
+    if (edadBeneficiario + t < 110) {
+      const qxBen = getQx(edadBeneficiario + t, sexoBeneficiario, false, 'retiro_programado', anoCalculo + t);
+      probBeneficiarioVivo *= (1 - qxBen);
+    } else {
+      probBeneficiarioVivo = 0;
+    }
   }
   
   return cnu;
@@ -341,21 +353,23 @@ function calcularCNUSobrevivenciaBeneficiario(
  * Calcula el CNU individual para un beneficiario de sobrevivencia
  * (Cuando el causante YA falleció - pensión de sobrevivencia)
  * 
- * Fórmula: CNU = Σ [lx+t / lx] × [1 / (1+i)^(t+0.5)] × 12
+ * Fórmula: CNU = Σ [ _t p_x ] × [ 1 / (1+i)^(t+0.5) ] × 12
  */
 export function calcularCNUIndividual(
   edad: number,
   sexo: Sexo,
-  tasaInteres: number
+  tasaInteres: number,
+  modalidad: ModalidadPension = 'retiro_programado',
+  anoCalculo: number = 2026
 ): number {
-  const lxInicial = calcularLx(edad, sexo, false);
   let cnu = 0;
+  let factorSupervivencia = 1.0;
   
   for (let t = 0; t <= (110 - edad); t++) {
-    const lxFutura = calcularLx(edad + t, sexo, false);
-    const factorSupervivencia = lxFutura / lxInicial;
     const factorDescuento = 1 / Math.pow(1 + tasaInteres, t + 0.5);
     cnu += factorSupervivencia * factorDescuento;
+    const qx = getQx(edad + t, sexo, false, modalidad, anoCalculo + t);
+    factorSupervivencia *= (1 - qx);
   }
   
   return cnu * 12;
@@ -364,24 +378,26 @@ export function calcularCNUIndividual(
 /**
  * Calcula el Capital Necesario Unitario Temporal para un período de meses dado
  * Se utiliza para calcular el costo actuarial exacto del aumento temporal de pensión
- * Fórmula: CNU_temp = Σ_{t=0}^{m-1} [lx+t / lx] × [1 / (1+i)^(t+0.5)] × 12
+ * Fórmula: CNU_temp = Σ_{t=0}^{m-1} [ _t p_x ] × [ 1 / (1+i)^(t+0.5) ] × 12
  */
 export function calcularCNUTemporal(
   edad: number,
   sexo: Sexo,
   meses: number,
   tasaInteres: number,
-  esInvalido: boolean = false
+  esInvalido: boolean = false,
+  modalidad: ModalidadPension = 'renta_vitalicia',
+  anoCalculo: number = 2026
 ): number {
   const anos = Math.ceil(meses / 12);
-  const lxInicial = calcularLx(edad, sexo, esInvalido);
   let cnuTemporal = 0;
+  let factorSupervivencia = 1.0;
 
   for (let t = 0; t < anos; t++) {
-    const lxFutura = calcularLx(edad + t, sexo, esInvalido);
-    const factorSupervivencia = lxFutura / lxInicial;
     const factorDescuento = 1 / Math.pow(1 + tasaInteres, t + 0.5);
     cnuTemporal += factorSupervivencia * factorDescuento;
+    const qx = getQx(edad + t, sexo, esInvalido, modalidad, anoCalculo + t);
+    factorSupervivencia *= (1 - qx);
   }
 
   return cnuTemporal * 12;
@@ -398,9 +414,9 @@ export function calcularRetiroProgramado(
   tasaInteres: number = TASAS_INTERES.RETIRO_PROGRAMADO,
   beneficiarios?: BeneficiarioPension[]
 ): ResultadoEscenario {
-  const cnu = calcularCNU(edad, sexo, tasaInteres, beneficiarios);
+  const cnu = calcularCNU(edad, sexo, tasaInteres, beneficiarios, false, 'retiro_programado');
   const pensionMensual = fondos / cnu;
-  const expectativaVida = calcularExpectativaVida(edad, sexo);
+  const expectativaVida = calcularExpectativaVida(edad, sexo, false, 'retiro_programado');
   
   const proyeccion: ProyeccionAnual[] = [];
   let saldo = fondos;
@@ -408,7 +424,7 @@ export function calcularRetiroProgramado(
   
   for (let año = 0; año <= Math.min(45, 110 - edad); año++) {
     const edadActual = edad + año;
-    const cnuAnual = calcularCNU(edadActual, sexo, tasaInteres);
+    const cnuAnual = calcularCNU(edadActual, sexo, tasaInteres, undefined, false, 'retiro_programado', 2026 + año);
     const pensionAnual = saldo / cnuAnual * 12;
     const pensionMes = pensionAnual / 12;
     
@@ -446,9 +462,9 @@ export function calcularRVInmediata(
   tasaInteres: number = TASAS_INTERES.RENTA_VITALICIA_VEJEZ,
   beneficiarios?: BeneficiarioPension[]
 ): ResultadoEscenario {
-  const cnu = calcularCNU(edad, sexo, tasaInteres, beneficiarios);
+  const cnu = calcularCNU(edad, sexo, tasaInteres, beneficiarios, false, 'renta_vitalicia');
   const pensionMensual = fondos / cnu;
-  const expectativaVida = calcularExpectativaVida(edad, sexo);
+  const expectativaVida = calcularExpectativaVida(edad, sexo, false, 'renta_vitalicia');
   
   return {
     nombre: 'Renta Vitalicia Inmediata',

@@ -173,9 +173,9 @@ describe('Motor Actuarial de Pensiones - Sistema Chileno', () => {
       const uf = 40844.79;
       const beneficiarios = [{ tipo: 'conyuge' as const, edad: 70, sexo: 'M' as const, porcentajePension: 0.60 }];
 
-      // RV Simple con tasa oficial de mercado (2.79% - TASAS_INTERES.RENTA_VITALICIA_VEJEZ)
+      // RV Simple con tasa observada de aseguradoras líderes (~3.08% en SCOMP 4 Life / Confuturo)
       const saldoNetoRV = (saldoUF - 32.66) * uf; // Menos comisión asesor 1.5%
-      const resRV = calcularRVInmediata(saldoNetoRV, 64, 'F', TASAS_INTERES.RENTA_VITALICIA_VEJEZ, beneficiarios);
+      const resRV = calcularRVInmediata(saldoNetoRV, 64, 'F', 0.0308, beneficiarios);
       const pensionRVUF = resRV.pensionMensual / uf;
 
       // SCOMP 4 Life: 9,59 UF / Confuturo: 9,55 UF / Penta: 9,50 UF

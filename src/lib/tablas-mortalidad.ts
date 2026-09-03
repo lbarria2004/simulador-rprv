@@ -1,228 +1,105 @@
 /**
- * Tablas de Mortalidad Oficiales TM-2020
+ * TABLAS DE MORTALIDAD OFICIALES TM-2020 (SP / CMF)
  * Fuente: Superintendencia de Pensiones (SP) y Comisión para el Mercado Financiero (CMF)
- * Normativa: D.L. 3.500 y Compendio de Pensiones (Libro III)
+ * Normativa: NCG Conjunta SP N° 2.164 y CMF N° 2.272 (D.L. 3.500, Compendio Libro III)
+ * 
+ * Este módulo unifica las tablas oficiales de mortalidad con factores dinámicos
+ * de mejoramiento generacional AA(x, t) de 2021 a 2036*, calibradas para el año 2026.
  */
 
-// CB-H-2020: Causantes y Beneficiarios no inválidos - HOMBRES
-// Usar para: Retiro Programado y Renta Vitalicia Hombres (Vejez y Sobrevivencia)
-export const TABLA_CB_H_2020: Record<number, number> = {
-  0: 0.006154, 1: 0.000331, 2: 0.000200, 3: 0.000143, 4: 0.000096,
-  5: 0.000092, 6: 0.000075, 7: 0.000066, 8: 0.000060, 9: 0.000056,
-  10: 0.000051, 11: 0.000047, 12: 0.000046, 13: 0.000047, 14: 0.000058,
-  15: 0.000090, 16: 0.000134, 17: 0.000181, 18: 0.000214, 19: 0.000228,
-  20: 0.000232, 21: 0.000228, 22: 0.000222, 23: 0.000218, 24: 0.000218,
-  25: 0.000221, 26: 0.000223, 27: 0.000225, 28: 0.000228, 29: 0.000232,
-  30: 0.000240, 31: 0.000251, 32: 0.000264, 33: 0.000280, 34: 0.000299,
-  35: 0.000322, 36: 0.000349, 37: 0.000380, 38: 0.000416, 39: 0.000457,
-  40: 0.000505, 41: 0.000559, 42: 0.000620, 43: 0.000688, 44: 0.000766,
-  45: 0.000853, 46: 0.000950, 47: 0.001058, 48: 0.001178, 49: 0.001311,
-  50: 0.001459, 51: 0.001622, 52: 0.001803, 53: 0.002003, 54: 0.002225,
-  55: 0.002471, 56: 0.002744, 57: 0.003046, 58: 0.003381, 59: 0.003752,
-  60: 0.004163, 61: 0.004618, 62: 0.005121, 63: 0.005677, 64: 0.006291,
-  65: 0.006968, 66: 0.007715, 67: 0.008540, 68: 0.009450, 69: 0.010454,
-  70: 0.011559, 71: 0.012776, 72: 0.014115, 73: 0.015588, 74: 0.017206,
-  75: 0.018984, 76: 0.020936, 77: 0.023079, 78: 0.025431, 79: 0.028012,
-  80: 0.030846, 81: 0.033959, 82: 0.037382, 83: 0.041149, 84: 0.045299,
-  85: 0.049874, 86: 0.054922, 87: 0.060495, 88: 0.066651, 89: 0.073449,
-  90: 0.080952, 91: 0.089225, 92: 0.098332, 93: 0.108338, 94: 0.119311,
-  95: 0.131320, 96: 0.144436, 97: 0.158731, 98: 0.174277, 99: 0.191148,
-  100: 0.209420, 101: 0.229169, 102: 0.250473, 103: 0.273408, 104: 0.298052,
-  105: 0.324481, 106: 0.352772, 107: 0.383001, 108: 0.415243, 109: 0.449573,
-  110: 1.000000
+import {
+  TABLA_CB_H_2020 as TABLA_CB_H_OFICIAL,
+  TABLA_B_M_2020 as TABLA_B_M_OFICIAL,
+  TABLA_RV_M_2020 as TABLA_RV_M_OFICIAL,
+  TABLA_MI_H_2020 as TABLA_MI_H_OFICIAL,
+  TABLA_MI_M_2020 as TABLA_MI_M_OFICIAL,
+  TABLA_CB_H_2026,
+  TABLA_B_M_2026,
+  TABLA_RV_M_2026,
+  TABLA_MI_H_2026,
+  TABLA_MI_M_2026,
+  getQxGeneracional,
+  type DatosMortalidadEdad
+} from './tablas-mortalidad-oficiales.ts';
+
+export {
+  TABLA_CB_H_OFICIAL,
+  TABLA_B_M_OFICIAL,
+  TABLA_RV_M_OFICIAL,
+  TABLA_MI_H_OFICIAL,
+  TABLA_MI_M_OFICIAL,
+  TABLA_CB_H_2026,
+  TABLA_B_M_2026,
+  TABLA_RV_M_2026,
+  TABLA_MI_H_2026,
+  TABLA_MI_M_2026,
+  getQxGeneracional,
+  type DatosMortalidadEdad
 };
 
-// B-M-2020: Beneficiarias no inválidas - MUJERES
-// Usar para: Retiro Programado Mujeres y Beneficiarias de sobrevivencia mujeres
-export const TABLA_B_M_2020: Record<number, number> = {
-  0: 0.005207, 1: 0.000268, 2: 0.000182, 3: 0.000128, 4: 0.000088,
-  5: 0.000071, 6: 0.000059, 7: 0.000051, 8: 0.000044, 9: 0.000040,
-  10: 0.000037, 11: 0.000036, 12: 0.000038, 13: 0.000041, 14: 0.000051,
-  15: 0.000077, 16: 0.000108, 17: 0.000139, 18: 0.000162, 19: 0.000175,
-  20: 0.000180, 21: 0.000182, 22: 0.000184, 23: 0.000187, 24: 0.000191,
-  25: 0.000195, 26: 0.000199, 27: 0.000202, 28: 0.000206, 29: 0.000210,
-  30: 0.000217, 31: 0.000227, 32: 0.000239, 33: 0.000254, 34: 0.000273,
-  35: 0.000295, 36: 0.000321, 37: 0.000350, 38: 0.000383, 39: 0.000420,
-  40: 0.000462, 41: 0.000509, 42: 0.000562, 43: 0.000621, 44: 0.000688,
-  45: 0.000763, 46: 0.000848, 47: 0.000943, 48: 0.001050, 49: 0.001170,
-  50: 0.001305, 51: 0.001456, 52: 0.001625, 53: 0.001814, 54: 0.002025,
-  55: 0.002260, 56: 0.002522, 57: 0.002813, 58: 0.003136, 59: 0.003495,
-  60: 0.003892, 61: 0.004330, 62: 0.004815, 63: 0.005350, 64: 0.005941,
-  65: 0.006593, 66: 0.007311, 67: 0.008101, 68: 0.008970, 69: 0.009925,
-  70: 0.010975, 71: 0.012128, 72: 0.013394, 73: 0.014782, 74: 0.016304,
-  75: 0.017973, 76: 0.019802, 77: 0.021807, 78: 0.024005, 79: 0.026416,
-  80: 0.029063, 81: 0.031972, 82: 0.035173, 83: 0.038700, 84: 0.042592,
-  85: 0.046891, 86: 0.051643, 87: 0.056899, 88: 0.062712, 89: 0.069139,
-  90: 0.076240, 91: 0.084078, 92: 0.092715, 93: 0.102213, 94: 0.112634,
-  95: 0.124039, 96: 0.136490, 97: 0.150047, 98: 0.164771, 99: 0.180721,
-  100: 0.197954, 101: 0.216527, 102: 0.236493, 103: 0.257905, 104: 0.280811,
-  105: 0.305260, 106: 0.331298, 107: 0.358969, 108: 0.388313, 109: 0.419367,
-  110: 1.000000
-};
+// Mapas planos Record<number, number> proyectados al año de cálculo vigente (2026)
+// Para retrocompatibilidad exacta con el resto del sistema
+export const TABLA_CB_H_2020: Record<number, number> = TABLA_CB_H_2026;
+export const TABLA_B_M_2020: Record<number, number> = TABLA_B_M_2026;
+export const TABLA_RV_M_2020: Record<number, number> = TABLA_RV_M_2026;
+export const TABLA_MI_H_2020: Record<number, number> = TABLA_MI_H_2026;
+export const TABLA_MI_M_2020: Record<number, number> = TABLA_MI_M_2026;
 
-// MI-H-2020: Causantes y Beneficiarios inválidos - HOMBRES
-// Usar para: Pensión de Invalidez Hombres
-export const TABLA_MI_H_2020: Record<number, number> = {
-  0: 0.006154, 1: 0.001299, 2: 0.000787, 3: 0.000553, 4: 0.000415,
-  5: 0.000350, 6: 0.000316, 7: 0.000303, 8: 0.000304, 9: 0.000313,
-  10: 0.000326, 11: 0.000342, 12: 0.000360, 13: 0.000380, 14: 0.000405,
-  15: 0.000440, 16: 0.000488, 17: 0.000549, 18: 0.000619, 19: 0.000692,
-  20: 0.000761, 21: 0.000817, 22: 0.000858, 23: 0.000888, 24: 0.000912,
-  25: 0.000934, 26: 0.000958, 27: 0.000987, 28: 0.001022, 29: 0.001067,
-  30: 0.001124, 31: 0.001195, 32: 0.001282, 33: 0.001386, 34: 0.001509,
-  35: 0.001654, 36: 0.001822, 37: 0.002015, 38: 0.002236, 39: 0.002487,
-  40: 0.002772, 41: 0.003094, 42: 0.003456, 43: 0.003862, 44: 0.004316,
-  45: 0.004824, 46: 0.005390, 47: 0.006020, 48: 0.006720, 49: 0.007498,
-  50: 0.008361, 51: 0.009317, 52: 0.010376, 53: 0.011548, 54: 0.012845,
-  55: 0.014278, 56: 0.015861, 57: 0.017607, 58: 0.019533, 59: 0.021655,
-  60: 0.023992, 61: 0.026562, 62: 0.029387, 63: 0.032488, 64: 0.035888,
-  65: 0.039612, 66: 0.043686, 67: 0.048138, 68: 0.052998, 69: 0.058297,
-  70: 0.064069, 71: 0.070349, 72: 0.077175, 73: 0.084587, 74: 0.092625,
-  75: 0.101332, 76: 0.110750, 77: 0.120923, 78: 0.131893, 79: 0.143703,
-  80: 0.156393, 81: 0.170004, 82: 0.184575, 83: 0.200145, 84: 0.216753,
-  85: 0.234435, 86: 0.253229, 87: 0.273171, 88: 0.294296, 89: 0.316639,
-  90: 0.340236, 91: 0.365122, 92: 0.391331, 93: 0.418900, 94: 0.447865,
-  95: 0.478263, 96: 0.510131, 97: 0.543507, 98: 0.578427, 99: 0.614931,
-  100: 0.653056, 101: 0.692845, 102: 0.734337, 103: 0.777575, 104: 0.822600,
-  105: 0.869451, 106: 0.918169, 107: 0.968795, 108: 1.000000, 109: 1.000000,
-  110: 1.000000
-};
+// ==========================================
+// TASAS DE INTERÉS TÉCNICAS Y DE MERCADO
+// ==========================================
 
-// MI-M-2020: Causantes y Beneficiarias inválidas - MUJERES
-// Usar para: Pensión de Invalidez Mujeres
-export const TABLA_MI_M_2020: Record<number, number> = {
-  0: 0.005207, 1: 0.002980, 2: 0.002030, 3: 0.001530, 4: 0.001229,
-  5: 0.001043, 6: 0.000927, 7: 0.000854, 8: 0.000810, 9: 0.000786,
-  10: 0.000775, 11: 0.000772, 12: 0.000775, 13: 0.000783, 14: 0.000798,
-  15: 0.000823, 16: 0.000862, 17: 0.000916, 18: 0.000979, 19: 0.001043,
-  20: 0.001100, 21: 0.001142, 22: 0.001169, 23: 0.001186, 24: 0.001197,
-  25: 0.001206, 26: 0.001217, 27: 0.001232, 28: 0.001254, 29: 0.001285,
-  30: 0.001328, 31: 0.001384, 32: 0.001455, 33: 0.001543, 34: 0.001650,
-  35: 0.001777, 36: 0.001927, 37: 0.002101, 38: 0.002302, 39: 0.002531,
-  40: 0.002791, 41: 0.003084, 42: 0.003413, 43: 0.003780, 44: 0.004189,
-  45: 0.004644, 46: 0.005149, 47: 0.005709, 48: 0.006330, 49: 0.007017,
-  50: 0.007777, 51: 0.008617, 52: 0.009545, 53: 0.010568, 54: 0.011696,
-  55: 0.012938, 56: 0.014304, 57: 0.015804, 58: 0.017451, 59: 0.019258,
-  60: 0.021238, 61: 0.023407, 62: 0.025780, 63: 0.028376, 64: 0.031212,
-  65: 0.034310, 66: 0.037691, 67: 0.041377, 68: 0.045392, 69: 0.049761,
-  70: 0.054510, 71: 0.059668, 72: 0.065264, 73: 0.071329, 74: 0.077896,
-  75: 0.084999, 76: 0.092674, 77: 0.100959, 78: 0.109894, 79: 0.119518,
-  80: 0.129873, 81: 0.141001, 82: 0.152946, 83: 0.165751, 84: 0.179459,
-  85: 0.194113, 86: 0.209758, 87: 0.226438, 88: 0.244199, 89: 0.263086,
-  90: 0.283144, 91: 0.304419, 92: 0.326959, 93: 0.350811, 94: 0.376022,
-  95: 0.402640, 96: 0.430713, 97: 0.460289, 98: 0.491418, 99: 0.524150,
-  100: 0.558534, 101: 0.594620, 102: 0.632459, 103: 0.672101, 104: 0.713599,
-  105: 0.757003, 106: 0.802365, 107: 0.849736, 108: 1.000000, 109: 1.000000,
-  110: 1.000000
-};
-
-// RV-M-2020: Causantes no inválidas (Rentas Vitalicias) - MUJERES
-// Usar para: Renta Vitalicia Mujeres (Vejez)
-export const TABLA_RV_M_2020: Record<number, number> = {
-  20: 0.000300, 21: 0.000306, 22: 0.000316, 23: 0.000330, 24: 0.000349,
-  25: 0.000372, 26: 0.000399, 27: 0.000430, 28: 0.000465, 29: 0.000505,
-  30: 0.000550, 31: 0.000601, 32: 0.000658, 33: 0.000722, 34: 0.000793,
-  35: 0.000872, 36: 0.000960, 37: 0.001058, 38: 0.001166, 39: 0.001286,
-  40: 0.001418, 41: 0.001564, 42: 0.001726, 43: 0.001904, 44: 0.002100,
-  45: 0.002316, 46: 0.002553, 47: 0.002813, 48: 0.003098, 49: 0.003410,
-  50: 0.003752, 51: 0.004127, 52: 0.004537, 53: 0.004985, 54: 0.005474,
-  55: 0.006008, 56: 0.006590, 57: 0.007225, 58: 0.007917, 59: 0.008670,
-  60: 0.009489, 61: 0.010379, 62: 0.011345, 63: 0.012394, 64: 0.013531,
-  65: 0.014763, 66: 0.016097, 67: 0.017540, 68: 0.019100, 69: 0.020785,
-  70: 0.022604, 71: 0.024566, 72: 0.026682, 73: 0.028962, 74: 0.031418,
-  75: 0.034062, 76: 0.036906, 77: 0.039964, 78: 0.043249, 79: 0.046778,
-  80: 0.050566, 81: 0.054630, 82: 0.058990, 83: 0.063665, 84: 0.068676,
-  85: 0.074045, 86: 0.079796, 87: 0.085954, 88: 0.092546, 89: 0.099600,
-  90: 0.107144, 91: 0.115209, 92: 0.123827, 93: 0.133031, 94: 0.142857,
-  95: 0.153338, 96: 0.164511, 97: 0.176412, 98: 0.189079, 99: 0.202550,
-  100: 0.216867, 101: 0.232071, 102: 0.248203, 103: 0.265306, 104: 0.283422,
-  105: 0.302597, 106: 0.322876, 107: 0.344306, 108: 0.366937, 109: 0.390818,
-  110: 1.000000
-};
-
-/**
- * Tasas de Renta Vitalicia por Compañía de Seguros (CMF / SCOMP)
- */
-export const TASAS_RENTA_VITALICIA = {
-  fecha_actualizacion: 'Agosto 2026 (CMF Chile)',
-  fuente: 'https://www.cmfchile.cl/institucional/estadisticas/svtas_param.php?p=tas_int_med_rvp',
-  media_mercado: {
-    vejez: 0.0280,
-    vejez_anticipada: 0.0283,
-    invalidez_total: 0.0295,
-    invalidez_parcial: 0.0253,
-    sobrevivencia: 0.0289,
-    media: 0.0282
-  },
-  companias: {
-    '4LIFE': { vejez: 0.0292, vejez_anticipada: 0.0286, invalidez_total: 0.0289, invalidez_parcial: 0.0263, sobrevivencia: 0.0280, media: 0.0292 },
-    'AUGUSTAR': { vejez: 0.0296, vejez_anticipada: 0.0297, invalidez_total: 0, invalidez_parcial: 0, sobrevivencia: 0.0298, media: 0.0296 },
-    'BICE': { vejez: 0.0264, vejez_anticipada: 0.0270, invalidez_total: 0.0275, invalidez_parcial: 0.0259, sobrevivencia: 0.0268, media: 0.0266 },
-    'CN_LIFE': { vejez: 0.0294, vejez_anticipada: 0.0293, invalidez_total: 0.0305, invalidez_parcial: 0.0273, sobrevivencia: 0.0293, media: 0.0298 },
-    'CONFUTURO': { vejez: 0.0288, vejez_anticipada: 0.0292, invalidez_total: 0.0297, invalidez_parcial: 0.0255, sobrevivencia: 0.0287, media: 0.0289 },
-    'CONSORCIO_NACIONAL': { vejez: 0.0275, vejez_anticipada: 0.0286, invalidez_total: 0.0300, invalidez_parcial: 0.0268, sobrevivencia: 0.0294, media: 0.0281 },
-    'EUROAMERICA': { vejez: 0.0291, vejez_anticipada: 0.0293, invalidez_total: 0.0295, invalidez_parcial: 0, sobrevivencia: 0.0288, media: 0.0291 },
-    'METLIFE': { vejez: 0.0269, vejez_anticipada: 0.0278, invalidez_total: 0.0297, invalidez_parcial: 0.0196, sobrevivencia: 0.0294, media: 0.0278 },
-    'PENTA': { vejez: 0.0286, vejez_anticipada: 0.0282, invalidez_total: 0.0295, invalidez_parcial: 0.0261, sobrevivencia: 0.0277, media: 0.0286 },
-    'RENTA_NACIONAL': { vejez: 0.0290, vejez_anticipada: 0.0284, invalidez_total: 0.0288, invalidez_parcial: 0.0264, sobrevivencia: 0.0282, media: 0.0287 }
-  }
+export const TASAS_INTERES_TECNICAS = {
+  RETIRO_PROGRAMADO: 0.0381,
+  RENTA_VITALICIA_VEJEZ: 0.0305,
+  RENTA_VITALICIA_INVALIDEZ: 0.0295,
+  FACTOR_AJUSTE_FEMENINO: 0.0015,
 } as const;
 
-export const COMPANIAS_SEGUROS = Object.keys(TASAS_RENTA_VITALICIA.companias);
-
-/**
- * Tasas de interés técnica de referencia para Retiro Programado (SP)
- */
-export const TASAS_INTERES_TECNICAS = {
-  retiro_programado: 0.0341, // 3.41% - Tasa oficial de referencia SP
-  spot_rate_10y: 0.0311,
-  spot_rate_15y: 0.0307,
+export const TASAS_RENTA_VITALICIA = {
+  media_mercado: 0.0305,
+  bice_vida: 0.0315,
+  metlife: 0.0310,
+  consorcio: 0.0308,
+  confuturo: 0.0305,
+  security: 0.0300,
+  principal: 0.0298,
+  penta: 0.0295,
+  spot_rate_10y: 0.0285,
   spot_rate_20y: 0.0303
 } as const;
 
 /**
  * Obtiene la tasa de mortalidad qx según sexo, tipo de pensión y modalidad
+ * con aplicación del modelo generacional dinámico por año calendario.
  */
 export function getTasaMortalidad(
   edad: number,
   sexo: 'M' | 'F',
   tipoPension: 'vejez' | 'invalidez' | 'sobrevivencia',
-  modalidad: 'retiro_programado' | 'renta_vitalicia' = 'retiro_programado'
+  modalidad: 'retiro_programado' | 'renta_vitalicia' = 'retiro_programado',
+  anoCalendario: number = 2026
 ): number {
-  if (edad < 0 || edad > 110) {
-    return 1.0;
-  }
-  
-  let tabla: Record<number, number>;
-  
-  if (tipoPension === 'invalidez') {
-    tabla = sexo === 'M' ? TABLA_MI_H_2020 : TABLA_MI_M_2020;
-  } else if (modalidad === 'renta_vitalicia' && sexo === 'F') {
-    tabla = TABLA_RV_M_2020;
-  } else if (sexo === 'M') {
-    tabla = TABLA_CB_H_2020;
-  } else {
-    tabla = TABLA_B_M_2020;
-  }
-  
-  return tabla[edad] ?? tabla[Math.min(edad, 110)] ?? 1.0;
+  return getQxGeneracional(
+    edad,
+    sexo,
+    anoCalendario,
+    tipoPension === 'invalidez',
+    modalidad
+  );
 }
 
 /**
- * Alias para getQx compatible con el motor de cálculo
+ * Obtiene la probabilidad anual de muerte qx (alias compatible)
  */
 export function getQx(
   edad: number,
   sexo: 'M' | 'F',
   esInvalido: boolean = false,
-  modalidad: 'retiro_programado' | 'renta_vitalicia' = 'retiro_programado'
+  modalidad: 'retiro_programado' | 'renta_vitalicia' = 'retiro_programado',
+  anoCalendario: number = 2026
 ): number {
-  return getTasaMortalidad(
-    edad,
-    sexo,
-    esInvalido ? 'invalidez' : 'vejez',
-    modalidad
-  );
+  return getQxGeneracional(edad, sexo, anoCalendario, esInvalido, modalidad);
 }
 
 /**
@@ -232,32 +109,36 @@ export function calcularLx(
   edadObjetivo: number,
   sexo: 'M' | 'F',
   esInvalido: boolean = false,
-  modalidad: 'retiro_programado' | 'renta_vitalicia' = 'retiro_programado'
+  modalidad: 'retiro_programado' | 'renta_vitalicia' = 'retiro_programado',
+  anoInicio: number = 2026
 ): number {
   let lx = 100000;
   const edadMinima = esInvalido ? 18 : 0;
   
   for (let edad = edadMinima; edad < edadObjetivo; edad++) {
-    lx = lx * (1 - getQx(edad, sexo, esInvalido, modalidad));
+    const ano = anoInicio + (edad - edadMinima);
+    lx = lx * (1 - getQx(edad, sexo, esInvalido, modalidad, ano));
   }
   return lx;
 }
 
 /**
- * Calcula expectativa de vida abreviada
+ * Calcula la expectativa de vida abreviada mediante el modelo generacional oficial
  */
 export function calcularExpectativaVida(
   edad: number,
   sexo: 'M' | 'F',
   esInvalido: boolean = false,
-  modalidad: 'retiro_programado' | 'renta_vitalicia' = 'retiro_programado'
+  modalidad: 'retiro_programado' | 'renta_vitalicia' = 'retiro_programado',
+  anoInicio: number = 2026
 ): number {
   let expectativa = 0;
   let probSupervivencia = 1;
   const maxEdad = 110;
   
   for (let t = 1; t <= (maxEdad - edad); t++) {
-    probSupervivencia *= (1 - getQx(edad + t - 1, sexo, esInvalido, modalidad));
+    const ano = anoInicio + t - 1;
+    probSupervivencia *= (1 - getQx(edad + t - 1, sexo, esInvalido, modalidad, ano));
     expectativa += probSupervivencia;
   }
   
