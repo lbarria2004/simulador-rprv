@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { User, Wallet, HeartHandshake, Sparkles, Building2, RefreshCw } from 'lucide-react';
 import { AfiliadoState } from './types';
+import { calcularEdadDesdeFecha } from '@/lib/date-utils';
 
 interface AffiliateSidebarProps {
   afiliado: AfiliadoState;
@@ -145,16 +146,27 @@ export function AffiliateSidebar({
             </div>
           </div>
 
-          {/* Edad y Sexo */}
+          {/* Fecha de Nacimiento y Sexo */}
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1">
-              <Label className="text-xs text-slate-600">Edad (años)</Label>
+              <div className="flex items-center justify-between">
+                <Label className="text-xs text-slate-600">F. Nacimiento</Label>
+                <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-700 border-blue-200 py-0 h-4 font-semibold">
+                  {afiliado.edad} años
+                </Badge>
+              </div>
               <Input
-                type="number"
-                min={18}
-                max={100}
-                value={afiliado.edad}
-                onChange={e => setAfiliado(prev => ({ ...prev, edad: parseInt(e.target.value) || 0 }))}
+                type="date"
+                value={afiliado.fechaNacimiento || ''}
+                onChange={e => {
+                  const fecha = e.target.value;
+                  const edadCalc = calcularEdadDesdeFecha(fecha);
+                  setAfiliado(prev => ({
+                    ...prev,
+                    fechaNacimiento: fecha,
+                    edad: edadCalc
+                  }));
+                }}
                 className="h-8 text-xs font-semibold"
               />
             </div>
@@ -229,13 +241,24 @@ export function AffiliateSidebar({
             {afiliado.tieneConyuge && (
               <div className="grid grid-cols-2 gap-2 pt-1">
                 <div className="space-y-0.5">
-                  <Label className="text-[11px] text-slate-500">Edad Cónyuge</Label>
+                  <div className="flex items-center justify-between">
+                    <Label className="text-[11px] text-slate-500">F. Nacimiento Cónyuge</Label>
+                    <Badge variant="outline" className="text-[9px] bg-rose-50 text-rose-700 border-rose-200 py-0 h-3.5 font-semibold">
+                      {afiliado.edadConyuge} años
+                    </Badge>
+                  </div>
                   <Input
-                    type="number"
-                    min={18}
-                    max={100}
-                    value={afiliado.edadConyuge}
-                    onChange={e => setAfiliado(prev => ({ ...prev, edadConyuge: parseInt(e.target.value) || 0 }))}
+                    type="date"
+                    value={afiliado.fechaNacimientoConyuge || ''}
+                    onChange={e => {
+                      const fecha = e.target.value;
+                      const edadCalc = calcularEdadDesdeFecha(fecha);
+                      setAfiliado(prev => ({
+                        ...prev,
+                        fechaNacimientoConyuge: fecha,
+                        edadConyuge: edadCalc
+                      }));
+                    }}
                     className="h-7 text-xs bg-white"
                   />
                 </div>

@@ -2,35 +2,45 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { AffiliateSidebar } from '@/components/simulador/AffiliateSidebar';
+import { ModalitiesSelector } from '@/components/simulador/ModalitiesSelector';
+import { MultiQuotationResults } from '@/components/simulador/MultiQuotationResults';
 import { SummaryCards } from '@/components/simulador/SummaryCards';
 import { ScenarioSliders } from '@/components/simulador/ScenarioSliders';
 import { TrajectoryChart } from '@/components/simulador/TrajectoryChart';
 import { InsuranceRankingTable } from '@/components/simulador/InsuranceRankingTable';
 import { DecisionMatrix } from '@/components/simulador/DecisionMatrix';
-import { AfiliadoState, CláusulasState, CompaniasRankingItem } from '@/components/simulador/types';
+import { 
+  AfiliadoState, 
+  CláusulasState, 
+  CompaniasRankingItem,
+  ModalidadConfig,
+  CotizacionItemResultado
+} from '@/components/simulador/types';
 import {
   calcularRetiroProgramado,
   calcularRVInmediata,
+  calcularRVPeriodoGarantizado,
+  calcularRVAumentoTemporal,
   calcularRVConAmbasClausulas,
   calcularPGU,
   calcularBAC,
   BeneficiarioPension,
   ResultadoEscenario,
   AFP,
-  TASAS_INTERES
+  Sexo
 } from '@/lib/pension-calculator';
 import { TASAS_RENTA_VITALICIA } from '@/lib/tablas-mortalidad';
+import { calcularFechaDesdeEdad } from '@/lib/date-utils';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   Building2, 
-  Sparkles, 
   Layers, 
   BarChart3, 
-  FileText, 
   CheckCircle, 
   ShieldCheck, 
-  Scale
+  Scale,
+  Sliders
 } from 'lucide-react';
 
 const CLASIFICACIONES_RIESGO: Record<string, string> = {
@@ -52,11 +62,13 @@ export default function SimuladorPage() {
   const [fuenteUF, setFuenteUF] = useState<string>('sii.cl');
   const [isLoadingUF, setIsLoadingUF] = useState<boolean>(false);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState<boolean>(false);
+  const [isCotizando, setIsCotizando] = useState<boolean>(false);
 
   // Estado del Afiliado (por defecto: Caso real Juan Zamora SCOMP)
   const [afiliado, setAfiliado] = useState<AfiliadoState>({
     nombre: 'Juan Lorenzo Zamora Mena',
     rut: '9.171.135-4',
+    fechaNacimiento: '1961-02-15',
     edad: 65,
     sexo: 'M',
     fondosUF: 1035.47,
@@ -64,12 +76,42 @@ export default function SimuladorPage() {
     anosCotizados: 25,
     tipoPension: 'vejez',
     tieneConyuge: true,
+    fechaNacimientoConyuge: '1964-06-10',
     edadConyuge: 62,
     sexoConyuge: 'F',
     conAsesor: true
   });
 
-  // Estado de las Cláusulas y Escenarios
+  // Modalidades configuradas para cotizar en lote
+  const [modalidades, setModalidades] = useState<ModalidadConfig[]>([
+    {
+      id: 'base-rp',
+      tipo: 'retiro_programado',
+      nombre: 'Retiro Programado',
+      descripcion: 'Administrado por AFP • Fondos heredables',
+      activa: true
+    },
+    {
+      id: 'base-rv-simple',
+      tipo: 'renta_vitalicia_simple',
+      nombre: 'Renta Vitalicia Inmediata Simple',
+      descripcion: 'Aseguradora • Pensión fija en UF de por vida',
+      activa: true
+    },
+    {
+      id: 'base-rv-garantizada-15',
+      tipo: 'rv_garantizada',
+      nombre: 'RV Garantizada 15 años (180 meses)',
+      descripcion: 'Pensión fija con garantía de pago por 15 años a beneficiarios o herederos',
+      mesesGarantizados: 180,
+      activa: true
+    }
+  ]);
+
+  // Resultados de la cotización generada
+  const [cotizacionResultados, setCotizacionResultados] = useState<CotizacionItemResultado[]>([]);
+
+  // Estado de las Cláusulas y Escenarios para explorador complementario
   const [clausulas, setClausulas] = useState<CláusulasState>({
     mesesGarantizados: 180, // 15 años
     mesesAumento: 36,       // 3 años
@@ -113,6 +155,7 @@ export default function SimuladorPage() {
       setAfiliado({
         nombre: 'Juan Lorenzo Zamora Mena',
         rut: '9.171.135-4',
+        fechaNacimiento: '1961-02-15',
         edad: 65,
         sexo: 'M',
         fondosUF: 1035.47,
@@ -120,6 +163,7 @@ export default function SimuladorPage() {
         anosCotizados: 25,
         tipoPension: 'vejez',
         tieneConyuge: true,
+        fechaNacimientoConyuge: '1964-06-10',
         edadConyuge: 62,
         sexoConyuge: 'F',
         conAsesor: true
@@ -134,6 +178,7 @@ export default function SimuladorPage() {
       setAfiliado({
         nombre: 'Mónica Cecilia Spuler Inostroza',
         rut: '7.706.092-8',
+        fechaNacimiento: '1962-04-12',
         edad: 64,
         sexo: 'F',
         fondosUF: 2177.40,
@@ -141,6 +186,7 @@ export default function SimuladorPage() {
         anosCotizados: 30,
         tipoPension: 'vejez',
         tieneConyuge: true,
+        fechaNacimientoConyuge: '1956-08-20',
         edadConyuge: 70,
         sexoConyuge: 'M',
         conAsesor: true
@@ -155,6 +201,7 @@ export default function SimuladorPage() {
       setAfiliado({
         nombre: 'Afiliado Soltero',
         rut: '12.345.678-9',
+        fechaNacimiento: '1961-01-01',
         edad: 65,
         sexo: 'M',
         fondosUF: 1500.00,
@@ -162,6 +209,7 @@ export default function SimuladorPage() {
         anosCotizados: 20,
         tipoPension: 'vejez',
         tieneConyuge: false,
+        fechaNacimientoConyuge: undefined,
         edadConyuge: 60,
         sexoConyuge: 'F',
         conAsesor: false
@@ -169,10 +217,137 @@ export default function SimuladorPage() {
     }
   };
 
-  // ==========================================
-  // MOTOR DE CÁLCULO ACTUARIAL EN TIEMPO REAL
-  // ==========================================
-  const calculos = useMemo(() => {
+  // Función de cálculo individual por modalidad
+  const calcularModalidad = useCallback((
+    mod: ModalidadConfig,
+    fondosRP: number,
+    fondosRV: number,
+    edad: number,
+    sexo: Sexo,
+    tasaRVSimple: number,
+    beneficiarios: BeneficiarioPension[]
+  ): CotizacionItemResultado => {
+    let resultado: ResultadoEscenario;
+
+    if (mod.tipo === 'retiro_programado') {
+      resultado = calcularRetiroProgramado(fondosRP, edad, sexo, 0.0358, beneficiarios);
+    } else if (mod.tipo === 'renta_vitalicia_simple') {
+      resultado = calcularRVInmediata(fondosRV, edad, sexo, tasaRVSimple, beneficiarios);
+    } else if (mod.tipo === 'rv_garantizada') {
+      resultado = calcularRVPeriodoGarantizado(
+        fondosRV,
+        edad,
+        sexo,
+        mod.mesesGarantizados || 180,
+        tasaRVSimple,
+        beneficiarios
+      );
+    } else if (mod.tipo === 'rv_aumento_temporal') {
+      resultado = calcularRVAumentoTemporal(
+        fondosRV,
+        edad,
+        sexo,
+        mod.mesesAumento || 36,
+        mod.porcentajeAumento || 1.0,
+        tasaRVSimple,
+        beneficiarios
+      );
+    } else {
+      // RV Combinada
+      resultado = calcularRVConAmbasClausulas(
+        fondosRV,
+        edad,
+        sexo,
+        mod.mesesGarantizados || 180,
+        mod.mesesAumento || 36,
+        mod.porcentajeAumento || 1.0,
+        tasaRVSimple,
+        beneficiarios
+      );
+    }
+
+    const pguObj = clausulas.incluirPGU 
+      ? calcularPGU(resultado.pensionMensual, edad) 
+      : { montoBeneficioCLP: 0, cumpleRequisitos: false, descripcion: '' };
+    const pguMensual = pguObj.montoBeneficioCLP;
+
+    const bacObj = clausulas.incluirBAC 
+      ? calcularBAC(afiliado.anosCotizados, 0, valorUF) 
+      : { beneficioCLP: 0, beneficioUF: 0, cumpleRequisitos: false, descripcion: '' };
+    const bacMensual = bacObj.beneficioCLP;
+
+    const totalCLP = resultado.pensionMensual + pguMensual + bacMensual;
+    const totalUF = valorUF > 0 ? totalCLP / valorUF : 0;
+
+    return {
+      config: mod,
+      resultado,
+      pguMensual,
+      bacMensual,
+      totalConBeneficiosCLP: Math.round(totalCLP),
+      totalConBeneficiosUF: Number(totalUF.toFixed(2))
+    };
+  }, [afiliado.anosCotizados, clausulas.incluirPGU, clausulas.incluirBAC, valorUF]);
+
+  // Manejar cálculo de todas las modalidades activas en lote
+  const handleGenerarCotizacion = useCallback(() => {
+    setIsCotizando(true);
+    try {
+      const beneficiarios: BeneficiarioPension[] = [];
+      if (afiliado.tieneConyuge) {
+        beneficiarios.push({
+          tipo: 'conyuge',
+          edad: afiliado.edadConyuge,
+          sexo: afiliado.sexoConyuge,
+          porcentajePension: 0.60
+        });
+      }
+
+      const fondosBase = afiliado.fondosCLP;
+      const fondosRP = afiliado.conAsesor ? fondosBase * (1 - 0.012) : fondosBase;
+      const fondosRV = afiliado.conAsesor ? fondosBase * (1 - 0.015) : fondosBase;
+      const tasaRVSimple = TASAS_RENTA_VITALICIA.companias['4LIFE']?.vejez || 0.0292;
+
+      const activas = modalidades.filter(m => m.activa);
+      const resultados = activas.map(mod =>
+        calcularModalidad(
+          mod,
+          fondosRP,
+          fondosRV,
+          afiliado.edad,
+          afiliado.sexo,
+          tasaRVSimple,
+          beneficiarios
+        )
+      );
+
+      setCotizacionResultados(resultados);
+    } finally {
+      setIsCotizando(false);
+    }
+  }, [afiliado, modalidades, calcularModalidad]);
+
+  // Generar cotización inicial al cargar o cambiar parámetros clave
+  useEffect(() => {
+    handleGenerarCotizacion();
+  }, [handleGenerarCotizacion]);
+
+  // Manejadores de modalidades
+  const handleToggleModalidad = (id: string) => {
+    setModalidades(prev => prev.map(m => m.id === id ? { ...m, activa: !m.activa } : m));
+  };
+
+  const handleAgregarModalidad = (nueva: Omit<ModalidadConfig, 'id'>) => {
+    const id = `custom-${Date.now()}`;
+    setModalidades(prev => [...prev, { ...nueva, id }]);
+  };
+
+  const handleEliminarModalidad = (id: string) => {
+    setModalidades(prev => prev.filter(m => m.id !== id));
+  };
+
+  // Cálculos complementarios de ranking de aseguradoras
+  const rankingCompanias = useMemo(() => {
     const beneficiarios: BeneficiarioPension[] = [];
     if (afiliado.tieneConyuge) {
       beneficiarios.push({
@@ -183,48 +358,10 @@ export default function SimuladorPage() {
       });
     }
 
-    // Descuento regulado de comisión de asesor según SCOMP (1,5% en RV, 1,2% en RP)
     const fondosBase = afiliado.fondosCLP;
-    const fondosRP = afiliado.conAsesor ? fondosBase * (1 - 0.012) : fondosBase;
     const fondosRV = afiliado.conAsesor ? fondosBase * (1 - 0.015) : fondosBase;
 
-    // 1. Retiro Programado (tasa de mercado ~3.58%)
-    const resultadoRP = calcularRetiroProgramado(
-      fondosRP,
-      afiliado.edad,
-      afiliado.sexo,
-      0.0358,
-      beneficiarios
-    );
-
-    // 2. Renta Vitalicia Simple (tasa mercado CMF ~2.80% - 2.92%)
-    const tasaRVSimple = TASAS_RENTA_VITALICIA.companias['4LIFE']?.vejez || 0.0292;
-    const resultadoRVSimple = calcularRVInmediata(
-      fondosRV,
-      afiliado.edad,
-      afiliado.sexo,
-      tasaRVSimple,
-      beneficiarios
-    );
-
-    // 3. Renta Vitalicia con Cláusulas (Aumento Temporal + Garantía)
-    const resultadoRVClausulas = calcularRVConAmbasClausulas(
-      fondosRV,
-      afiliado.edad,
-      afiliado.sexo,
-      clausulas.mesesGarantizados,
-      clausulas.mesesAumento,
-      clausulas.porcentajeAumento,
-      tasaRVSimple,
-      beneficiarios
-    );
-
-    // 4. Beneficios Estatales
-    const pgu = calcularPGU(resultadoRVSimple.pensionMensual, afiliado.edad);
-    const bac = calcularBAC(afiliado.anosCotizados, 0, valorUF);
-
-    // 5. Ranking por Compañías Aseguradoras
-    const rankingCompanias: CompaniasRankingItem[] = [];
+    const ranking: CompaniasRankingItem[] = [];
     for (const [key, item] of Object.entries(TASAS_RENTA_VITALICIA.companias)) {
       if (!item.vejez) continue;
       const rvComp = calcularRVInmediata(
@@ -235,7 +372,7 @@ export default function SimuladorPage() {
         beneficiarios
       );
 
-      rankingCompanias.push({
+      ranking.push({
         nombre: key.replace('_', ' '),
         rating: CLASIFICACIONES_RIESGO[key] || 'AA+',
         tasaVejez: item.vejez,
@@ -243,18 +380,10 @@ export default function SimuladorPage() {
         pensionCLP: rvComp.pensionMensual
       });
     }
+    return ranking;
+  }, [afiliado]);
 
-    return {
-      resultadoRP,
-      resultadoRVSimple,
-      resultadoRVClausulas,
-      pgu,
-      bac,
-      rankingCompanias
-    };
-  }, [afiliado, clausulas, valorUF]);
-
-  // Descarga del Informe PDF Oficial
+  // Descarga del Informe PDF Oficial con todas las modalidades cotizadas
   const handleGenerarPDF = async () => {
     setIsGeneratingPDF(true);
     try {
@@ -266,6 +395,7 @@ export default function SimuladorPage() {
             nombre: afiliado.nombre || 'Afiliado',
             sexo: afiliado.sexo,
             edad: afiliado.edad,
+            fechaNacimiento: afiliado.fechaNacimiento,
             fondosAcumulados: afiliado.fondosCLP,
             anosCotizados: afiliado.anosCotizados,
             tipoPension: afiliado.tipoPension
@@ -278,11 +408,7 @@ export default function SimuladorPage() {
             incluirBAC: clausulas.incluirBAC,
             afpSeleccionada: clausulas.afpSeleccionada
           },
-          resultados: [
-            calculos.resultadoRP,
-            calculos.resultadoRVSimple,
-            calculos.resultadoRVClausulas
-          ],
+          resultados: cotizacionResultados.map(r => r.resultado),
           beneficiarios: afiliado.tieneConyuge ? [{
             tipo: 'conyuge',
             edad: afiliado.edadConyuge,
@@ -311,6 +437,11 @@ export default function SimuladorPage() {
     }
   };
 
+  // Extraer resultados representativos para gráficos y tablas comparativas
+  const primerRP = cotizacionResultados.find(r => r.config.tipo === 'retiro_programado')?.resultado;
+  const primerRVSimple = cotizacionResultados.find(r => r.config.tipo === 'renta_vitalicia_simple')?.resultado;
+  const primerRVClausula = cotizacionResultados.find(r => r.config.tipo !== 'retiro_programado' && r.config.tipo !== 'renta_vitalicia_simple')?.resultado;
+
   return (
     <div className="min-h-screen bg-slate-100/70 text-slate-900 pb-12">
       {/* Barra de Encabezado Superior */}
@@ -325,7 +456,7 @@ export default function SimuladorPage() {
                 Simulador Actuarial de Pensiones SCOMP
               </h1>
               <span className="text-[11px] text-slate-500 font-medium">
-                Calibrado con normativa SP, CMF y Servicio de Impuestos Internos (SII)
+                Tablas TM-2020 Oficiales • SII • CMF • Multi-Cotización en Lote
               </span>
             </div>
           </div>
@@ -338,7 +469,7 @@ export default function SimuladorPage() {
 
             <Badge variant="outline" className="text-xs bg-blue-50 text-blue-800 border-blue-200 gap-1.5 py-1 px-2.5 font-medium hidden sm:flex">
               <ShieldCheck className="w-3.5 h-3.5 text-blue-600" />
-              <span>Tasas CMF 2026</span>
+              <span>Tablas TM-2020</span>
             </Badge>
           </div>
         </div>
@@ -362,28 +493,25 @@ export default function SimuladorPage() {
 
           {/* Panel Principal (8 columnas en LG) */}
           <div className="lg:col-span-8 space-y-5">
-            {/* 1. Tarjetas Ejecutivas de Comparación */}
-            <SummaryCards
-              resultadoRP={calculos.resultadoRP}
-              resultadoRVSimple={calculos.resultadoRVSimple}
-              resultadoRVClausulas={calculos.resultadoRVClausulas}
-              afpSeleccionada={clausulas.afpSeleccionada}
-              onSelectAFP={(afp: AFP) => setClausulas(prev => ({ ...prev, afpSeleccionada: afp }))}
-              pgu={calculos.pgu}
-              bac={calculos.bac}
-              edadAfiliado={afiliado.edad}
+            {/* 1. Selector y Constructor de Modalidades a Cotizar */}
+            <ModalitiesSelector
+              modalidades={modalidades}
+              onToggleModalidad={handleToggleModalidad}
+              onAgregarModalidad={handleAgregarModalidad}
+              onEliminarModalidad={handleEliminarModalidad}
+              onGenerarCotizacion={handleGenerarCotizacion}
+              isCotizando={isCotizando}
             />
 
-            {/* 2. Sliders Interactivos de Cláusulas */}
-            <ScenarioSliders
-              clausulas={clausulas}
-              setClausulas={setClausulas}
-              anosCotizados={afiliado.anosCotizados}
-              setAnosCotizados={(anos: number) => setAfiliado(prev => ({ ...prev, anosCotizados: anos }))}
-              bacUF={calculos.bac.beneficioUF}
+            {/* 2. Resultados Consolidados de la Multi-Cotización */}
+            <MultiQuotationResults
+              items={cotizacionResultados}
+              valorUF={valorUF}
+              onDescargarPDF={handleGenerarPDF}
+              isGeneratingPDF={isGeneratingPDF}
             />
 
-            {/* 3. Pestañas de Detalle (Gráfico, Ranking de Aseguradoras y Matriz Cliente) */}
+            {/* 3. Pestañas de Análisis Detallado (Curva a 25 años, Ranking Aseguradoras, Sliders y Matriz) */}
             <Tabs defaultValue="grafico" className="w-full">
               <TabsList className="grid grid-cols-3 bg-white border border-slate-200 h-10 p-1 rounded-xl shadow-xs">
                 <TabsTrigger value="grafico" className="text-xs font-semibold gap-1.5 data-[state=active]:bg-blue-50 data-[state=active]:text-blue-900">
@@ -396,39 +524,43 @@ export default function SimuladorPage() {
                   <span>Ranking Aseguradoras CMF</span>
                 </TabsTrigger>
 
-                <TabsTrigger value="matriz" className="text-xs font-semibold gap-1.5 data-[state=active]:bg-blue-50 data-[state=active]:text-blue-900">
-                  <Scale className="w-3.5 h-3.5" />
-                  <span>Matriz para el Cliente</span>
+                <TabsTrigger value="sliders" className="text-xs font-semibold gap-1.5 data-[state=active]:bg-blue-50 data-[state=active]:text-blue-900">
+                  <Sliders className="w-3.5 h-3.5" />
+                  <span>Ajustes Finos</span>
                 </TabsTrigger>
               </TabsList>
 
               <TabsContent value="grafico" className="pt-3">
-                <TrajectoryChart
-                  edadInicial={afiliado.edad}
-                  proyeccionRP={calculos.resultadoRP.proyeccion}
-                  resultadoRVSimple={calculos.resultadoRVSimple}
-                  resultadoRVClausulas={calculos.resultadoRVClausulas}
-                  valorUF={valorUF}
-                />
+                {primerRP && primerRVSimple && (
+                  <TrajectoryChart
+                    edadInicial={afiliado.edad}
+                    proyeccionRP={primerRP.proyeccion}
+                    resultadoRVSimple={primerRVSimple}
+                    resultadoRVClausulas={primerRVClausula || primerRVSimple}
+                    valorUF={valorUF}
+                  />
+                )}
               </TabsContent>
 
               <TabsContent value="ranking" className="pt-3">
                 <InsuranceRankingTable
-                  items={calculos.rankingCompanias}
+                  items={rankingCompanias}
                   valorUF={valorUF}
                 />
               </TabsContent>
 
-              <TabsContent value="matriz" className="pt-3">
-                <DecisionMatrix
-                  onGenerarPDF={handleGenerarPDF}
-                  isGeneratingPDF={isGeneratingPDF}
-                  nombreAfiliado={afiliado.nombre}
+              <TabsContent value="sliders" className="pt-3">
+                <ScenarioSliders
+                  clausulas={clausulas}
+                  setClausulas={setClausulas}
+                  anosCotizados={afiliado.anosCotizados}
+                  setAnosCotizados={(anos: number) => setAfiliado(prev => ({ ...prev, anosCotizados: anos }))}
+                  bacUF={calcularBAC(afiliado.anosCotizados, 0, valorUF).beneficioUF}
                 />
               </TabsContent>
             </Tabs>
 
-            {/* Matriz siempre accesible al pie para generación rápida de PDF */}
+            {/* Matriz siempre accesible al pie para asesoría y generación de PDF */}
             <DecisionMatrix
               onGenerarPDF={handleGenerarPDF}
               isGeneratingPDF={isGeneratingPDF}
