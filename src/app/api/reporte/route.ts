@@ -252,6 +252,12 @@ export async function POST(request: NextRequest) {
     drawText(page, `Saldo Acumulado (Bruto): ${fondosUF} UF`, 50, y, { size: 10, font: fontRegular });
     y -= 20;
 
+    // Obtener comisión AFP seleccionada (compartido para vejez e invalidez)
+    const afpSeleccionada = parametros.afpSeleccionada || 'HABITAT';
+    const comisionAFP = COMISIONES_AFP[afpSeleccionada] ?? 0.0095;
+    const comisionAFPPct = (comisionAFP * 100).toFixed(2).replace('.', ',');
+    const afpLabel = AFP_LABELS[afpSeleccionada] || 'AFP Habitat (0,95%)';
+
     // ========== PENSIÓN DE VEJEZ ==========
     if (tipoPension === 'vejez') {
       // Clasificar resultados por tipo usando propiedades del objeto
@@ -273,12 +279,6 @@ export async function POST(request: NextRequest) {
       
       // Número de sección dinámico
       let numSeccion = 1;
-
-      // Obtener comisión AFP seleccionada
-      const afpSeleccionada = parametros.afpSeleccionada || 'HABITAT';
-      const comisionAFP = COMISIONES_AFP[afpSeleccionada] ?? 0.0095;
-      const comisionAFPPct = (comisionAFP * 100).toFixed(2).replace('.', ',');
-      const afpLabel = AFP_LABELS[afpSeleccionada] || 'AFP Habitat (0,95%)';
 
       // 1. Retiro Programado
       if (retiroProgramado) {
@@ -455,7 +455,7 @@ export async function POST(request: NextRequest) {
           if (parametros.usarProyeccionUF && parametros.incrementoAnualUF) {
             const anosAumento = mesesAumento / 12;
             ufFutura = parametros.uf + (anosAumento * parametros.incrementoAnualUF);
-            pensionBaseProyectada = pensionBaseUF * ufFutura;
+            pensionBaseProyectada = (pensionBase / parametros.uf) * ufFutura;
             pensionBaseProyectadaUF = pensionBaseUF; // UF se mantiene igual
             const descSaludProyectada = Math.round(pensionBaseProyectada * 0.07);
             pensionBaseLiqProyectada = pensionBaseProyectada - descSaludProyectada;
@@ -909,7 +909,7 @@ export async function POST(request: NextRequest) {
     const filename = `Estudio${tipoSuffix}_${nombreLimpio}.pdf`;
 
     // Retornar el PDF
-    return new NextResponse(pdfBytes, {
+    return new Response(Buffer.from(pdfBytes), {
       status: 200,
       headers: {
         'Content-Type': 'application/pdf',

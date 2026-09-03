@@ -74,7 +74,7 @@ export async function GET() {
       sobrevivencia: number;
       media: number;
     }> = {};
-    let mediaMercado = null;
+    let mediaMercado: any = null;
 
     for (let i = 1; i < rows.length; i++) {
       const r = rows[i];

@@ -226,7 +226,7 @@ export default function SimuladorPage() {
     // 5. Ranking por Compañías Aseguradoras
     const rankingCompanias: CompaniasRankingItem[] = [];
     for (const [key, item] of Object.entries(TASAS_RENTA_VITALICIA.companias)) {
-      if (!item.vejez || item.vejez === 0) continue;
+      if (!item.vejez) continue;
       const rvComp = calcularRVInmediata(
         fondosRV,
         afiliado.edad,

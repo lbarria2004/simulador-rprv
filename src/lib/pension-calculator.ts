@@ -41,6 +41,7 @@ export type Sexo = 'M' | 'F';
 export type TipoPension = 'vejez' | 'invalidez' | 'sobrevivencia';
 export type ModalidadPension = 'retiro_programado' | 'renta_vitalicia';
 export type GradoInvalidez = 'total' | 'total_2_3' | 'parcial';
+export type AFP = 'PLANVITAL' | 'HABITAT' | 'CAPITAL' | 'CUPRUM' | 'MODELO' | 'PROVIDA' | 'UNO';
 
 export type MesesGarantizados = number;
 export type MesesAumento = number;
