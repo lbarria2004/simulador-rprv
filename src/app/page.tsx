@@ -15,7 +15,8 @@ import {
   CompaniasRankingItem,
   ModalidadConfig,
   CotizacionItemResultado,
-  InvalidezFinanciamientoInfo
+  InvalidezFinanciamientoInfo,
+  SobrevivenciaFinanciamientoInfo
 } from '@/components/simulador/types';
 import {
   calcularRetiroProgramado,
@@ -26,8 +27,13 @@ import {
   calcularPGU,
   calcularBAC,
   calcularFinanciamientoInvalidez,
+  calcularFinanciamientoSobrevivencia,
+  calcularCNUSobrevivencia,
+  calcularPorcentajesBeneficiarios,
+  calcularExpectativaVida,
   BeneficiarioPension,
   ResultadoEscenario,
+  ProyeccionAnual,
   AFP,
   Sexo
 } from '@/lib/pension-calculator';
@@ -274,11 +280,92 @@ export default function SimuladorPage() {
     sexo: Sexo,
     tasaRVSimple: number,
     beneficiarios: BeneficiarioPension[],
-    esInvalido: boolean = false
+    esInvalido: boolean = false,
+    tipoPension: 'vejez' | 'invalidez' | 'sobrevivencia' = 'vejez'
   ): CotizacionItemResultado => {
     let resultado: ResultadoEscenario;
 
-    if (mod.tipo === 'retiro_programado') {
+    if (tipoPension === 'sobrevivencia') {
+      const porcentajes = calcularPorcentajesBeneficiarios(beneficiarios);
+      if (mod.tipo === 'retiro_programado') {
+        const { cnuTotal: cnuRP } = calcularCNUSobrevivencia(beneficiarios, 0.0358, 'retiro_programado');
+        const pensionRP = cnuRP > 0 ? fondosRP / cnuRP : 0;
+        const pensionPorBen = porcentajes.map(b => ({
+          tipo: b.tipo,
+          porcentaje: b.porcentaje,
+          pensionMensual: Math.round(pensionRP * b.porcentaje)
+        }));
+
+        const proyeccionRP: ProyeccionAnual[] = [];
+        let saldoTemp = fondosRP;
+        for (let y = 0; y <= 25; y++) {
+          const pAnual = (saldoTemp / (cnuRP > 0 ? cnuRP : 1)) * 12;
+          proyeccionRP.push({
+            año: y + 1,
+            edad: edad + y,
+            pensionMensual: Math.round(pAnual / 12),
+            saldoAcumulado: Math.round(saldoTemp),
+            retiroAcumulado: 0,
+            fase: 'decreciente'
+          });
+          saldoTemp = Math.max(0, (saldoTemp - pAnual) * (1 + 0.0358));
+          if (saldoTemp <= 0) break;
+        }
+
+        resultado = {
+          nombre: 'Retiro Programado Sobrevivencia',
+          pensionMensual: Math.round(pensionRP),
+          pensionEnUF: valorUF > 0 ? Number((pensionRP / valorUF).toFixed(2)) : 0,
+          pensionAnual: Math.round(pensionRP * 12),
+          cnu: cnuRP,
+          tasaInteres: 0.0358,
+          expectativaVida: calcularExpectativaVida(porcentajes[0]?.edad || 60, porcentajes[0]?.sexo || 'F'),
+          pensionPorBeneficiario: pensionPorBen,
+          proyeccion: proyeccionRP,
+          advertencias: ['Pensión de Sobrevivencia Legal (D.L. 3.500 Art. 58)', 'Recálculo anual por saldo decreciente en AFP']
+        };
+      } else {
+        // Modalidades de Renta Vitalicia en Sobrevivencia
+        const { cnuTotal: cnuRVBase } = calcularCNUSobrevivencia(beneficiarios, tasaRVSimple, 'renta_vitalicia');
+        let factorAjusteModalidad = 1.0;
+        if (mod.tipo === 'rv_garantizada') {
+          const mesesGarantizados = mod.mesesGarantizados || 180;
+          factorAjusteModalidad = 1 + (mesesGarantizados / 1200) * 0.45;
+        } else if (mod.tipo === 'rv_aumento_temporal') {
+          const mesesAumento = mod.mesesAumento || 36;
+          const pctAumento = mod.porcentajeAumento || 1.0;
+          factorAjusteModalidad = 1 + (mesesAumento / 120) * pctAumento * 0.25;
+        } else if (mod.tipo === 'rv_combinada') {
+          const mesesGarantizados = mod.mesesGarantizados || 180;
+          const mesesAumento = mod.mesesAumento || 36;
+          const pctAumento = mod.porcentajeAumento || 1.0;
+          factorAjusteModalidad = 1 + ((mesesGarantizados / 1200) * 0.45) + ((mesesAumento / 120) * pctAumento * 0.25);
+        }
+
+        const cnuFinal = cnuRVBase * factorAjusteModalidad;
+        const pensionRV = cnuFinal > 0 ? fondosRV / cnuFinal : 0;
+        const pensionPorBen = porcentajes.map(b => ({
+          tipo: b.tipo,
+          porcentaje: b.porcentaje,
+          pensionMensual: Math.round(pensionRV * b.porcentaje)
+        }));
+
+        resultado = {
+          nombre: mod.nombre,
+          pensionMensual: Math.round(pensionRV),
+          pensionEnUF: valorUF > 0 ? Number((pensionRV / valorUF).toFixed(2)) : 0,
+          pensionAnual: Math.round(pensionRV * 12),
+          cnu: cnuFinal,
+          tasaInteres: tasaRVSimple,
+          expectativaVida: calcularExpectativaVida(porcentajes[0]?.edad || 60, porcentajes[0]?.sexo || 'F'),
+          pensionPorBeneficiario: pensionPorBen,
+          advertencias: [
+            'Renta Vitalicia Fija en UF de por vida',
+            'Distribución a beneficiarios según Art. 58 DL 3.500'
+          ]
+        };
+      }
+    } else if (mod.tipo === 'retiro_programado') {
       resultado = calcularRetiroProgramado(fondosRP, edad, sexo, 0.0358, beneficiarios, esInvalido);
     } else if (mod.tipo === 'renta_vitalicia_simple') {
       resultado = calcularRVInmediata(fondosRV, edad, sexo, tasaRVSimple, beneficiarios, esInvalido);
@@ -318,12 +405,12 @@ export default function SimuladorPage() {
       );
     }
 
-    const pguObj = clausulas.incluirPGU 
+    const pguObj = (clausulas.incluirPGU && tipoPension !== 'sobrevivencia')
       ? calcularPGU(resultado.pensionMensual, edad) 
       : null;
     const pguMensual = (pguObj && pguObj.aplica) ? (pguObj.montoMensual || 0) : 0;
 
-    const bacObj = clausulas.incluirBAC 
+    const bacObj = (clausulas.incluirBAC && tipoPension !== 'sobrevivencia')
       ? calcularBAC(afiliado.anosCotizados, 0, valorUF) 
       : null;
     const bacMensual = (bacObj && bacObj.aplica) ? (bacObj.beneficioMensualPesos || 0) : 0;
@@ -385,6 +472,42 @@ export default function SimuladorPage() {
     valorUF
   ]);
 
+  // Desglose actuarial de financiamiento para Pensión de Sobrevivencia (D.L. 3.500)
+  const financiamientoSobrevivencia = useMemo<SobrevivenciaFinanciamientoInfo | undefined>(() => {
+    if (afiliado.tipoPension !== 'sobrevivencia') return undefined;
+
+    const beneficiarios: BeneficiarioPension[] = (afiliado.beneficiarios && afiliado.beneficiarios.length > 0)
+      ? afiliado.beneficiarios
+      : (afiliado.tieneConyuge ? [{
+          tipo: 'conyuge',
+          edad: afiliado.edadConyuge,
+          sexo: afiliado.sexoConyuge,
+          porcentajePension: 0.60
+        }] : []);
+
+    const ingresoBase = afiliado.ingresoBaseCLP || 1200000;
+    const cubiertoSIS = afiliado.cubiertoSIS ?? true;
+
+    return calcularFinanciamientoSobrevivencia(
+      afiliado.fondosCLP,
+      ingresoBase,
+      cubiertoSIS,
+      beneficiarios,
+      0.0358,
+      valorUF
+    );
+  }, [
+    afiliado.tipoPension,
+    afiliado.fondosCLP,
+    afiliado.ingresoBaseCLP,
+    afiliado.cubiertoSIS,
+    afiliado.beneficiarios,
+    afiliado.tieneConyuge,
+    afiliado.edadConyuge,
+    afiliado.sexoConyuge,
+    valorUF
+  ]);
+
   // Manejar cálculo de todas las modalidades activas en lote
   const handleGenerarCotizacion = useCallback(() => {
     setIsCotizando(true);
@@ -399,11 +522,14 @@ export default function SimuladorPage() {
           }] : []);
 
       const esInvalido = afiliado.tipoPension === 'invalidez' || !!afiliado.esInvalido;
+      const esSobrevivencia = afiliado.tipoPension === 'sobrevivencia';
       
-      // En Pensión de Invalidez con cobertura SIS, el saldo para cotizar en SCOMP incluye el Aporte Adicional del SIS
+      // En Invalidez o Sobrevivencia con cobertura SIS, el saldo para cotizar en SCOMP incluye el Aporte Adicional del SIS
       const fondosEfectivos = (esInvalido && financiamientoInvalidez)
         ? financiamientoInvalidez.saldoTotalFinanciamientoCLP
-        : afiliado.fondosCLP;
+        : (esSobrevivencia && financiamientoSobrevivencia)
+          ? financiamientoSobrevivencia.saldoTotalFinanciamientoCLP
+          : afiliado.fondosCLP;
 
       const fondosRP = afiliado.conAsesor ? fondosEfectivos * (1 - 0.012) : fondosEfectivos;
       const fondosRV = afiliado.conAsesor ? fondosEfectivos * (1 - 0.015) : fondosEfectivos;
@@ -412,6 +538,8 @@ export default function SimuladorPage() {
       let tasaRVSimple = comp4Life?.vejez || 0.0308;
       if (esInvalido) {
         tasaRVSimple = (afiliado.gradoInvalidez === 'parcial' ? comp4Life?.invalidez_parcial : comp4Life?.invalidez_total) || comp4Life?.vejez || 0.0303;
+      } else if (esSobrevivencia) {
+        tasaRVSimple = comp4Life?.sobrevivencia || 0.0301;
       }
 
       const activas = modalidades.filter(m => m.activa);
@@ -424,7 +552,8 @@ export default function SimuladorPage() {
           afiliado.sexo,
           tasaRVSimple,
           beneficiarios,
-          esInvalido
+          esInvalido,
+          afiliado.tipoPension
         )
       );
 
@@ -432,7 +561,7 @@ export default function SimuladorPage() {
     } finally {
       setIsCotizando(false);
     }
-  }, [afiliado, modalidades, calcularModalidad, financiamientoInvalidez]);
+  }, [afiliado, modalidades, calcularModalidad, financiamientoInvalidez, financiamientoSobrevivencia]);
 
   // Generar cotización inicial al cargar o cambiar parámetros clave
   useEffect(() => {
@@ -465,37 +594,56 @@ export default function SimuladorPage() {
         }] : []);
 
     const esInvalido = afiliado.tipoPension === 'invalidez' || !!afiliado.esInvalido;
+    const esSobrevivencia = afiliado.tipoPension === 'sobrevivencia';
+
     const fondosEfectivos = (esInvalido && financiamientoInvalidez)
       ? financiamientoInvalidez.saldoTotalFinanciamientoCLP
-      : afiliado.fondosCLP;
+      : (esSobrevivencia && financiamientoSobrevivencia)
+        ? financiamientoSobrevivencia.saldoTotalFinanciamientoCLP
+        : afiliado.fondosCLP;
+
     const fondosRV = afiliado.conAsesor ? fondosEfectivos * (1 - 0.015) : fondosEfectivos;
 
     const ranking: CompaniasRankingItem[] = [];
     for (const [key, item] of Object.entries(TASAS_RENTA_VITALICIA?.companias || {})) {
-      const tasaAplicable = esInvalido 
-        ? ((afiliado.gradoInvalidez === 'parcial' ? item.invalidez_parcial : item.invalidez_total) || item.vejez)
-        : item.vejez;
+      let tasaAplicable = item.vejez;
+      if (esInvalido) {
+        tasaAplicable = (afiliado.gradoInvalidez === 'parcial' ? item.invalidez_parcial : item.invalidez_total) || item.vejez;
+      } else if (esSobrevivencia) {
+        tasaAplicable = item.sobrevivencia || item.vejez;
+      }
       if (!tasaAplicable || tasaAplicable <= 0) continue;
 
-      const rvComp = calcularRVInmediata(
-        fondosRV,
-        afiliado.edad,
-        afiliado.sexo,
-        tasaAplicable,
-        beneficiarios,
-        esInvalido
-      );
+      let pensionUF = 0;
+      let pensionCLP = 0;
+
+      if (esSobrevivencia) {
+        const { cnuTotal } = calcularCNUSobrevivencia(beneficiarios, tasaAplicable, 'renta_vitalicia');
+        pensionCLP = cnuTotal > 0 ? Math.round(fondosRV / cnuTotal) : 0;
+        pensionUF = valorUF > 0 ? Number((pensionCLP / valorUF).toFixed(2)) : 0;
+      } else {
+        const rvComp = calcularRVInmediata(
+          fondosRV,
+          afiliado.edad,
+          afiliado.sexo,
+          tasaAplicable,
+          beneficiarios,
+          esInvalido
+        );
+        pensionUF = rvComp.pensionEnUF;
+        pensionCLP = rvComp.pensionMensual;
+      }
 
       ranking.push({
         nombre: key.replace('_', ' '),
         rating: CLASIFICACIONES_RIESGO[key] || 'AA+',
         tasaVejez: tasaAplicable,
-        pensionUF: rvComp.pensionEnUF,
-        pensionCLP: rvComp.pensionMensual
+        pensionUF,
+        pensionCLP
       });
     }
     return ranking;
-  }, [afiliado, financiamientoInvalidez]);
+  }, [afiliado, financiamientoInvalidez, financiamientoSobrevivencia, valorUF]);
 
   // Descarga del Informe PDF Oficial con todas las modalidades cotizadas
   const handleGenerarPDF = async () => {
@@ -595,12 +743,12 @@ export default function SimuladorPage() {
         </div>
       </header>
 
-      {/* Selector Superior de Régimen de Pensión: Vejez vs Invalidez */}
+      {/* Selector Superior de Régimen de Pensión: Vejez vs Invalidez vs Sobrevivencia */}
       <div className="bg-white border-b border-slate-200/90 shadow-2xs">
         <div className="max-w-7xl mx-auto px-4 py-2.5 flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <span className="text-xs font-semibold text-slate-700 hidden sm:inline">Régimen Previsional:</span>
-            <div className="inline-flex p-1 bg-slate-100/90 rounded-xl border border-slate-200 shadow-2xs">
+            <div className="inline-flex p-1 bg-slate-100/90 rounded-xl border border-slate-200 shadow-2xs gap-1">
               <button
                 type="button"
                 onClick={() => {
@@ -610,7 +758,7 @@ export default function SimuladorPage() {
                     esInvalido: false
                   }));
                 }}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
                   afiliado.tipoPension === 'vejez'
                     ? 'bg-white text-blue-900 shadow-sm border border-slate-200/80 ring-1 ring-blue-500/20'
                     : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
@@ -638,7 +786,7 @@ export default function SimuladorPage() {
                     ingresoBaseUF: prev.ingresoBaseUF || (valorUF > 0 ? Math.round((1200000 / valorUF) * 100) / 100 : 29.35)
                   }));
                 }}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
                   afiliado.tipoPension === 'invalidez'
                     ? 'bg-amber-600 text-white shadow-sm ring-1 ring-amber-600/30'
                     : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
@@ -652,6 +800,33 @@ export default function SimuladorPage() {
                   </Badge>
                 )}
               </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setAfiliado(prev => ({
+                    ...prev,
+                    tipoPension: 'sobrevivencia',
+                    esInvalido: false,
+                    cubiertoSIS: prev.cubiertoSIS ?? true,
+                    ingresoBaseCLP: prev.ingresoBaseCLP || 1200000,
+                    ingresoBaseUF: prev.ingresoBaseUF || (valorUF > 0 ? Math.round((1200000 / valorUF) * 100) / 100 : 29.35)
+                  }));
+                }}
+                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  afiliado.tipoPension === 'sobrevivencia'
+                    ? 'bg-purple-700 text-white shadow-sm ring-1 ring-purple-700/30'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                }`}
+              >
+                <span className="text-base">🕊️</span>
+                <span>Pensión de Sobrevivencia</span>
+                {afiliado.tipoPension === 'sobrevivencia' && (
+                  <Badge variant="outline" className="text-[9px] bg-purple-600 text-white border-purple-500 py-0 h-4">
+                    Tablas B-2020 + SIS
+                  </Badge>
+                )}
+              </button>
             </div>
           </div>
 
@@ -660,6 +835,11 @@ export default function SimuladorPage() {
               <Badge className="bg-amber-100 text-amber-900 border-amber-300 gap-1.5 py-1 px-3">
                 <Accessibility className="w-3.5 h-3.5 text-amber-600" />
                 <span>Régimen Invalidez Calificada (D.L. 3.500) • Tabla {afiliado.sexo === 'M' ? 'MI-H-2020' : 'MI-M-2020'}</span>
+              </Badge>
+            ) : afiliado.tipoPension === 'sobrevivencia' ? (
+              <Badge className="bg-purple-100 text-purple-900 border-purple-300 gap-1.5 py-1 px-3">
+                <ShieldCheck className="w-3.5 h-3.5 text-purple-600" />
+                <span>Régimen Sobrevivencia Legal (D.L. 3.500 Art. 58) • Tablas B-M / B-H / MI</span>
               </Badge>
             ) : (
               <Badge className="bg-slate-100 text-slate-700 border-slate-300 gap-1.5 py-1 px-3">
@@ -684,6 +864,7 @@ export default function SimuladorPage() {
               onRefreshUF={fetchUF}
               isLoadingUF={isLoadingUF}
               invalidezInfo={financiamientoInvalidez}
+              sobrevivenciaInfo={financiamientoSobrevivencia}
             />
           </div>
 
@@ -707,6 +888,7 @@ export default function SimuladorPage() {
               isGeneratingPDF={isGeneratingPDF}
               tipoPension={afiliado.tipoPension}
               invalidezInfo={financiamientoInvalidez}
+              sobrevivenciaInfo={financiamientoSobrevivencia}
             />
 
             {/* 3. Pestañas de Análisis Detallado (Curva a 25 años, Ranking Aseguradoras, Sliders y Matriz) */}

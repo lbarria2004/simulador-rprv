@@ -23,6 +23,11 @@ import {
   calcularCapitalNecesarioInvalidez,
   calcularAporteAdicionalSIS,
   calcularFinanciamientoInvalidez,
+  calcularPensionReferenciaCausante,
+  calcularCapitalNecesarioSobrevivencia,
+  calcularAporteAdicionalSISSobrevivencia,
+  calcularFinanciamientoSobrevivencia,
+  calcularCNUSobrevivencia,
   PGU,
   BAC,
   TASAS_INTERES
@@ -357,6 +362,86 @@ describe('Motor Actuarial de Pensiones - Sistema Chileno', () => {
       assert.ok(des.capitalNecesarioCLP > 25_000_000);
       assert.equal(des.saldoTotalFinanciamientoCLP, des.capitalNecesarioCLP);
       assert.equal(des.aporteAdicionalSISCLP, des.capitalNecesarioCLP - 25_000_000);
+    });
+  });
+
+  describe('Pensión de Sobrevivencia y Aporte Adicional SIS (D.L. 3.500)', () => {
+    it('Pensión de Referencia del Causante equivale al 70% del Ingreso Base', () => {
+      const ingresoBase = 1_500_000;
+      const refCausante = calcularPensionReferenciaCausante(ingresoBase);
+
+      assert.equal(refCausante, 1_050_000, 'Debe ser exactamente 70% de 1.5M ($1.050.000)');
+    });
+
+    it('CNU de sobrevivencia para hijos trunca el flujo a los 18 años (no llega a 110)', () => {
+      const hijo8Anos: BeneficiarioPension[] = [{
+        tipo: 'hijo',
+        edad: 8,
+        sexo: 'M'
+      }];
+
+      const { cnuTotal } = calcularCNUSobrevivencia(hijo8Anos, 0.0358, 'retiro_programado');
+
+      // Un flujo de 10 años (8 a 18) con tasa 3.58% y factor 0.15 da un CNU moderado (< 15)
+      // Si fuera hasta los 110 años daría mucho más alto
+      assert.ok(cnuTotal > 0, 'CNU debe ser positivo');
+      assert.ok(cnuTotal < 15, `CNU de hijo de 8 años (${cnuTotal}) no debería superar 15 por ser temporal hasta los 18`);
+    });
+
+    it('Capital Necesario de Sobrevivencia es proporcional al grupo familiar y la pensión de referencia', () => {
+      const beneficiarios: BeneficiarioPension[] = [
+        { tipo: 'conyuge', edad: 60, sexo: 'F', porcentajePension: 0.60 }
+      ];
+      const pRef = 700_000;
+      const cnSob = calcularCapitalNecesarioSobrevivencia(pRef, beneficiarios, 0.0358);
+
+      assert.ok(cnSob > 0, 'Capital necesario de sobrevivencia debe ser mayor que cero');
+      assert.ok(cnSob > 10_000_000, 'Capital necesario debe ser significativo');
+    });
+
+    it('Aporte Adicional SIS de Sobrevivencia cubre la brecha del saldo del causante', () => {
+      const cn = 60_000_000;
+      const saldoCausante = 20_000_000;
+      const aporteCubierto = calcularAporteAdicionalSISSobrevivencia(cn, saldoCausante, true);
+      const aporteNoCubierto = calcularAporteAdicionalSISSobrevivencia(cn, saldoCausante, false);
+      const aporteSaldoMayor = calcularAporteAdicionalSISSobrevivencia(cn, 80_000_000, true);
+
+      assert.equal(aporteCubierto, 40_000_000, 'SIS debe enterar los $40M faltantes');
+      assert.equal(aporteNoCubierto, 0, 'Sin cobertura SIS no hay aporte');
+      assert.equal(aporteSaldoMayor, 0, 'Si saldo supera el CN no hay aporte');
+    });
+
+    it('Financiamiento integral de sobrevivencia desglosa pensiones de cónyuge e hijos con prorrateo', () => {
+      const beneficiarios: BeneficiarioPension[] = [
+        { tipo: 'conyuge', edad: 55, sexo: 'F' },
+        { tipo: 'hijo', edad: 10, sexo: 'M' }
+      ];
+
+      const fin = calcularFinanciamientoSobrevivencia(
+        15_000_000, // saldo causante
+        1_000_000,  // ingreso base
+        true,       // cubierto SIS
+        beneficiarios,
+        0.0358,
+        40876.41
+      );
+
+      assert.equal(fin.pensionReferenciaCausanteCLP, 700_000); // 70% de 1M
+      assert.equal(fin.beneficiarios.length, 2);
+
+      // Cónyuge con hijo tiene 50% legal
+      const conyuge = fin.beneficiarios.find(b => b.tipo === 'conyuge');
+      assert.equal(conyuge?.porcentaje, 0.50);
+      assert.equal(conyuge?.pensionReferenciaCLP, 350_000);
+
+      // Hijo tiene 15% legal
+      const hijo = fin.beneficiarios.find(b => b.tipo === 'hijo');
+      assert.equal(hijo?.porcentaje, 0.15);
+      assert.equal(hijo?.pensionReferenciaCLP, 105_000);
+
+      // Saldo total para SCOMP garantiza el Capital Necesario
+      assert.equal(fin.saldoTotalFinanciamientoCLP, fin.capitalNecesarioCLP);
+      assert.equal(fin.aporteAdicionalSISCLP, fin.capitalNecesarioCLP - 15_000_000);
     });
   });
 });

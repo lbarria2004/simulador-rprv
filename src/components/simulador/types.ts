@@ -40,6 +40,35 @@ export interface InvalidezFinanciamientoInfo {
   porcentajeReferencia: number; // 0.70 o 0.50
 }
 
+export interface BeneficiarioSobrevivenciaInfo {
+  tipo: string;
+  nombre?: string;
+  edad: number;
+  sexo: Sexo;
+  porcentaje: number;
+  porcentajeOriginal: number;
+  pensionReferenciaCLP: number;
+  pensionReferenciaUF: number;
+}
+
+export interface SobrevivenciaFinanciamientoInfo {
+  pensionReferenciaCausanteCLP: number;
+  pensionReferenciaCausanteUF: number;
+  capitalNecesarioCLP: number;
+  capitalNecesarioUF: number;
+  aporteAdicionalSISCLP: number;
+  aporteAdicionalSISUF: number;
+  saldoPropioCLP: number;
+  saldoPropioUF: number;
+  saldoTotalFinanciamientoCLP: number;
+  saldoTotalFinanciamientoUF: number;
+  cubiertoSIS: boolean;
+  cnuTotalSobrevivencia: number;
+  beneficiarios: BeneficiarioSobrevivenciaInfo[];
+  sumaPorcentajesOriginales: number;
+  factorProrrateo: number;
+}
+
 export interface CláusulasState {
   mesesGarantizados: number;
   mesesAumento: number;

@@ -63,7 +63,7 @@ export function InsuranceRankingTable({ items, valorUF, tipoPension = 'vejez' }:
                 <TableHead className="w-12 text-center">#</TableHead>
                 <TableHead>Compañía Aseguradora</TableHead>
                 <TableHead className="text-center">Clasificación Riesgo CMF</TableHead>
-                <TableHead className="text-right">Tasa CMF {tipoPension === 'invalidez' ? 'Invalidez' : 'Vejez'}</TableHead>
+                <TableHead className="text-right">Tasa CMF {tipoPension === 'invalidez' ? 'Invalidez' : tipoPension === 'sobrevivencia' ? 'Sobrevivencia' : 'Vejez'}</TableHead>
                 <TableHead className="text-right font-bold text-slate-900">Pensión Mensual (UF)</TableHead>
                 <TableHead className="text-right font-bold text-slate-900">Pensión Mensual (Pesos)</TableHead>
               </TableRow>

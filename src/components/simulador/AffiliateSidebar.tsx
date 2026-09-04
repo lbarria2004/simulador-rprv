@@ -7,8 +7,8 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { User, Wallet, HeartHandshake, Sparkles, Building2, RefreshCw, Accessibility } from 'lucide-react';
-import { AfiliadoState, InvalidezFinanciamientoInfo } from './types';
+import { User, Wallet, HeartHandshake, Sparkles, Building2, RefreshCw, Accessibility, Users } from 'lucide-react';
+import { AfiliadoState, InvalidezFinanciamientoInfo, SobrevivenciaFinanciamientoInfo } from './types';
 import { calcularEdadDesdeFecha } from '@/lib/date-utils';
 import { BeneficiariesManager } from './BeneficiariesManager';
 import { BeneficiarioPension } from '@/lib/pension-calculator';
@@ -22,6 +22,7 @@ interface AffiliateSidebarProps {
   isLoadingUF: boolean;
   onApplyPreset?: (presetKey: 'zamora' | 'spuler' | 'soltero') => void;
   invalidezInfo?: InvalidezFinanciamientoInfo;
+  sobrevivenciaInfo?: SobrevivenciaFinanciamientoInfo;
 }
 
 export function AffiliateSidebar({
@@ -32,7 +33,8 @@ export function AffiliateSidebar({
   onRefreshUF,
   isLoadingUF,
   onApplyPreset,
-  invalidezInfo
+  invalidezInfo,
+  sobrevivenciaInfo
 }: AffiliateSidebarProps) {
   // Manejar cambio de fondos en Pesos y sincronizar UF
   const handlePesosChange = (valStr: string) => {
@@ -98,13 +100,31 @@ export function AffiliateSidebar({
         <CardHeader className="pb-3 pt-4 px-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <div className="p-1.5 rounded-md bg-blue-600 text-white">
-                <User className="w-4 h-4" />
+              <div className={`p-1.5 rounded-md text-white ${
+                afiliado.tipoPension === 'sobrevivencia' 
+                  ? 'bg-purple-700' 
+                  : afiliado.tipoPension === 'invalidez' 
+                    ? 'bg-amber-600' 
+                    : 'bg-blue-600'
+              }`}>
+                {afiliado.tipoPension === 'sobrevivencia' ? (
+                  <span className="text-xs">🕊️</span>
+                ) : (
+                  <User className="w-4 h-4" />
+                )}
               </div>
-              <CardTitle className="text-base font-semibold text-slate-900">Datos del Afiliado</CardTitle>
+              <CardTitle className="text-base font-semibold text-slate-900">
+                {afiliado.tipoPension === 'sobrevivencia' ? 'Datos del Causante (Fallecido)' : 'Datos del Afiliado'}
+              </CardTitle>
             </div>
             <div className="flex items-center gap-1">
-              <Badge variant="secondary" className="text-[11px] font-mono font-medium text-slate-700">
+              <Badge variant="secondary" className={`text-[11px] font-mono font-medium ${
+                afiliado.tipoPension === 'sobrevivencia'
+                  ? 'bg-purple-100 text-purple-900 border-purple-300'
+                  : afiliado.tipoPension === 'invalidez'
+                    ? 'bg-amber-100 text-amber-900 border-amber-300'
+                    : 'text-slate-700'
+              }`}>
                 {afiliado.tipoPension.toUpperCase()}
               </Badge>
             </div>
@@ -115,7 +135,9 @@ export function AffiliateSidebar({
           {/* Nombre y RUT */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <div className="space-y-1">
-              <Label className="text-xs text-slate-600">Nombre del Afiliado</Label>
+              <Label className="text-xs text-slate-600">
+                {afiliado.tipoPension === 'sobrevivencia' ? 'Nombre del Causante' : 'Nombre del Afiliado'}
+              </Label>
               <Input
                 type="text"
                 value={afiliado.nombre}
@@ -124,7 +146,9 @@ export function AffiliateSidebar({
               />
             </div>
             <div className="space-y-1">
-              <Label className="text-xs text-slate-600">RUT</Label>
+              <Label className="text-xs text-slate-600">
+                {afiliado.tipoPension === 'sobrevivencia' ? 'RUT del Causante' : 'RUT'}
+              </Label>
               <Input
                 type="text"
                 value={afiliado.rut}
@@ -249,37 +273,18 @@ export function AffiliateSidebar({
           </div>
 
           {/* Expediente de Pensión de Invalidez (D.L. 3.500) */}
-          <div className={`p-3 rounded-lg border transition-all space-y-2.5 ${
-            afiliado.tipoPension === 'invalidez' 
-              ? 'border-amber-300 bg-amber-50/50 shadow-xs ring-1 ring-amber-400/30' 
-              : 'border-slate-200 bg-slate-50/70'
-          }`}>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-800">
-                <Accessibility className={`w-4 h-4 ${afiliado.tipoPension === 'invalidez' ? 'text-amber-600' : 'text-slate-500'}`} />
-                <span>Expediente de Pensión de Invalidez</span>
+          {afiliado.tipoPension === 'invalidez' && (
+            <div className="p-3 rounded-lg border border-amber-300 bg-amber-50/60 shadow-xs ring-1 ring-amber-400/30 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-800">
+                  <Accessibility className="w-4 h-4 text-amber-600" />
+                  <span>Expediente de Pensión de Invalidez</span>
+                </div>
+                <Badge variant="outline" className="text-[9px] bg-amber-100 text-amber-900 border-amber-300 font-bold py-0 h-4">
+                  Tabla {afiliado.sexo === 'M' ? 'MI-H-2020' : 'MI-M-2020'}
+                </Badge>
               </div>
-              <div className="flex items-center gap-1.5">
-                {afiliado.tipoPension === 'invalidez' && (
-                  <Badge variant="outline" className="text-[9px] bg-amber-100 text-amber-900 border-amber-300 font-bold py-0 h-4">
-                    Tabla {afiliado.sexo === 'M' ? 'MI-H-2020' : 'MI-M-2020'}
-                  </Badge>
-                )}
-                <Switch
-                  checked={afiliado.tipoPension === 'invalidez'}
-                  onCheckedChange={checked => setAfiliado(prev => ({ 
-                    ...prev, 
-                    tipoPension: checked ? 'invalidez' : 'vejez',
-                    esInvalido: checked,
-                    cubiertoSIS: prev.cubiertoSIS ?? true,
-                    ingresoBaseCLP: prev.ingresoBaseCLP || 1200000,
-                    ingresoBaseUF: prev.ingresoBaseUF || (valorUF > 0 ? Math.round((1200000 / valorUF) * 100) / 100 : 29.35)
-                  }))}
-                />
-              </div>
-            </div>
 
-            {afiliado.tipoPension === 'invalidez' ? (
               <div className="space-y-3 pt-2 border-t border-amber-200/60">
                 {/* Grado de Invalidez Dictaminado */}
                 <div className="space-y-1">
@@ -319,7 +324,7 @@ export function AffiliateSidebar({
                   </div>
                 </div>
 
-                {/* Cobertura del Seguro de Invalidez y Sobrevivencia (SIS) */}
+                {/* Cobertura del Seguro SIS */}
                 <div className="p-2.5 bg-white rounded-md border border-amber-200/80 space-y-1.5">
                   <div className="flex items-center justify-between">
                     <Label className="text-[11px] font-semibold text-slate-800">
@@ -406,12 +411,128 @@ export function AffiliateSidebar({
                   </div>
                 )}
               </div>
-            ) : (
-              <p className="text-[10px] text-slate-500 leading-tight">
-                Régimen activo: <strong>Pensión de Vejez</strong> ({afiliado.sexo === 'M' ? 'CB-H-2020' : 'RV-M-2020'}). Active este conmutador o seleccione arriba si tramita dictamen de invalidez.
-              </p>
-            )}
-          </div>
+            </div>
+          )}
+
+          {/* Expediente de Pensión de Sobrevivencia (D.L. 3.500) */}
+          {afiliado.tipoPension === 'sobrevivencia' && (
+            <div className="p-3 rounded-lg border border-purple-300 bg-purple-50/60 shadow-xs ring-1 ring-purple-400/30 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-purple-950">
+                  <span className="text-sm">🕊️</span>
+                  <span>Expediente de Sobrevivencia (D.L. 3.500)</span>
+                </div>
+                <Badge variant="outline" className="text-[9px] bg-purple-100 text-purple-900 border-purple-300 font-bold py-0 h-4">
+                  Tablas B-M / B-H / MI
+                </Badge>
+              </div>
+
+              <div className="space-y-3 pt-2 border-t border-purple-200/60">
+                {/* Cobertura del Seguro SIS */}
+                <div className="p-2.5 bg-white rounded-md border border-purple-200/80 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-[11px] font-semibold text-slate-800">
+                      Causante Cubierto por SIS al Fallecer
+                    </Label>
+                    <Switch
+                      checked={afiliado.cubiertoSIS ?? true}
+                      onCheckedChange={checked => setAfiliado(prev => ({ ...prev, cubiertoSIS: checked }))}
+                    />
+                  </div>
+                  <p className="text-[10px] text-slate-600 leading-tight">
+                    {(afiliado.cubiertoSIS ?? true)
+                      ? 'Trabajador activo o cesante protegido: La aseguradora del SIS aporta el Aporte Adicional ($AA) si el saldo en AFP no cubre el Capital Necesario.'
+                      : 'Sin cobertura SIS: La pensión familiar se financia exclusivamente con el saldo individual acumulado en AFP.'}
+                  </p>
+                </div>
+
+                {/* Ingreso Base Promedio (Últimos 10 años) */}
+                <div className="space-y-1.5">
+                  <Label className="text-[11px] text-purple-950 font-medium flex items-center justify-between">
+                    <span>Ingreso Base del Causante (10 años)</span>
+                    <span className="text-[9px] text-slate-400 font-normal">Ref 70%</span>
+                  </Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="relative">
+                      <Input
+                        type="text"
+                        value={afiliado.ingresoBaseCLP ? `$${afiliado.ingresoBaseCLP.toLocaleString('es-CL')}` : '$1.200.000'}
+                        onChange={e => handleIngresoBaseCLPChange(e.target.value)}
+                        placeholder="$1.200.000"
+                        className="h-8 text-xs font-semibold text-purple-950 bg-white"
+                      />
+                    </div>
+                    <div className="relative">
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={afiliado.ingresoBaseUF || ''}
+                        onChange={e => handleIngresoBaseUFChange(e.target.value)}
+                        placeholder="29,35"
+                        className="h-8 text-xs font-semibold text-slate-700 bg-white"
+                      />
+                      <span className="absolute right-2 top-2 text-[10px] font-bold text-slate-400">UF</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Resumen Actuarial de Financiamiento en tiempo real */}
+                {sobrevivenciaInfo && (
+                  <div className="p-2.5 bg-purple-100/70 rounded-md border border-purple-300 text-[11px] space-y-1.5">
+                    <div className="font-semibold text-purple-950 text-xs flex items-center justify-between border-b border-purple-200 pb-1">
+                      <span>Financiamiento Actuarial SIS</span>
+                      <span className="text-[10px] font-normal text-purple-800">
+                        {sobrevivenciaInfo.cubiertoSIS ? 'Con Aporte SIS' : 'Solo Saldo AFP'}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between text-slate-700">
+                      <span>Pensión Referencia Causante (70% IB):</span>
+                      <strong className="text-purple-950">${sobrevivenciaInfo.pensionReferenciaCausanteCLP.toLocaleString('es-CL')}/mes</strong>
+                    </div>
+
+                    <div className="flex justify-between text-slate-700">
+                      <span>Capital Necesario Familiar (CN):</span>
+                      <span className="font-medium">${sobrevivenciaInfo.capitalNecesarioCLP.toLocaleString('es-CL')}</span>
+                    </div>
+
+                    <div className="flex justify-between text-slate-700">
+                      <span>Saldo Acumulado en AFP:</span>
+                      <span className="font-medium">${sobrevivenciaInfo.saldoPropioCLP.toLocaleString('es-CL')}</span>
+                    </div>
+
+                    {sobrevivenciaInfo.cubiertoSIS && (
+                      <div className="flex justify-between text-emerald-800 bg-emerald-100/80 px-1.5 py-0.5 rounded font-semibold">
+                        <span>Aporte Adicional SIS (+AA):</span>
+                        <span>+${sobrevivenciaInfo.aporteAdicionalSISCLP.toLocaleString('es-CL')}</span>
+                      </div>
+                    )}
+
+                    <div className="flex justify-between text-indigo-950 font-bold border-t border-purple-200 pt-1">
+                      <span>Saldo Total para SCOMP:</span>
+                      <span className="text-emerald-700">${sobrevivenciaInfo.saldoTotalFinanciamientoCLP.toLocaleString('es-CL')} ({sobrevivenciaInfo.saldoTotalFinanciamientoUF} UF)</span>
+                    </div>
+
+                    {sobrevivenciaInfo.factorProrrateo < 1 && (
+                      <div className="text-[10px] text-amber-800 bg-amber-50 p-1.5 rounded border border-amber-200">
+                        ⚠️ Prorrateo legal: suma de porcentajes {(sobrevivenciaInfo.sumaPorcentajesOriginales * 100).toFixed(0)}% ajustada a 100% (factor {(sobrevivenciaInfo.factorProrrateo * 100).toFixed(1)}%).
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Indicador de Régimen de Vejez */}
+          {afiliado.tipoPension === 'vejez' && (
+            <div className="p-2.5 rounded-lg border border-slate-200 bg-slate-50/70 text-[11px] text-slate-500 flex items-center justify-between">
+              <span>Régimen Ordinario de Vejez (Tablas TM-2020)</span>
+              <Badge variant="outline" className="text-[9px] bg-blue-50 text-blue-800 border-blue-200 py-0">
+                {afiliado.sexo === 'M' ? 'CB-H-2020' : 'RV-M-2020'}
+              </Badge>
+            </div>
+          )}
 
           {/* Asesor Previsional SCOMP Toggle */}
           <div className="flex items-center justify-between p-3 rounded-lg border border-indigo-100 bg-indigo-50/40">

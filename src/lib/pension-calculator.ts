@@ -400,15 +400,20 @@ export function calcularCNUIndividual(
   sexo: Sexo,
   tasaInteres: number,
   modalidad: ModalidadPension = 'retiro_programado',
-  anoCalculo: number = 2026
+  anoCalculo: number = 2026,
+  esInvalido: boolean = false,
+  esHijo: boolean = false,
+  esEstudiante: boolean = false
 ): number {
   let cnu = 0;
   let factorSupervivencia = 1.0;
+  const maxEdad = (esHijo && !esInvalido) ? (esEstudiante ? 24 : 18) : 110;
+  if (edad >= maxEdad) return 0;
   
-  for (let t = 0; t <= (110 - edad); t++) {
+  for (let t = 0; t <= (maxEdad - edad); t++) {
     const factorDescuento = 1 / Math.pow(1 + tasaInteres, t + 0.5);
     cnu += factorSupervivencia * factorDescuento;
-    const qx = getQx(edad + t, sexo, false, modalidad, anoCalculo + t);
+    const qx = getQx(edad + t, sexo, esInvalido, modalidad, anoCalculo + t);
     factorSupervivencia *= (1 - qx);
   }
   
@@ -1213,7 +1218,8 @@ export function calcularPorcentajesBeneficiarios(
  */
 export function calcularCNUSobrevivencia(
   beneficiarios: BeneficiarioPension[],
-  tasaInteres: number
+  tasaInteres: number,
+  modalidad: ModalidadPension = 'retiro_programado'
 ): { cnuTotal: number; detallePorBeneficiario: { tipo: string; cnu: number; porcentaje: number }[] } {
   const porcentajes = calcularPorcentajesBeneficiarios(beneficiarios);
   let cnuTotal = 0;
@@ -1224,9 +1230,24 @@ export function calcularCNUSobrevivencia(
     return { cnuTotal: 0, detallePorBeneficiario: [] };
   }
   
-  for (const ben of porcentajes) {
-    // CNU individual del beneficiario
-    const cnuIndividual = calcularCNUIndividual(ben.edad, ben.sexo, tasaInteres);
+  for (let i = 0; i < porcentajes.length; i++) {
+    const ben = porcentajes[i];
+    const benOrig = beneficiarios[i] || ben;
+    const esHijo = ben.tipo === 'hijo';
+    const esEstudiante = !!benOrig.esEstudiante;
+    const esInvalido = !!benOrig.esInvalido;
+
+    // CNU individual del beneficiario con truncamiento si es hijo no inválido
+    const cnuIndividual = calcularCNUIndividual(
+      ben.edad,
+      ben.sexo,
+      tasaInteres,
+      modalidad,
+      2026,
+      esInvalido,
+      esHijo,
+      esEstudiante
+    );
     
     // Aporte al CNU total ponderado por porcentaje
     cnuTotal += cnuIndividual * ben.porcentaje;
@@ -1485,8 +1506,7 @@ export function calcularOpcionesSobrevivencia(
     return resultados;
   }
   
-  const primaSeguro = fondosCausante * 0.03;
-  const pensionRV = (fondosCausante - primaSeguro) / cnuRV;
+  const pensionRV = fondosCausante / cnuRV;
   
   // Usar porcentajes YA ajustados (no aplicar factorAjuste adicional)
   const pensionPorBenRV = porcentajes.map(b => ({
@@ -1553,9 +1573,8 @@ export function calcularRVInmediataSobrevivencia(
     pensionReferencia = fondosCausante / cnuCausante;
   }
 
-  const { cnuTotal } = calcularCNUSobrevivencia(beneficiarios, tasaInteres);
-  const primaSeguro = fondosCausante * 0.03;
-  const pensionMensual = (fondosCausante - primaSeguro) / cnuTotal;
+  const { cnuTotal } = calcularCNUSobrevivencia(beneficiarios, tasaInteres, 'renta_vitalicia');
+  const pensionMensual = fondosCausante / cnuTotal;
 
   // Los porcentajes YA incluyen el prorrateo aplicado en calcularPorcentajesBeneficiarios
   // No aplicar doble ajuste
@@ -2240,4 +2259,146 @@ export function calcularFinanciamientoInvalidez(
     porcentajeReferencia
   };
 }
+
+// ==========================================
+// MÓDULO ACTUARIAL DE PENSIÓN DE SOBREVIVENCIA
+// Según D.L. 3.500 Art. 5, 54, 58 al 60 y Compendio SP
+// ==========================================
+
+/**
+ * Calcula la Pensión de Referencia del Causante según D.L. 3.500 Art. 58
+ * Equivale al 70% del Ingreso Base del afiliado fallecido
+ */
+export function calcularPensionReferenciaCausante(ingresoBaseCausanteCLP: number): number {
+  return Math.round(Math.max(0, ingresoBaseCausanteCLP) * 0.70);
+}
+
+/**
+ * Calcula el Capital Necesario (CN) actuarial de sobrevivencia
+ * FÓRMULA (Compendio de Pensiones SP Libro III, Anexo 7):
+ * CN_sob = Σ [ Pensión_Referencia_Beneficiario_i × CNU_sob_i ] = Pensión_Ref_Causante × CNU_sob_total
+ */
+export function calcularCapitalNecesarioSobrevivencia(
+  pensionReferenciaCausanteCLP: number,
+  beneficiarios: BeneficiarioPension[],
+  tasaInteres: number = 0.0358
+): number {
+  if (pensionReferenciaCausanteCLP <= 0 || beneficiarios.length === 0) return 0;
+  const { cnuTotal } = calcularCNUSobrevivencia(beneficiarios, tasaInteres, 'retiro_programado');
+  return Math.round(pensionReferenciaCausanteCLP * cnuTotal);
+}
+
+/**
+ * Calcula el Aporte Adicional financiado por la Aseguradora del SIS en caso de sobrevivencia
+ * Si el causante estaba cubierto por el SIS: AA = max(0, CN_sob - Saldo_Causante)
+ * Si el causante no estaba cubierto: AA = 0
+ */
+export function calcularAporteAdicionalSISSobrevivencia(
+  capitalNecesarioCLP: number,
+  saldoAcumuladoCLP: number,
+  cubiertoSIS: boolean = true
+): number {
+  if (!cubiertoSIS) return 0;
+  return Math.max(0, Math.round(capitalNecesarioCLP - saldoAcumuladoCLP));
+}
+
+export interface DesgloseBeneficiarioSobrevivencia {
+  tipo: string;
+  nombre?: string;
+  edad: number;
+  sexo: Sexo;
+  porcentaje: number;
+  porcentajeOriginal: number;
+  pensionReferenciaCLP: number;
+  pensionReferenciaUF: number;
+}
+
+export interface DesgloseFinanciamientoSobrevivencia {
+  pensionReferenciaCausanteCLP: number;
+  pensionReferenciaCausanteUF: number;
+  capitalNecesarioCLP: number;
+  capitalNecesarioUF: number;
+  aporteAdicionalSISCLP: number;
+  aporteAdicionalSISUF: number;
+  saldoPropioCLP: number;
+  saldoPropioUF: number;
+  saldoTotalFinanciamientoCLP: number;
+  saldoTotalFinanciamientoUF: number;
+  cubiertoSIS: boolean;
+  cnuTotalSobrevivencia: number;
+  beneficiarios: DesgloseBeneficiarioSobrevivencia[];
+  sumaPorcentajesOriginales: number;
+  factorProrrateo: number;
+}
+
+/**
+ * Calcula el financiamiento integral de la Pensión de Sobrevivencia
+ */
+export function calcularFinanciamientoSobrevivencia(
+  saldoPropioCLP: number,
+  ingresoBaseCausanteCLP: number,
+  cubiertoSIS: boolean = true,
+  beneficiarios: BeneficiarioPension[] = [],
+  tasaInteres: number = 0.0358,
+  valorUF: number = 40876.41
+): DesgloseFinanciamientoSobrevivencia {
+  const pensionReferenciaCausanteCLP = calcularPensionReferenciaCausante(ingresoBaseCausanteCLP);
+  const pensionReferenciaCausanteUF = valorUF > 0 ? Number((pensionReferenciaCausanteCLP / valorUF).toFixed(2)) : 0;
+
+  const porcentajes = calcularPorcentajesBeneficiarios(beneficiarios);
+  const { cnuTotal } = calcularCNUSobrevivencia(beneficiarios, tasaInteres, 'retiro_programado');
+
+  const capitalNecesarioCLP = Math.round(pensionReferenciaCausanteCLP * cnuTotal);
+  const capitalNecesarioUF = valorUF > 0 ? Number((capitalNecesarioCLP / valorUF).toFixed(2)) : 0;
+
+  const aporteAdicionalSISCLP = calcularAporteAdicionalSISSobrevivencia(
+    capitalNecesarioCLP,
+    saldoPropioCLP,
+    cubiertoSIS
+  );
+  const aporteAdicionalSISUF = valorUF > 0 ? Number((aporteAdicionalSISCLP / valorUF).toFixed(2)) : 0;
+
+  const saldoPropioUF = valorUF > 0 ? Number((saldoPropioCLP / valorUF).toFixed(2)) : 0;
+  const saldoTotalFinanciamientoCLP = cubiertoSIS 
+    ? Math.max(saldoPropioCLP, capitalNecesarioCLP) 
+    : saldoPropioCLP;
+  const saldoTotalFinanciamientoUF = valorUF > 0 ? Number((saldoTotalFinanciamientoCLP / valorUF).toFixed(2)) : 0;
+
+  const sumaPorcentajesOriginales = porcentajes.reduce((sum, b) => sum + b.porcentajeOriginal, 0);
+  const factorProrrateo = porcentajes[0]?.factorProrrateo ?? 1.0;
+
+  const desgloseBeneficiarios: DesgloseBeneficiarioSobrevivencia[] = porcentajes.map(b => {
+    const pRefCLP = Math.round(pensionReferenciaCausanteCLP * b.porcentaje);
+    const pRefUF = valorUF > 0 ? Number((pRefCLP / valorUF).toFixed(2)) : 0;
+    return {
+      tipo: b.tipo,
+      nombre: b.nombre || (b.tipo === 'conyuge' ? 'Cónyuge Sobreviviente' : b.tipo === 'hijo' ? 'Hijo/a' : 'Beneficiario'),
+      edad: b.edad,
+      sexo: b.sexo,
+      porcentaje: b.porcentaje,
+      porcentajeOriginal: b.porcentajeOriginal,
+      pensionReferenciaCLP: pRefCLP,
+      pensionReferenciaUF: pRefUF
+    };
+  });
+
+  return {
+    pensionReferenciaCausanteCLP,
+    pensionReferenciaCausanteUF,
+    capitalNecesarioCLP,
+    capitalNecesarioUF,
+    aporteAdicionalSISCLP,
+    aporteAdicionalSISUF,
+    saldoPropioCLP,
+    saldoPropioUF,
+    saldoTotalFinanciamientoCLP,
+    saldoTotalFinanciamientoUF,
+    cubiertoSIS,
+    cnuTotalSobrevivencia: cnuTotal,
+    beneficiarios: desgloseBeneficiarios,
+    sumaPorcentajesOriginales,
+    factorProrrateo
+  };
+}
+
 

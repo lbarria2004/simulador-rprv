@@ -16,7 +16,7 @@ import {
   Clock,
   Coins
 } from 'lucide-react';
-import { CotizacionItemResultado, InvalidezFinanciamientoInfo } from './types';
+import { CotizacionItemResultado, InvalidezFinanciamientoInfo, SobrevivenciaFinanciamientoInfo } from './types';
 
 interface MultiQuotationResultsProps {
   items: CotizacionItemResultado[];
@@ -25,6 +25,7 @@ interface MultiQuotationResultsProps {
   isGeneratingPDF?: boolean;
   tipoPension?: 'vejez' | 'invalidez' | 'sobrevivencia';
   invalidezInfo?: InvalidezFinanciamientoInfo;
+  sobrevivenciaInfo?: SobrevivenciaFinanciamientoInfo;
 }
 
 function formatCLP(val: number): string {
@@ -43,7 +44,8 @@ export function MultiQuotationResults({
   onDescargarPDF,
   isGeneratingPDF = false,
   tipoPension = 'vejez',
-  invalidezInfo
+  invalidezInfo,
+  sobrevivenciaInfo
 }: MultiQuotationResultsProps) {
   if (items.length === 0) {
     return (
@@ -72,13 +74,19 @@ export function MultiQuotationResults({
           <div className="flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-amber-300" />
             <h2 className="text-base font-semibold">
-              {tipoPension === 'invalidez' ? 'Cotización de Pensión de Invalidez' : 'Resumen Comparativo de Cotización'} ({items.length} Modalidades)
+              {tipoPension === 'invalidez' 
+                ? 'Cotización de Pensión de Invalidez' 
+                : tipoPension === 'sobrevivencia' 
+                  ? 'Cotización de Pensión de Sobrevivencia' 
+                  : 'Resumen Comparativo de Cotización'} ({items.length} Modalidades)
             </h2>
           </div>
           <p className="text-xs text-blue-200 mt-0.5">
             {tipoPension === 'invalidez' 
               ? `Cálculo con Tablas Generacionales de Invalidez MI-2020 • UF $${valorUF.toLocaleString('es-CL', { minimumFractionDigits: 2 })}`
-              : `Cálculo actuarial oficial con tablas generacionales TM-2020 a valor UF $${valorUF.toLocaleString('es-CL', { minimumFractionDigits: 2 })}`
+              : tipoPension === 'sobrevivencia'
+                ? `Cálculo actuarial oficial según D.L. 3.500 Art. 58 y Tablas B-2020 • UF $${valorUF.toLocaleString('es-CL', { minimumFractionDigits: 2 })}`
+                : `Cálculo actuarial oficial con tablas generacionales TM-2020 a valor UF $${valorUF.toLocaleString('es-CL', { minimumFractionDigits: 2 })}`
             }
           </p>
         </div>
@@ -128,6 +136,53 @@ export function MultiQuotationResults({
             <div className="text-[10px] text-slate-500 font-medium">Saldo Total para Cotizar</div>
             <div className="text-sm font-extrabold text-indigo-950">{formatCLP(invalidezInfo.saldoTotalFinanciamientoCLP)}</div>
             <div className="text-[10px] font-semibold text-emerald-700">{formatUF(invalidezInfo.saldoTotalFinanciamientoUF)}</div>
+          </div>
+        </div>
+      )}
+
+      {/* Banner de Financiamiento Pensión de Sobrevivencia (D.L. 3.500) */}
+      {tipoPension === 'sobrevivencia' && sobrevivenciaInfo && (
+        <div className="p-3.5 rounded-xl border border-purple-300 bg-purple-50/90 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+          <div className="space-y-1.5 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge className="bg-purple-700 text-white hover:bg-purple-800 text-xs font-bold gap-1">
+                <span>🕊️</span> Sobrevivencia Legal (Art. 58 DL 3500)
+              </Badge>
+              <Badge variant="outline" className={`text-xs font-semibold ${sobrevivenciaInfo.cubiertoSIS ? 'bg-emerald-50 text-emerald-800 border-emerald-300' : 'bg-slate-100 text-slate-700 border-slate-300'}`}>
+                {sobrevivenciaInfo.cubiertoSIS ? '✓ Cubierto por Seguro SIS' : '✗ Sin Cobertura SIS'}
+              </Badge>
+              <Badge variant="outline" className="text-xs bg-white text-slate-700 border-slate-300 font-mono">
+                Tablas B-2020 / MI
+              </Badge>
+            </div>
+            <p className="text-xs text-purple-950 leading-relaxed">
+              {sobrevivenciaInfo.cubiertoSIS ? (
+                <>
+                  Pensión Referencia Causante (70% IB): <strong>{formatCLP(sobrevivenciaInfo.pensionReferenciaCausanteCLP)} / mes</strong> ({formatUF(sobrevivenciaInfo.pensionReferenciaCausanteUF)}). 
+                  La aseguradora del SIS entera un Aporte Adicional de <strong>+{formatCLP(sobrevivenciaInfo.aporteAdicionalSISCLP)}</strong> al saldo AFP para constituir el Capital Necesario familiar ({formatCLP(sobrevivenciaInfo.capitalNecesarioCLP)}).
+                </>
+              ) : (
+                <>
+                  Pensión financiada íntegramente con los fondos acumulados por el causante en su AFP ({formatCLP(sobrevivenciaInfo.saldoPropioCLP)}). Al no estar cubierto por SIS a la fecha de defunción, no aplica Aporte Adicional.
+                </>
+              )}
+            </p>
+            {sobrevivenciaInfo.beneficiarios.length > 0 && (
+              <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-purple-200/80">
+                <span className="text-[11px] font-semibold text-purple-900 mr-1">Beneficiarios con Derecho:</span>
+                {sobrevivenciaInfo.beneficiarios.map((ben, bIdx) => (
+                  <Badge key={bIdx} variant="secondary" className="text-[10px] bg-white text-purple-900 border border-purple-200">
+                    {ben.nombre || (ben.tipo === 'conyuge' ? 'Cónyuge' : 'Hijo/a')} ({(ben.porcentaje * 100).toFixed(0)}%): {formatCLP(ben.pensionReferenciaCLP)}
+                  </Badge>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="bg-white p-2.5 rounded-lg border border-purple-200 shrink-0 text-right space-y-0.5 min-w-[190px]">
+            <div className="text-[10px] text-slate-500 font-medium">Saldo Total SCOMP</div>
+            <div className="text-sm font-extrabold text-indigo-950">{formatCLP(sobrevivenciaInfo.saldoTotalFinanciamientoCLP)}</div>
+            <div className="text-[10px] font-semibold text-emerald-700">{formatUF(sobrevivenciaInfo.saldoTotalFinanciamientoUF)}</div>
           </div>
         </div>
       )}
@@ -187,7 +242,7 @@ export function MultiQuotationResults({
                 {/* Monto Total Pensión */}
                 <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100">
                   <span className="text-[10px] text-slate-500 font-medium uppercase tracking-wider block">
-                    Pensión Total Mensual
+                    {tipoPension === 'sobrevivencia' ? 'Pensión Familiar Total' : 'Pensión Total Mensual'}
                   </span>
                   <div className="flex items-baseline gap-1.5 mt-0.5">
                     <span className="text-xl font-black text-slate-900">
@@ -202,6 +257,27 @@ export function MultiQuotationResults({
                       <span>Base: {formatCLP(item.resultado.pensionMensual)}</span>
                       {item.pguMensual > 0 && <span className="text-emerald-700 font-medium">+ PGU ({formatCLP(item.pguMensual)})</span>}
                       {item.bacMensual > 0 && <span className="text-indigo-700 font-medium">+ BAC ({formatCLP(item.bacMensual)})</span>}
+                    </div>
+                  )}
+
+                  {/* Distribución por Beneficiario en Sobrevivencia */}
+                  {tipoPension === 'sobrevivencia' && item.resultado.pensionPorBeneficiario && item.resultado.pensionPorBeneficiario.length > 0 && (
+                    <div className="mt-2.5 pt-2 border-t border-purple-200/60 space-y-1 bg-purple-50/50 p-2 rounded">
+                      <span className="text-[10px] font-bold text-purple-950 uppercase tracking-wider block">
+                        Distribución a Beneficiarios:
+                      </span>
+                      <div className="space-y-0.5">
+                        {item.resultado.pensionPorBeneficiario.map((ben, bIdx) => (
+                          <div key={bIdx} className="flex justify-between items-center text-xs">
+                            <span className="text-slate-700 capitalize">
+                              {ben.tipo === 'conyuge' ? 'Cónyuge' : ben.tipo === 'hijo' ? 'Hijo/a' : ben.tipo} ({(ben.porcentaje * 100).toFixed(0)}%):
+                            </span>
+                            <span className="font-bold text-purple-950 font-mono">
+                              {formatCLP(ben.pensionMensual)}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>
