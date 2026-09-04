@@ -290,7 +290,7 @@ export function calcularCNU(
   anoCalculo: number = 2026
 ): number {
   let cnu = 0;
-  const maxEdad = esInvalido ? 81 : 110;
+  const maxEdad = 110;
   
   // CNU del titular con proyección generacional dinámica
   let factorSupervivencia = 1.0;
@@ -452,11 +452,12 @@ export function calcularRetiroProgramado(
   edad: number,
   sexo: Sexo,
   tasaInteres: number = TASAS_INTERES.RETIRO_PROGRAMADO,
-  beneficiarios?: BeneficiarioPension[]
+  beneficiarios?: BeneficiarioPension[],
+  esInvalido: boolean = false
 ): ResultadoEscenario {
-  const cnu = calcularCNU(edad, sexo, tasaInteres, beneficiarios, false, 'retiro_programado');
+  const cnu = calcularCNU(edad, sexo, tasaInteres, beneficiarios, esInvalido, 'retiro_programado');
   const pensionMensual = fondos / cnu;
-  const expectativaVida = calcularExpectativaVida(edad, sexo, false, 'retiro_programado');
+  const expectativaVida = calcularExpectativaVida(edad, sexo, esInvalido, 'retiro_programado');
   
   const proyeccion: ProyeccionAnual[] = [];
   let saldo = fondos;
@@ -464,7 +465,7 @@ export function calcularRetiroProgramado(
   
   for (let año = 0; año <= Math.min(45, 110 - edad); año++) {
     const edadActual = edad + año;
-    const cnuAnual = calcularCNU(edadActual, sexo, tasaInteres, undefined, false, 'retiro_programado', 2026 + año);
+    const cnuAnual = calcularCNU(edadActual, sexo, tasaInteres, undefined, esInvalido, 'retiro_programado', 2026 + año);
     const pensionAnual = saldo / cnuAnual * 12;
     const pensionMes = pensionAnual / 12;
     
@@ -484,7 +485,7 @@ export function calcularRetiroProgramado(
   }
   
   return {
-    nombre: 'Retiro Programado',
+    nombre: esInvalido ? 'Retiro Programado (Invalidez MI-2020)' : 'Retiro Programado',
     pensionMensual: Math.round(pensionMensual),
     pensionEnUF: pensionMensual / UF_ACTUAL,
     pensionAnual: pensionMensual * 12,
@@ -500,14 +501,15 @@ export function calcularRVInmediata(
   edad: number,
   sexo: Sexo,
   tasaInteres: number = TASAS_INTERES.RENTA_VITALICIA_VEJEZ,
-  beneficiarios?: BeneficiarioPension[]
+  beneficiarios?: BeneficiarioPension[],
+  esInvalido: boolean = false
 ): ResultadoEscenario {
-  const cnu = calcularCNU(edad, sexo, tasaInteres, beneficiarios, false, 'renta_vitalicia');
+  const cnu = calcularCNU(edad, sexo, tasaInteres, beneficiarios, esInvalido, 'renta_vitalicia');
   const pensionMensual = fondos / cnu;
-  const expectativaVida = calcularExpectativaVida(edad, sexo, false, 'renta_vitalicia');
+  const expectativaVida = calcularExpectativaVida(edad, sexo, esInvalido, 'renta_vitalicia');
   
   return {
-    nombre: 'Renta Vitalicia Inmediata',
+    nombre: esInvalido ? 'Renta Vitalicia Invalidez (MI-2020)' : 'Renta Vitalicia Inmediata',
     pensionMensual: Math.round(pensionMensual),
     pensionEnUF: pensionMensual / UF_ACTUAL,
     pensionAnual: pensionMensual * 12,
@@ -523,9 +525,10 @@ export function calcularRVPeriodoGarantizado(
   sexo: Sexo,
   mesesGarantizados: number,
   tasaInteres: number = TASAS_INTERES.RENTA_VITALICIA_VEJEZ,
-  beneficiarios?: BeneficiarioPension[]
+  beneficiarios?: BeneficiarioPension[],
+  esInvalido: boolean = false
 ): ResultadoEscenario {
-  const rvBase = calcularRVInmediata(fondos, edad, sexo, tasaInteres, beneficiarios);
+  const rvBase = calcularRVInmediata(fondos, edad, sexo, tasaInteres, beneficiarios, esInvalido);
   const factorAjuste = calcularFactorGarantizado(mesesGarantizados);
   const pensionAjustada = rvBase.pensionMensual * factorAjuste;
   
@@ -564,17 +567,18 @@ export function calcularRVAumentoTemporal(
   mesesAumento: number,
   porcentajeAumento: number,
   tasaInteres: number = TASAS_INTERES.RENTA_VITALICIA_VEJEZ,
-  beneficiarios?: BeneficiarioPension[]
+  beneficiarios?: BeneficiarioPension[],
+  esInvalido: boolean = false
 ): ResultadoEscenario {
   const porcentajeNormalizado = porcentajeAumento > 1 ? porcentajeAumento / 100 : porcentajeAumento;
-  const cnuVitalicio = calcularCNU(edad, sexo, tasaInteres, beneficiarios);
-  const cnuTemporal = calcularCNUTemporal(edad, sexo, mesesAumento, tasaInteres);
+  const cnuVitalicio = calcularCNU(edad, sexo, tasaInteres, beneficiarios, esInvalido, 'renta_vitalicia');
+  const cnuTemporal = calcularCNUTemporal(edad, sexo, mesesAumento, tasaInteres, esInvalido, 'renta_vitalicia');
   
   // Equivalencia actuarial:
   // Fondos = PensionBase * CNU_vitalicio + (porcentaje * PensionBase) * CNU_temporal
   const pensionBaseAjustada = fondos / (cnuVitalicio + porcentajeNormalizado * cnuTemporal);
   const pensionAumentadaFinal = pensionBaseAjustada * (1 + porcentajeNormalizado);
-  const expectativaVida = calcularExpectativaVida(edad, sexo);
+  const expectativaVida = calcularExpectativaVida(edad, sexo, esInvalido, 'renta_vitalicia');
   
   const anosAumento = Math.floor(mesesAumento / 12);
   const mesesRestantes = mesesAumento % 12;
@@ -598,7 +602,7 @@ export function calcularRVAumentoTemporal(
       año: año + 1,
       edad: edadActual,
       pensionMensual: enPeriodoAumento 
-        ? Math.round(pensionAumentadaFinal)
+        ? Math.round(pensionAumentadaFinal) 
         : Math.round(pensionBaseAjustada),
       saldoAcumulado: 0,
       retiroAcumulado: 0,
@@ -607,7 +611,7 @@ export function calcularRVAumentoTemporal(
   }
   
   return {
-    nombre: `RV con Aumento ${porcentajeAumento > 1 ? porcentajeAumento : porcentajeAumento * 100}% por ${nombrePeriodo}`,
+    nombre: `RV Aumento Temporal +${(porcentajeNormalizado * 100).toFixed(0)}% (${nombrePeriodo})`,
     pensionMensual: Math.round(pensionAumentadaFinal),
     pensionEnUF: pensionAumentadaFinal / UF_ACTUAL,
     pensionAnual: pensionAumentadaFinal * 12,
@@ -622,9 +626,9 @@ export function calcularRVAumentoTemporal(
     },
     proyeccion,
     advertencias: [
-      `Aumento del ${(porcentajeAumento > 1 ? porcentajeAumento : porcentajeAumento * 100).toFixed(0)}% por ${nombrePeriodo}`,
-      `Pensión durante aumento: ${formatearPesos(pensionAumentadaFinal)}`,
-      `Pensión después del período: ${formatearPesos(pensionBaseAjustada)}`
+      `Aumento ${(porcentajeNormalizado * 100).toFixed(0)}% durante ${nombrePeriodo}`,
+      `Pensión inicial: ${formatearPesos(pensionAumentadaFinal)}`,
+      `Pensión desde año ${anosAumentoInt + 1}: ${formatearPesos(pensionBaseAjustada)}`
     ]
   };
 }
@@ -637,17 +641,18 @@ export function calcularRVConAmbasClausulas(
   mesesAumento: number,
   porcentajeAumento: number,
   tasaInteres: number = TASAS_INTERES.RENTA_VITALICIA_VEJEZ,
-  beneficiarios?: BeneficiarioPension[]
+  beneficiarios?: BeneficiarioPension[],
+  esInvalido: boolean = false
 ): ResultadoEscenario {
   const porcentajeNormalizado = porcentajeAumento > 1 ? porcentajeAumento / 100 : porcentajeAumento;
-  const cnuVitalicio = calcularCNU(edad, sexo, tasaInteres, beneficiarios);
+  const cnuVitalicio = calcularCNU(edad, sexo, tasaInteres, beneficiarios, esInvalido, 'renta_vitalicia');
   const factorGarantizado = calcularFactorGarantizado(mesesGarantizados);
   const cnuEfectivoGarantizado = cnuVitalicio / (factorGarantizado > 0 ? factorGarantizado : 1);
-  const cnuTemporal = calcularCNUTemporal(edad, sexo, mesesAumento, tasaInteres);
+  const cnuTemporal = calcularCNUTemporal(edad, sexo, mesesAumento, tasaInteres, esInvalido, 'renta_vitalicia');
   
   const pensionBaseFinal = fondos / (cnuEfectivoGarantizado + porcentajeNormalizado * cnuTemporal);
   const pensionAumentadaFinal = pensionBaseFinal * (1 + porcentajeNormalizado);
-  const expectativaVida = calcularExpectativaVida(edad, sexo);
+  const expectativaVida = calcularExpectativaVida(edad, sexo, esInvalido, 'renta_vitalicia');
   
   const anosGarantia = Math.floor(mesesGarantizados / 12);
   const anosAumento = Math.floor(mesesAumento / 12);

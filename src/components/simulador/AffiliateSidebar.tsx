@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { User, Wallet, HeartHandshake, Sparkles, Building2, RefreshCw } from 'lucide-react';
+import { User, Wallet, HeartHandshake, Sparkles, Building2, RefreshCw, Accessibility } from 'lucide-react';
 import { AfiliadoState } from './types';
 import { calcularEdadDesdeFecha } from '@/lib/date-utils';
 import { BeneficiariesManager } from './BeneficiariesManager';
@@ -222,6 +222,77 @@ export function AffiliateSidebar({
                 </div>
               </div>
             </div>
+          </div>
+
+          {/* Condición de Invalidez Calificada (Tabla MI-2020) */}
+          <div className={`p-3 rounded-lg border transition-all space-y-2 ${
+            afiliado.esInvalido 
+              ? 'border-amber-300 bg-amber-50/60 shadow-xs ring-1 ring-amber-400/30' 
+              : 'border-slate-200 bg-slate-50/70'
+          }`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-800">
+                <Accessibility className={`w-3.5 h-3.5 ${afiliado.esInvalido ? 'text-amber-600' : 'text-slate-500'}`} />
+                <span>Condición de Invalidez Calificada</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                {afiliado.esInvalido && (
+                  <Badge variant="outline" className="text-[9px] bg-amber-100 text-amber-900 border-amber-300 font-bold py-0 h-4">
+                    Tabla {afiliado.sexo === 'M' ? 'MI-H-2020' : 'MI-M-2020'}
+                  </Badge>
+                )}
+                <Switch
+                  checked={!!afiliado.esInvalido}
+                  onCheckedChange={checked => setAfiliado(prev => ({ 
+                    ...prev, 
+                    esInvalido: checked,
+                    tipoPension: checked ? 'invalidez' : 'vejez'
+                  }))}
+                />
+              </div>
+            </div>
+            {afiliado.esInvalido ? (
+              <div className="space-y-2 pt-1 border-t border-amber-200/60">
+                <div className="flex items-center justify-between gap-2">
+                  <Label className="text-[11px] text-amber-900 font-medium">Grado Dictamen Médico</Label>
+                  <div className="grid grid-cols-2 gap-1">
+                    <Button
+                      type="button"
+                      variant={afiliado.gradoInvalidez === 'total' || !afiliado.gradoInvalidez ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setAfiliado(prev => ({ ...prev, gradoInvalidez: 'total' }))}
+                      className={`h-6 text-[10px] px-2 ${
+                        afiliado.gradoInvalidez === 'total' || !afiliado.gradoInvalidez 
+                          ? 'bg-amber-600 hover:bg-amber-700 text-white' 
+                          : 'bg-white text-slate-700 border-amber-200'
+                      }`}
+                    >
+                      Total (≥66,6%)
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={afiliado.gradoInvalidez === 'parcial' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setAfiliado(prev => ({ ...prev, gradoInvalidez: 'parcial' }))}
+                      className={`h-6 text-[10px] px-2 ${
+                        afiliado.gradoInvalidez === 'parcial' 
+                          ? 'bg-amber-600 hover:bg-amber-700 text-white' 
+                          : 'bg-white text-slate-700 border-amber-200'
+                      }`}
+                    >
+                      Parcial (50%-66,5%)
+                    </Button>
+                  </div>
+                </div>
+                <p className="text-[10px] text-amber-800/90 leading-tight">
+                  Se aplica la tabla oficial <strong>{afiliado.sexo === 'M' ? 'MI-H-2020' : 'MI-M-2020'}</strong>. La mayor tasa de mortalidad disminuye el CNU, lo que incrementa la pensión mensual que rinde el saldo.
+                </p>
+              </div>
+            ) : (
+              <p className="text-[10px] text-slate-500 leading-tight">
+                Aplica tablas de vejez ({afiliado.sexo === 'M' ? 'CB-H-2020' : 'RV-M-2020'}). Active si posee dictamen de invalidez ejecutoriado.
+              </p>
+            )}
           </div>
 
           {/* Asesor Previsional SCOMP Toggle */}

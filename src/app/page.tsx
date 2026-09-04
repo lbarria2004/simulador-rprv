@@ -75,6 +75,8 @@ export default function SimuladorPage() {
     fondosCLP: Math.round(1035.47 * 40876.41),
     anosCotizados: 25,
     tipoPension: 'vejez',
+    esInvalido: false,
+    gradoInvalidez: 'total',
     tieneConyuge: true,
     fechaNacimientoConyuge: '1964-06-10',
     edadConyuge: 62,
@@ -173,6 +175,8 @@ export default function SimuladorPage() {
         fondosCLP: Math.round(1035.47 * valorUF),
         anosCotizados: 25,
         tipoPension: 'vejez',
+        esInvalido: false,
+        gradoInvalidez: 'total',
         tieneConyuge: true,
         fechaNacimientoConyuge: '1964-06-10',
         edadConyuge: 62,
@@ -207,6 +211,8 @@ export default function SimuladorPage() {
         fondosCLP: Math.round(2177.40 * valorUF),
         anosCotizados: 30,
         tipoPension: 'vejez',
+        esInvalido: false,
+        gradoInvalidez: 'total',
         tieneConyuge: true,
         fechaNacimientoConyuge: '1956-08-20',
         edadConyuge: 70,
@@ -232,7 +238,7 @@ export default function SimuladorPage() {
       }));
     } else {
       setAfiliado({
-        nombre: 'Afiliado Soltero',
+        nombre: 'Afiliado Sin Beneficiarios',
         rut: '12.345.678-9',
         fechaNacimiento: '1961-01-01',
         edad: 65,
@@ -241,6 +247,8 @@ export default function SimuladorPage() {
         fondosCLP: Math.round(1500.00 * valorUF),
         anosCotizados: 20,
         tipoPension: 'vejez',
+        esInvalido: false,
+        gradoInvalidez: 'total',
         tieneConyuge: false,
         fechaNacimientoConyuge: undefined,
         edadConyuge: 60,
@@ -259,14 +267,15 @@ export default function SimuladorPage() {
     edad: number,
     sexo: Sexo,
     tasaRVSimple: number,
-    beneficiarios: BeneficiarioPension[]
+    beneficiarios: BeneficiarioPension[],
+    esInvalido: boolean = false
   ): CotizacionItemResultado => {
     let resultado: ResultadoEscenario;
 
     if (mod.tipo === 'retiro_programado') {
-      resultado = calcularRetiroProgramado(fondosRP, edad, sexo, 0.0358, beneficiarios);
+      resultado = calcularRetiroProgramado(fondosRP, edad, sexo, 0.0358, beneficiarios, esInvalido);
     } else if (mod.tipo === 'renta_vitalicia_simple') {
-      resultado = calcularRVInmediata(fondosRV, edad, sexo, tasaRVSimple, beneficiarios);
+      resultado = calcularRVInmediata(fondosRV, edad, sexo, tasaRVSimple, beneficiarios, esInvalido);
     } else if (mod.tipo === 'rv_garantizada') {
       resultado = calcularRVPeriodoGarantizado(
         fondosRV,
@@ -274,7 +283,8 @@ export default function SimuladorPage() {
         sexo,
         mod.mesesGarantizados || 180,
         tasaRVSimple,
-        beneficiarios
+        beneficiarios,
+        esInvalido
       );
     } else if (mod.tipo === 'rv_aumento_temporal') {
       resultado = calcularRVAumentoTemporal(
@@ -284,7 +294,8 @@ export default function SimuladorPage() {
         mod.mesesAumento || 36,
         mod.porcentajeAumento || 1.0,
         tasaRVSimple,
-        beneficiarios
+        beneficiarios,
+        esInvalido
       );
     } else {
       // RV Combinada
@@ -296,7 +307,8 @@ export default function SimuladorPage() {
         mod.mesesAumento || 36,
         mod.porcentajeAumento || 1.0,
         tasaRVSimple,
-        beneficiarios
+        beneficiarios,
+        esInvalido
       );
     }
 
@@ -337,10 +349,16 @@ export default function SimuladorPage() {
             porcentajePension: 0.60
           }] : []);
 
+      const esInvalido = !!afiliado.esInvalido;
       const fondosBase = afiliado.fondosCLP;
       const fondosRP = afiliado.conAsesor ? fondosBase * (1 - 0.012) : fondosBase;
       const fondosRV = afiliado.conAsesor ? fondosBase * (1 - 0.015) : fondosBase;
-      const tasaRVSimple = TASAS_RENTA_VITALICIA?.companias?.['4LIFE']?.vejez || 0.0308;
+      
+      const comp4Life = TASAS_RENTA_VITALICIA?.companias?.['4LIFE'];
+      let tasaRVSimple = comp4Life?.vejez || 0.0308;
+      if (esInvalido) {
+        tasaRVSimple = (afiliado.gradoInvalidez === 'parcial' ? comp4Life?.invalidez_parcial : comp4Life?.invalidez_total) || comp4Life?.vejez || 0.0303;
+      }
 
       const activas = modalidades.filter(m => m.activa);
       const resultados = activas.map(mod =>
@@ -351,7 +369,8 @@ export default function SimuladorPage() {
           afiliado.edad,
           afiliado.sexo,
           tasaRVSimple,
-          beneficiarios
+          beneficiarios,
+          esInvalido
         )
       );
 
@@ -391,24 +410,30 @@ export default function SimuladorPage() {
           porcentajePension: 0.60
         }] : []);
 
+    const esInvalido = !!afiliado.esInvalido;
     const fondosBase = afiliado.fondosCLP;
     const fondosRV = afiliado.conAsesor ? fondosBase * (1 - 0.015) : fondosBase;
 
     const ranking: CompaniasRankingItem[] = [];
     for (const [key, item] of Object.entries(TASAS_RENTA_VITALICIA?.companias || {})) {
-      if (!item.vejez) continue;
+      const tasaAplicable = esInvalido 
+        ? ((afiliado.gradoInvalidez === 'parcial' ? item.invalidez_parcial : item.invalidez_total) || item.vejez)
+        : item.vejez;
+      if (!tasaAplicable || tasaAplicable <= 0) continue;
+
       const rvComp = calcularRVInmediata(
         fondosRV,
         afiliado.edad,
         afiliado.sexo,
-        item.vejez,
-        beneficiarios
+        tasaAplicable,
+        beneficiarios,
+        esInvalido
       );
 
       ranking.push({
         nombre: key.replace('_', ' '),
         rating: CLASIFICACIONES_RIESGO[key] || 'AA+',
-        tasaVejez: item.vejez,
+        tasaVejez: tasaAplicable,
         pensionUF: rvComp.pensionEnUF,
         pensionCLP: rvComp.pensionMensual
       });
@@ -440,7 +465,9 @@ export default function SimuladorPage() {
             fechaNacimiento: afiliado.fechaNacimiento,
             fondosAcumulados: afiliado.fondosCLP,
             anosCotizados: afiliado.anosCotizados,
-            tipoPension: afiliado.tipoPension
+            tipoPension: afiliado.tipoPension,
+            esInvalido: afiliado.esInvalido,
+            gradoInvalidez: afiliado.gradoInvalidez
           },
           parametros: {
             uf: valorUF,

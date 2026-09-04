@@ -10,6 +10,8 @@ export interface AfiliadoState {
   fondosUF: number;
   anosCotizados: number;
   tipoPension: TipoPension;
+  esInvalido: boolean; // Condición de invalidez calificada (aplica tablas MI-2020)
+  gradoInvalidez?: 'total' | 'parcial';
   tieneConyuge: boolean;
   fechaNacimientoConyuge?: string; // YYYY-MM-DD
   edadConyuge: number;

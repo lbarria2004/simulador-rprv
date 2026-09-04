@@ -307,9 +307,9 @@ export function BeneficiariesManager({
             </div>
           </div>
 
-          {/* Opciones especiales para hijos */}
-          {(opcionSeleccionada.startsWith('hijo') || opcionSeleccionada === 'madre_padre_nm') && (
-            <div className="flex flex-wrap items-center gap-3 pt-1 border-t border-slate-200/60 text-xs text-slate-600">
+          {/* Condiciones Especiales (Invalidez y Estudios) */}
+          <div className="flex flex-wrap items-center gap-3 pt-1 border-t border-slate-200/60 text-xs text-slate-600">
+            {opcionSeleccionada.startsWith('hijo') && (
               <label className="flex items-center gap-1.5 cursor-pointer">
                 <input
                   type="checkbox"
@@ -319,18 +319,23 @@ export function BeneficiariesManager({
                 />
                 <span>Estudiante regular (hasta 24 años)</span>
               </label>
+            )}
 
-              <label className="flex items-center gap-1.5 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={esInvalido}
-                  onChange={e => setEsInvalido(e.target.checked)}
-                  className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5"
-                />
+            <label className="flex items-center gap-1.5 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={esInvalido}
+                onChange={e => setEsInvalido(e.target.checked)}
+                className="rounded border-slate-300 text-amber-600 focus:ring-amber-500 w-3.5 h-3.5"
+              />
+              <span className="flex items-center gap-1">
                 <span>Invalidez calificada</span>
-              </label>
-            </div>
-          )}
+                <Badge variant="outline" className="text-[9px] py-0 h-3.5 bg-amber-50 text-amber-800 border-amber-200 font-normal">
+                  Tabla MI-2020
+                </Badge>
+              </span>
+            </label>
+          </div>
 
           {/* Botón Incorporar Beneficiario */}
           <Button

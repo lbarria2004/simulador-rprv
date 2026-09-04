@@ -246,5 +246,59 @@ describe('Motor Actuarial de Pensiones - Sistema Chileno', () => {
       assert.equal(res[0].porcentaje, 0.50);
       assert.equal(res[1].porcentaje, 0.15);
     });
+
+    it('Hijo inválido de cualquier edad (ej. 35 años) mantiene derecho de pensión vitalicia (15%)', () => {
+      const ben: BeneficiarioPension[] = [
+        { tipo: 'conyuge', edad: 62, sexo: 'F', porcentajePension: 0 },
+        { tipo: 'hijo', edad: 35, sexo: 'M', porcentajePension: 0, esInvalido: true }
+      ];
+      const res = calcularPorcentajesBeneficiarios(ben);
+      assert.equal(res.length, 2);
+      assert.equal(res[0].porcentaje, 0.50);
+      assert.equal(res[1].porcentaje, 0.15);
+    });
+  });
+
+  describe('Condición de Invalidez y Tablas MI-2020 (Titular y Beneficiarios)', () => {
+    it('CNU con condición de invalidez (MI-H-2020) es significativamente menor que en vejez normal', () => {
+      const cnuVejez = calcularCNU(65, 'M', 0.0358, [], false);
+      const cnuInvalidez = calcularCNU(65, 'M', 0.0358, [], true);
+
+      assert.ok(cnuInvalidez > 0, 'CNU de invalidez debe ser positivo');
+      assert.ok(cnuInvalidez < cnuVejez, `CNU invalidez (${cnuInvalidez}) debe ser menor que CNU vejez (${cnuVejez})`);
+    });
+
+    it('Retiro Programado con titular inválido genera mayor pensión mensual inicial debido al menor CNU', () => {
+      const rpVejez = calcularRetiroProgramado(FONDOS_TEST, 65, 'M', 0.0358, [], false);
+      const rpInvalidez = calcularRetiroProgramado(FONDOS_TEST, 65, 'M', 0.0358, [], true);
+
+      assert.ok(
+        rpInvalidez.pensionMensual > rpVejez.pensionMensual,
+        `Pensión invalidez ($${rpInvalidez.pensionMensual}) debe superar a vejez ($${rpVejez.pensionMensual})`
+      );
+    });
+
+    it('Renta Vitalicia con titular inválido genera mayor pensión mensual para la misma tasa de mercado', () => {
+      const rvVejez = calcularRVInmediata(FONDOS_TEST, 65, 'M', 0.0305, [], false);
+      const rvInvalidez = calcularRVInmediata(FONDOS_TEST, 65, 'M', 0.0305, [], true);
+
+      assert.ok(
+        rvInvalidez.pensionMensual > rvVejez.pensionMensual,
+        `RV invalidez ($${rvInvalidez.pensionMensual}) debe ser mayor que RV vejez ($${rvVejez.pensionMensual})`
+      );
+    });
+
+    it('Beneficiario con invalidez se proyecta con tabla MI-2020 hasta los 110 años', () => {
+      const benInvalido: BeneficiarioPension[] = [
+        { tipo: 'hijo', edad: 25, sexo: 'M', esInvalido: true, porcentajePension: 0.15 }
+      ];
+      const cnuConBenInvalido = calcularCNU(65, 'M', 0.0358, benInvalido, false);
+      const cnuSinBen = calcularCNU(65, 'M', 0.0358, [], false);
+
+      assert.ok(
+        cnuConBenInvalido > cnuSinBen,
+        'CNU con beneficiario debe ser mayor al CNU sin beneficiario'
+      );
+    });
   });
 });
