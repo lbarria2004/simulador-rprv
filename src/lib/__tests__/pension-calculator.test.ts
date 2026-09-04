@@ -18,10 +18,12 @@ import {
   calcularBAC,
   getQx,
   calcularExpectativaVida,
+  calcularPorcentajesBeneficiarios,
   PGU,
   BAC,
   TASAS_INTERES
 } from '../pension-calculator.ts';
+import type { BeneficiarioPension } from '../pension-calculator.ts';
 
 describe('Motor Actuarial de Pensiones - Sistema Chileno', () => {
   const FONDOS_TEST = 50_000_000; // $50.000.000 CLP
@@ -180,6 +182,69 @@ describe('Motor Actuarial de Pensiones - Sistema Chileno', () => {
 
       // SCOMP 4 Life: 9,59 UF / Confuturo: 9,55 UF / Penta: 9,50 UF
       assert.ok(Math.abs(pensionRVUF - 9.59) < 0.1, `Pensión RV (${pensionRVUF.toFixed(2)} UF) muy desviada de 9.59 UF`);
+    });
+  });
+
+  describe('Beneficiarios Legales y Prorrateo (D.L. 3.500 Art. 58)', () => {
+    it('Cónyuge sola sin hijos recibe el 60% legal', () => {
+      const ben: BeneficiarioPension[] = [
+        { tipo: 'conyuge', edad: 62, sexo: 'F', porcentajePension: 0 }
+      ];
+      const res = calcularPorcentajesBeneficiarios(ben);
+      assert.equal(res.length, 1);
+      assert.equal(res[0].porcentaje, 0.60);
+      assert.equal(res[0].factorProrrateo, 1.0);
+    });
+
+    it('Cónyuge con hijo menor con derecho: Cónyuge baja a 50% e Hijo recibe 15%', () => {
+      const ben: BeneficiarioPension[] = [
+        { tipo: 'conyuge', edad: 60, sexo: 'F', porcentajePension: 0 },
+        { tipo: 'hijo', edad: 14, sexo: 'M', porcentajePension: 0 }
+      ];
+      const res = calcularPorcentajesBeneficiarios(ben);
+      assert.equal(res.length, 2);
+      assert.equal(res[0].porcentaje, 0.50);
+      assert.equal(res[1].porcentaje, 0.15);
+      assert.equal(res[0].factorProrrateo, 1.0); // Suma = 65% <= 100%
+    });
+
+    it('Aplica prorrateo legal cuando la suma de porcentajes supera el 100%', () => {
+      // Cónyuge (50%) + 4 Hijos (15% cada uno = 60%) => Suma teórica = 110%
+      const ben: BeneficiarioPension[] = [
+        { tipo: 'conyuge', edad: 55, sexo: 'F', porcentajePension: 0 },
+        { tipo: 'hijo', edad: 10, sexo: 'M', porcentajePension: 0 },
+        { tipo: 'hijo', edad: 12, sexo: 'F', porcentajePension: 0 },
+        { tipo: 'hijo', edad: 14, sexo: 'M', porcentajePension: 0 },
+        { tipo: 'hijo', edad: 16, sexo: 'F', porcentajePension: 0 }
+      ];
+      const res = calcularPorcentajesBeneficiarios(ben);
+      assert.equal(res.length, 5);
+      const sumaFinal = res.reduce((acc, r) => acc + r.porcentaje, 0);
+      // La suma ajustada debe ser exactamente 1.0 (o margen menor a 0.001 por redondeo de 4 decimales)
+      assert.ok(Math.abs(sumaFinal - 1.0) < 0.005, `Suma prorrateada (${sumaFinal}) no converge a 1.0`);
+      assert.ok(res[0].factorProrrateo < 1.0);
+      assert.ok(res[0].porcentaje < 0.50);
+    });
+
+    it('Hijo mayor de 18 que no es estudiante ni inválido no tiene derecho (0%) y cónyuge mantiene 60%', () => {
+      const ben: BeneficiarioPension[] = [
+        { tipo: 'conyuge', edad: 62, sexo: 'F', porcentajePension: 0 },
+        { tipo: 'hijo', edad: 22, sexo: 'M', porcentajePension: 0, esEstudiante: false, esInvalido: false }
+      ];
+      const res = calcularPorcentajesBeneficiarios(ben);
+      assert.equal(res.length, 1); // Solo la cónyuge
+      assert.equal(res[0].porcentaje, 0.60);
+    });
+
+    it('Hijo entre 18 y 24 años acreditado como estudiante sí tiene derecho (15%)', () => {
+      const ben: BeneficiarioPension[] = [
+        { tipo: 'conyuge', edad: 62, sexo: 'F', porcentajePension: 0 },
+        { tipo: 'hijo', edad: 21, sexo: 'M', porcentajePension: 0, esEstudiante: true }
+      ];
+      const res = calcularPorcentajesBeneficiarios(ben);
+      assert.equal(res.length, 2);
+      assert.equal(res[0].porcentaje, 0.50);
+      assert.equal(res[1].porcentaje, 0.15);
     });
   });
 });

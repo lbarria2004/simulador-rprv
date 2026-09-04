@@ -79,6 +79,17 @@ export default function SimuladorPage() {
     fechaNacimientoConyuge: '1964-06-10',
     edadConyuge: 62,
     sexoConyuge: 'F',
+    beneficiarios: [
+      {
+        id: 'ben-default-conyuge',
+        nombre: 'Cónyuge',
+        tipo: 'conyuge',
+        fechaNacimiento: '1964-06-10',
+        edad: 62,
+        sexo: 'F',
+        porcentajePension: 0.60
+      }
+    ],
     conAsesor: true
   });
 
@@ -166,6 +177,17 @@ export default function SimuladorPage() {
         fechaNacimientoConyuge: '1964-06-10',
         edadConyuge: 62,
         sexoConyuge: 'F',
+        beneficiarios: [
+          {
+            id: 'ben-zamora-conyuge',
+            nombre: 'Cónyuge',
+            tipo: 'conyuge',
+            fechaNacimiento: '1964-06-10',
+            edad: 62,
+            sexo: 'F',
+            porcentajePension: 0.60
+          }
+        ],
         conAsesor: true
       });
       setClausulas(prev => ({
@@ -189,6 +211,17 @@ export default function SimuladorPage() {
         fechaNacimientoConyuge: '1956-08-20',
         edadConyuge: 70,
         sexoConyuge: 'M',
+        beneficiarios: [
+          {
+            id: 'ben-spuler-conyuge',
+            nombre: 'Cónyuge',
+            tipo: 'conyuge',
+            fechaNacimiento: '1956-08-20',
+            edad: 70,
+            sexo: 'M',
+            porcentajePension: 0.60
+          }
+        ],
         conAsesor: true
       });
       setClausulas(prev => ({
@@ -212,6 +245,7 @@ export default function SimuladorPage() {
         fechaNacimientoConyuge: undefined,
         edadConyuge: 60,
         sexoConyuge: 'F',
+        beneficiarios: [],
         conAsesor: false
       });
     }
@@ -294,15 +328,14 @@ export default function SimuladorPage() {
   const handleGenerarCotizacion = useCallback(() => {
     setIsCotizando(true);
     try {
-      const beneficiarios: BeneficiarioPension[] = [];
-      if (afiliado.tieneConyuge) {
-        beneficiarios.push({
-          tipo: 'conyuge',
-          edad: afiliado.edadConyuge,
-          sexo: afiliado.sexoConyuge,
-          porcentajePension: 0.60
-        });
-      }
+      const beneficiarios: BeneficiarioPension[] = (afiliado.beneficiarios && afiliado.beneficiarios.length > 0)
+        ? afiliado.beneficiarios
+        : (afiliado.tieneConyuge ? [{
+            tipo: 'conyuge',
+            edad: afiliado.edadConyuge,
+            sexo: afiliado.sexoConyuge,
+            porcentajePension: 0.60
+          }] : []);
 
       const fondosBase = afiliado.fondosCLP;
       const fondosRP = afiliado.conAsesor ? fondosBase * (1 - 0.012) : fondosBase;
@@ -349,15 +382,14 @@ export default function SimuladorPage() {
 
   // Cálculos complementarios de ranking de aseguradoras
   const rankingCompanias = useMemo(() => {
-    const beneficiarios: BeneficiarioPension[] = [];
-    if (afiliado.tieneConyuge) {
-      beneficiarios.push({
-        tipo: 'conyuge',
-        edad: afiliado.edadConyuge,
-        sexo: afiliado.sexoConyuge,
-        porcentajePension: 0.60
-      });
-    }
+    const beneficiarios: BeneficiarioPension[] = (afiliado.beneficiarios && afiliado.beneficiarios.length > 0)
+      ? afiliado.beneficiarios
+      : (afiliado.tieneConyuge ? [{
+          tipo: 'conyuge',
+          edad: afiliado.edadConyuge,
+          sexo: afiliado.sexoConyuge,
+          porcentajePension: 0.60
+        }] : []);
 
     const fondosBase = afiliado.fondosCLP;
     const fondosRV = afiliado.conAsesor ? fondosBase * (1 - 0.015) : fondosBase;
@@ -388,6 +420,15 @@ export default function SimuladorPage() {
   const handleGenerarPDF = async () => {
     setIsGeneratingPDF(true);
     try {
+      const beneficiariosReporte = (afiliado.beneficiarios && afiliado.beneficiarios.length > 0)
+        ? afiliado.beneficiarios
+        : (afiliado.tieneConyuge ? [{
+            tipo: 'conyuge',
+            edad: afiliado.edadConyuge,
+            sexo: afiliado.sexoConyuge,
+            porcentajePension: 0.60
+          }] : []);
+
       const res = await fetch('/api/reporte', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -410,12 +451,7 @@ export default function SimuladorPage() {
             afpSeleccionada: clausulas.afpSeleccionada
           },
           resultados: cotizacionResultados.map(r => r.resultado),
-          beneficiarios: afiliado.tieneConyuge ? [{
-            tipo: 'conyuge',
-            edad: afiliado.edadConyuge,
-            sexo: afiliado.sexoConyuge,
-            porcentajePension: 0.60
-          }] : []
+          beneficiarios: beneficiariosReporte
         })
       });
 

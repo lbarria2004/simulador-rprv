@@ -14,6 +14,7 @@ export interface AfiliadoState {
   fechaNacimientoConyuge?: string; // YYYY-MM-DD
   edadConyuge: number;
   sexoConyuge: Sexo;
+  beneficiarios: BeneficiarioPension[];
   conAsesor: boolean; // 1.5% RV / 1.2% RP
 }
 

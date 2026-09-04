@@ -58,11 +58,24 @@ export interface ClausulaAumentoTemporal {
   porcentaje: number;
 }
 
+export type TipoBeneficiario = 
+  | 'conyuge' 
+  | 'conviviente' 
+  | 'hijo' 
+  | 'madre_padre_hijos_nm' 
+  | 'padre' 
+  | 'madre';
+
 export interface BeneficiarioPension {
-  tipo: 'conyuge' | 'conviviente' | 'hijo' | 'padre' | 'madre';
+  id?: string;
+  nombre?: string;
+  tipo: TipoBeneficiario;
+  fechaNacimiento?: string;
   edad: number;
   sexo: Sexo;
   porcentajePension: number;
+  esEstudiante?: boolean; // Para hijos estudiantes entre 18 y 24 años
+  esInvalido?: boolean;   // Para beneficiarios calificados con invalidez
 }
 
 export interface DatosAfiliado {
@@ -290,11 +303,20 @@ export function calcularCNU(
   
   // Agregar CNU de beneficiarios (para vejez con cargas)
   if (beneficiarios && beneficiarios.length > 0) {
-    for (const ben of beneficiarios) {
+    const porcentajes = calcularPorcentajesBeneficiarios(beneficiarios);
+    for (let i = 0; i < beneficiarios.length; i++) {
+      const ben = beneficiarios[i];
+      const pInfo = porcentajes[i];
+      const pct = pInfo ? pInfo.porcentaje : (ben.porcentajePension || 0.60);
+      if (pct <= 0) continue;
+
       const cnuBen = calcularCNUSobrevivenciaBeneficiario(
         edad, sexo, tasaInteres,
-        ben.edad, ben.sexo, ben.porcentajePension, esInvalido,
-        modalidad, anoCalculo
+        ben.edad, ben.sexo, pct, esInvalido,
+        modalidad, anoCalculo,
+        ben.tipo === 'hijo',
+        ben.esEstudiante || false,
+        ben.esInvalido || false
       );
       cnu += cnuBen;
     }
@@ -316,15 +338,33 @@ function calcularCNUSobrevivenciaBeneficiario(
   porcentaje: number,
   esInvalidoTitular: boolean = false,
   modalidad: ModalidadPension = 'retiro_programado',
-  anoCalculo: number = 2026
+  anoCalculo: number = 2026,
+  esHijo: boolean = false,
+  esEstudianteHijo: boolean = false,
+  esInvalidoBeneficiario: boolean = false
 ): number {
+  let edadTopeBeneficiario = 110;
+  if (esHijo && !esInvalidoBeneficiario) {
+    edadTopeBeneficiario = esEstudianteHijo ? 24 : 18;
+  }
+
+  // Si el hijo ya cumplió o superó la edad tope legal, no genera pensión de sobrevivencia
+  if (edadBeneficiario >= edadTopeBeneficiario) {
+    return 0;
+  }
+
   let cnu = 0;
-  const maxEdad = Math.max(110 - edadTitular, 110 - edadBeneficiario);
+  const maxEdad = Math.max(110 - edadTitular, edadTopeBeneficiario - edadBeneficiario);
   
   let probTitularVivo = 1.0;
   let probBeneficiarioVivo = 1.0;
 
   for (let t = 0; t <= maxEdad; t++) {
+    const edadBenActual = edadBeneficiario + t;
+    if (edadBenActual >= edadTopeBeneficiario) {
+      break;
+    }
+
     const probTitularFallecido = 1.0 - probTitularVivo;
     const probConjunta = probTitularFallecido * probBeneficiarioVivo;
     const factorDescuento = 1 / Math.pow(1 + tasaInteres, t + 0.5);
@@ -338,8 +378,8 @@ function calcularCNUSobrevivenciaBeneficiario(
       probTitularVivo = 0;
     }
 
-    if (edadBeneficiario + t < 110) {
-      const qxBen = getQx(edadBeneficiario + t, sexoBeneficiario, false, 'retiro_programado', anoCalculo + t);
+    if (edadBenActual < 110) {
+      const qxBen = getQx(edadBenActual, sexoBeneficiario, esInvalidoBeneficiario, 'retiro_programado', anoCalculo + t);
       probBeneficiarioVivo *= (1 - qxBen);
     } else {
       probBeneficiarioVivo = 0;
@@ -1069,40 +1109,63 @@ export function calcularPorcentajesBeneficiarios(
 ): { tipo: string; porcentaje: number; porcentajeOriginal: number; edad: number; sexo: Sexo; factorProrrateo: number }[] {
   const resultados: { tipo: string; porcentaje: number; porcentajeOriginal: number; edad: number; sexo: Sexo; factorProrrateo: number }[] = [];
   
-  // Contar tipos de beneficiarios para validar reglas
-  const tieneHijos = beneficiarios.some(b => b.tipo === 'hijo');
-  const tieneConyuge = beneficiarios.some(b => b.tipo === 'conyuge');
-  const tieneConviviente = beneficiarios.some(b => b.tipo === 'conviviente');
-  const tieneOtrosBeneficiarios = tieneConyuge || tieneConviviente || tieneHijos;
+  // Un hijo tiene derecho si es < 18, o < 24 si es estudiante, o inválido de cualquier edad
+  const tieneHijosConDerecho = beneficiarios.some(
+    b => b.tipo === 'hijo' && (b.edad < 18 || (b.edad < 24 && b.esEstudiante) || b.esInvalido)
+  );
+  const tieneConyugeOConviviente = beneficiarios.some(
+    b => b.tipo === 'conyuge' || b.tipo === 'conviviente'
+  );
+  const tieneMadrePadreNM = beneficiarios.some(
+    b => b.tipo === 'madre_padre_hijos_nm'
+  );
+  const tieneOtrosBeneficiarios = tieneConyugeOConviviente || tieneHijosConDerecho || tieneMadrePadreNM;
   
-  // Usar los porcentajes asignados por el usuario (porcentajePension)
-  // Si el usuario no asignó porcentaje, usar el teórico según normativa
   for (const ben of beneficiarios) {
-    let porcentajeOriginal = ben.porcentajePension; // Usar el porcentaje asignado por el usuario
+    let porcentajeOriginal = ben.porcentajePension;
     
-    // Si el usuario no asignó porcentaje (es 0), calcular el teórico según normativa
+    // Si el usuario no forzó porcentaje personalizado (> 0), calcular el legal según D.L. 3.500
     if (!porcentajeOriginal || porcentajeOriginal === 0) {
       switch (ben.tipo) {
         case 'conyuge':
-          porcentajeOriginal = tieneHijos 
+          porcentajeOriginal = tieneHijosConDerecho 
             ? PORCENTAJES_SOBREVIVENCIA.CONYUGE_CON_HIJOS 
             : PORCENTAJES_SOBREVIVENCIA.CONYUGE_SIN_HIJOS;
           break;
           
         case 'conviviente':
-          porcentajeOriginal = tieneHijos 
+          porcentajeOriginal = tieneHijosConDerecho 
             ? PORCENTAJES_SOBREVIVENCIA.CONVIVIENTE_CON_HIJOS 
             : PORCENTAJES_SOBREVIVENCIA.CONVIVIENTE_SIN_HIJOS;
           break;
           
-        case 'hijo':
-          porcentajeOriginal = PORCENTAJES_SOBREVIVENCIA.HIJO_CON_PADRE;
+        case 'madre_padre_hijos_nm':
+          porcentajeOriginal = tieneHijosConDerecho
+            ? PORCENTAJES_SOBREVIVENCIA.MADRE_PADRE_CON_OTROS_HIJOS
+            : PORCENTAJES_SOBREVIVENCIA.MADRE_PADRE_SIN_OTROS_HIJOS;
           break;
+
+        case 'hijo': {
+          const tieneDerecho = ben.edad < 18 || (ben.edad < 24 && ben.esEstudiante) || ben.esInvalido;
+          if (!tieneDerecho) {
+            porcentajeOriginal = 0;
+          } else {
+            // Huérfano absoluto: no concurre con cónyuge, conviviente ni madre/padre no matrimonial
+            const esHuerfanoAbsoluto = !tieneConyugeOConviviente && !tieneMadrePadreNM;
+            porcentajeOriginal = esHuerfanoAbsoluto 
+              ? PORCENTAJES_SOBREVIVENCIA.HIJO_HUERFANO 
+              : PORCENTAJES_SOBREVIVENCIA.HIJO_CON_PADRE;
+          }
+          break;
+        }
           
         case 'padre':
         case 'madre':
+          // Sólo tienen derecho si no existen cónyuge, conviviente civil, madre/padre no mat., ni hijos con derecho
           if (!tieneOtrosBeneficiarios) {
             porcentajeOriginal = PORCENTAJES_SOBREVIVENCIA.PADRE_MADRE_SIN_OTROS;
+          } else {
+            porcentajeOriginal = 0;
           }
           break;
       }
@@ -1111,7 +1174,7 @@ export function calcularPorcentajesBeneficiarios(
     if (porcentajeOriginal > 0) {
       resultados.push({
         tipo: ben.tipo,
-        porcentaje: porcentajeOriginal, // Se ajustará después si hay prorrateo
+        porcentaje: porcentajeOriginal,
         porcentajeOriginal,
         edad: ben.edad,
         sexo: ben.sexo,
@@ -1120,16 +1183,13 @@ export function calcularPorcentajesBeneficiarios(
     }
   }
   
-  // APLICAR PRORRATEO SI LA SUMA SUPERA EL 100%
+  // APLICAR PRORRATEO LEGAL (Art. 58 DL 3500) SI LA SUMA SUPERA EL 100%
   const sumaPorcentajes = resultados.reduce((sum, r) => sum + r.porcentajeOriginal, 0);
   
   if (sumaPorcentajes > 1.0) {
-    // Factor de ajuste: 100% / suma_total
     const factorProrrateo = 1.0 / sumaPorcentajes;
-    
-    // Aplicar factor a cada beneficiario
     for (const r of resultados) {
-      r.porcentaje = r.porcentajeOriginal * factorProrrateo;
+      r.porcentaje = Number((r.porcentajeOriginal * factorProrrateo).toFixed(4));
       r.factorProrrateo = factorProrrateo;
     }
   }

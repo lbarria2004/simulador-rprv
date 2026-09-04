@@ -7,10 +7,11 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { User, Wallet, HeartHandshake, Sparkles, Building2, RefreshCw } from 'lucide-react';
 import { AfiliadoState } from './types';
 import { calcularEdadDesdeFecha } from '@/lib/date-utils';
+import { BeneficiariesManager } from './BeneficiariesManager';
+import { BeneficiarioPension } from '@/lib/pension-calculator';
 
 interface AffiliateSidebarProps {
   afiliado: AfiliadoState;
@@ -53,6 +54,19 @@ export function AffiliateSidebar({
     }));
   };
 
+  // Sincronizar lista de beneficiarios legales
+  const handleBeneficiariosChange = (nuevosBeneficiarios: BeneficiarioPension[]) => {
+    const conyuge = nuevosBeneficiarios.find(b => b.tipo === 'conyuge');
+    setAfiliado(prev => ({
+      ...prev,
+      beneficiarios: nuevosBeneficiarios,
+      tieneConyuge: !!conyuge,
+      edadConyuge: conyuge ? conyuge.edad : prev.edadConyuge,
+      sexoConyuge: conyuge ? conyuge.sexo : prev.sexoConyuge,
+      fechaNacimientoConyuge: conyuge ? conyuge.fechaNacimiento : prev.fechaNacimientoConyuge
+    }));
+  };
+
   return (
     <div className="space-y-4">
       {/* Tarjeta de Datos del Afiliado */}
@@ -67,60 +81,47 @@ export function AffiliateSidebar({
             </div>
             <div className="flex items-center gap-1">
               <Badge variant="secondary" className="text-[11px] font-mono font-medium text-slate-700">
-                UF: ${valorUF.toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                {afiliado.tipoPension.toUpperCase()}
               </Badge>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={onRefreshUF}
-                disabled={isLoadingUF}
-                className="h-6 w-6 text-slate-400 hover:text-blue-600"
-                title={`Fuente: ${fuenteUF}. Clic para actualizar`}
-              >
-                <RefreshCw className={`w-3 h-3 ${isLoadingUF ? 'animate-spin' : ''}`} />
-              </Button>
             </div>
           </div>
-          <CardDescription className="text-xs text-slate-500">
-            Valores sincronizados con el SII oficial de Chile
-          </CardDescription>
         </CardHeader>
 
         <CardContent className="px-4 pb-4 space-y-3.5">
           {/* Nombre y RUT */}
-          <div className="grid grid-cols-5 gap-2">
-            <div className="col-span-3 space-y-1">
-              <Label className="text-xs text-slate-600">Nombre Completo</Label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div className="space-y-1">
+              <Label className="text-xs text-slate-600">Nombre del Afiliado</Label>
               <Input
+                type="text"
                 value={afiliado.nombre}
                 onChange={e => setAfiliado(prev => ({ ...prev, nombre: e.target.value }))}
-                placeholder="Ej. Juan Pérez"
-                className="h-8 text-xs"
+                className="h-8 text-xs bg-white"
               />
             </div>
-            <div className="col-span-2 space-y-1">
+            <div className="space-y-1">
               <Label className="text-xs text-slate-600">RUT</Label>
               <Input
+                type="text"
                 value={afiliado.rut}
                 onChange={e => setAfiliado(prev => ({ ...prev, rut: e.target.value }))}
-                placeholder="12.345.678-9"
-                className="h-8 text-xs font-mono"
+                className="h-8 text-xs bg-white font-mono"
               />
             </div>
           </div>
 
           {/* Fecha de Nacimiento y Sexo */}
-          <div className="grid grid-cols-2 gap-2">
-            <div className="space-y-1">
+          <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
+            <div className="sm:col-span-7 space-y-1">
               <div className="flex items-center justify-between">
-                <Label className="text-xs text-slate-600">F. Nacimiento</Label>
+                <Label className="text-xs text-slate-600">Fecha de Nacimiento</Label>
                 <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-700 border-blue-200 py-0 h-4 font-semibold">
                   {afiliado.edad} años
                 </Badge>
               </div>
               <Input
                 type="date"
-                value={afiliado.fechaNacimiento || ''}
+                value={afiliado.fechaNacimiento}
                 onChange={e => {
                   const fecha = e.target.value;
                   const edadCalc = calcularEdadDesdeFecha(fecha);
@@ -130,51 +131,86 @@ export function AffiliateSidebar({
                     edad: edadCalc
                   }));
                 }}
-                className="h-8 text-xs font-semibold"
+                className="h-8 text-xs bg-white font-mono"
               />
             </div>
-            <div className="space-y-1">
+
+            <div className="sm:col-span-5 space-y-1">
               <Label className="text-xs text-slate-600">Sexo Legal</Label>
-              <Select
-                value={afiliado.sexo}
-                onValueChange={(val: 'M' | 'F') => setAfiliado(prev => ({ ...prev, sexo: val }))}
-              >
-                <SelectTrigger className="h-8 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="M">Masculino (65 años legal)</SelectItem>
-                  <SelectItem value="F">Femenino (60 años legal)</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="grid grid-cols-2 gap-1">
+                <Button
+                  type="button"
+                  variant={afiliado.sexo === 'M' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setAfiliado(prev => ({ ...prev, sexo: 'M' }))}
+                  className={`h-8 text-xs ${afiliado.sexo === 'M' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-white'}`}
+                >
+                  Hombre
+                </Button>
+                <Button
+                  type="button"
+                  variant={afiliado.sexo === 'F' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setAfiliado(prev => ({ ...prev, sexo: 'F' }))}
+                  className={`h-8 text-xs ${afiliado.sexo === 'F' ? 'bg-rose-600 hover:bg-rose-700' : 'bg-white'}`}
+                >
+                  Mujer
+                </Button>
+              </div>
             </div>
           </div>
 
-          {/* Fondos Acumulados (UF y CLP sincronizados) */}
-          <div className="p-3 bg-slate-50 rounded-lg border border-slate-200/80 space-y-2">
-            <div className="flex items-center gap-1.5 text-xs font-medium text-slate-800">
-              <Wallet className="w-3.5 h-3.5 text-blue-600" />
-              <span>Saldo Total para Pensión</span>
+          {/* Años Cotizados */}
+          <div className="space-y-1">
+            <Label className="text-xs text-slate-600">Años Cotizados (para beneficio BAC)</Label>
+            <Input
+              type="number"
+              min={0}
+              max={50}
+              value={afiliado.anosCotizados}
+              onChange={e => setAfiliado(prev => ({ ...prev, anosCotizados: Number(e.target.value) || 0 }))}
+              className="h-8 text-xs bg-white"
+            />
+          </div>
+
+          {/* Saldo de Fondos en UF y Pesos */}
+          <div className="p-3 bg-slate-50 rounded-lg border border-slate-200/80 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-800">
+                <Wallet className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Saldo Acumulado en AFP</span>
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={onRefreshUF}
+                disabled={isLoadingUF}
+                className="h-6 px-1.5 text-[10px] text-slate-500 hover:text-blue-600 gap-1"
+                title="Actualizar valor UF desde SII"
+              >
+                <RefreshCw className={`w-3 h-3 ${isLoadingUF ? 'animate-spin' : ''}`} />
+                <span>UF: ${valorUF.toLocaleString('es-CL')}</span>
+              </Button>
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <div className="space-y-0.5">
-                <Label className="text-[11px] text-slate-500 font-medium">En Unidades de Fomento</Label>
+                <Label className="text-[11px] text-slate-500">Monto en UF</Label>
                 <div className="relative">
                   <Input
                     type="number"
                     step="0.01"
-                    value={afiliado.fondosUF || ''}
+                    value={afiliado.fondosUF > 0 ? afiliado.fondosUF : ''}
                     onChange={e => handleUFChange(e.target.value)}
-                    placeholder="1000.00"
-                    className="h-8 text-xs pr-7 font-semibold text-blue-950 font-mono bg-white"
+                    placeholder="1.035,47"
+                    className="h-8 text-xs font-semibold text-blue-900 bg-white"
                   />
-                  <span className="absolute right-2 top-2 text-[10px] text-slate-400 font-semibold pointer-events-none">UF</span>
+                  <span className="absolute right-2 top-2 text-[10px] font-bold text-slate-400">UF</span>
                 </div>
               </div>
-
               <div className="space-y-0.5">
-                <Label className="text-[11px] text-slate-500 font-medium">En Pesos Chilenos</Label>
+                <Label className="text-[11px] text-slate-500">Equivalente en Pesos ($)</Label>
                 <div className="relative">
                   <Input
                     type="text"
@@ -186,62 +222,6 @@ export function AffiliateSidebar({
                 </div>
               </div>
             </div>
-          </div>
-
-          {/* Cónyuge / Sobrevivencia */}
-          <div className="p-3 bg-slate-50 rounded-lg border border-slate-200/80 space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5 text-xs font-medium text-slate-800">
-                <HeartHandshake className="w-3.5 h-3.5 text-rose-500" />
-                <span>Cónyuge con Derecho a Pensión</span>
-              </div>
-              <Switch
-                checked={afiliado.tieneConyuge}
-                onCheckedChange={checked => setAfiliado(prev => ({ ...prev, tieneConyuge: checked }))}
-              />
-            </div>
-
-            {afiliado.tieneConyuge && (
-              <div className="grid grid-cols-2 gap-2 pt-1">
-                <div className="space-y-0.5">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-[11px] text-slate-500">F. Nacimiento Cónyuge</Label>
-                    <Badge variant="outline" className="text-[9px] bg-rose-50 text-rose-700 border-rose-200 py-0 h-3.5 font-semibold">
-                      {afiliado.edadConyuge} años
-                    </Badge>
-                  </div>
-                  <Input
-                    type="date"
-                    value={afiliado.fechaNacimientoConyuge || ''}
-                    onChange={e => {
-                      const fecha = e.target.value;
-                      const edadCalc = calcularEdadDesdeFecha(fecha);
-                      setAfiliado(prev => ({
-                        ...prev,
-                        fechaNacimientoConyuge: fecha,
-                        edadConyuge: edadCalc
-                      }));
-                    }}
-                    className="h-7 text-xs bg-white"
-                  />
-                </div>
-                <div className="space-y-0.5">
-                  <Label className="text-[11px] text-slate-500">Sexo Cónyuge</Label>
-                  <Select
-                    value={afiliado.sexoConyuge}
-                    onValueChange={(val: 'M' | 'F') => setAfiliado(prev => ({ ...prev, sexoConyuge: val }))}
-                  >
-                    <SelectTrigger className="h-7 text-xs bg-white">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="F">Mujer (60% pensión)</SelectItem>
-                      <SelectItem value="M">Hombre (60% pensión)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            )}
           </div>
 
           {/* Asesor Previsional SCOMP Toggle */}
@@ -262,6 +242,12 @@ export function AffiliateSidebar({
           </div>
         </CardContent>
       </Card>
+
+      {/* Gestor de Beneficiarios Legales D.L. 3.500 */}
+      <BeneficiariesManager
+        beneficiarios={afiliado.beneficiarios || []}
+        onChange={handleBeneficiariosChange}
+      />
     </div>
   );
 }
