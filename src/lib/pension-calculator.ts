@@ -2506,8 +2506,74 @@ export function calcularRVAumentoTemporalSobrevivencia(
     advertencias: [
       `Fase Aumentada (+${pct}%): ${Math.round(pensionAumentadaMensual).toLocaleString('es-CL')} / mes durante ${nombrePeriodo} (${mesesAumento} meses)`,
       `Fase Vitalicia Posterior: ${Math.round(pensionBaseMensual).toLocaleString('es-CL')} / mes fijo en UF de por vida`,
-      `Única cláusula adicional permitida en sobrevivencia (D.L. 3.500 Art. 61 bis)`,
-      `Distribución a beneficiarios según Art. 58 D.L. 3.500`
+      `Distribución a beneficiarios según Art. 58 D.L. 3.500`,
+      `Nota regulatoria Art. 61 bis DL 3500: Cláusula exclusiva de Vejez e Invalidez según normativa CMF/SP`
+    ]
+  };
+}
+
+/**
+ * Calcula la Renta Vitalicia de Sobrevivencia con Período Garantizado de Pago
+ * Cláusula adicional permitida para sobrevivencia según la CMF (código CAD220131741) y Compendio SP.
+ * Si fallece un beneficiario garantizado, su cuota acrece a los demás o herederos designados.
+ */
+export function calcularRVSobrevivenciaGarantizada(
+  fondos: number,
+  beneficiarios: BeneficiarioPension[],
+  mesesGarantizados: number = 180,
+  tasaInteres: number = TASAS_INTERES.SOBREVIVENCIA,
+  valorUF: number = UF_ACTUAL
+): ResultadoEscenario {
+  const { cnuTotal } = calcularCNUSobrevivencia(beneficiarios, tasaInteres, 'renta_vitalicia');
+  const factorAjuste = calcularFactorGarantizado(mesesGarantizados);
+  const pensionBaseMensual = cnuTotal > 0 ? fondos / cnuTotal : 0;
+  const pensionGarantizadaMensual = pensionBaseMensual * factorAjuste;
+  
+  const porcentajes = calcularPorcentajesBeneficiarios(beneficiarios);
+  const pensionPorBen = porcentajes.map(b => ({
+    tipo: b.tipo,
+    porcentaje: b.porcentaje,
+    pensionMensual: Math.round(pensionGarantizadaMensual * b.porcentaje)
+  }));
+  
+  const anosGarantizados = Math.floor(mesesGarantizados / 12);
+  const mesesRestantes = mesesGarantizados % 12;
+  const nombrePeriodo = (anosGarantizados > 0 && mesesRestantes > 0)
+    ? `${anosGarantizados}a ${mesesRestantes}m`
+    : (anosGarantizados > 0 ? `${anosGarantizados} ${anosGarantizados === 1 ? 'año' : 'años'}` : `${mesesGarantizados} meses`);
+
+  const proyeccion: ProyeccionAnual[] = [];
+  const anosGarantizadosInt = Math.ceil(mesesGarantizados / 12);
+  for (let ano = 1; ano <= 25; ano++) {
+    const esFaseGarantizada = ano <= anosGarantizadosInt;
+    proyeccion.push({
+      año: ano,
+      edad: (porcentajes[0]?.edad || 60) + ano - 1,
+      pensionMensual: Math.round(pensionGarantizadaMensual),
+      saldoAcumulado: 0,
+      retiroAcumulado: 0,
+      fase: esFaseGarantizada ? 'normal' : 'decreciente'
+    });
+  }
+
+  const ufVal = valorUF > 0 ? valorUF : UF_ACTUAL;
+
+  return {
+    nombre: `RV Sobrevivencia con Período Garantizado (${nombrePeriodo})`,
+    pensionMensual: Math.round(pensionGarantizadaMensual),
+    pensionEnUF: ufVal > 0 ? Number((pensionGarantizadaMensual / ufVal).toFixed(2)) : 0,
+    pensionAnual: Math.round(pensionGarantizadaMensual * 12),
+    cnu: factorAjuste > 0 ? cnuTotal / factorAjuste : cnuTotal,
+    tasaInteres,
+    expectativaVida: calcularExpectativaVida(porcentajes[0]?.edad || 60, porcentajes[0]?.sexo || 'F'),
+    periodoGarantizado: mesesGarantizados,
+    pensionPorBeneficiario: pensionPorBen,
+    proyeccion,
+    advertencias: [
+      `Período Garantizado de Pago: ${nombrePeriodo} (${mesesGarantizados} meses)`,
+      `Si un beneficiario fallece durante la garantía, su cuota acrece a los demás o herederos designados`,
+      `Al término de los ${nombrePeriodo}, se mantiene la pensión vitalicia bajo alícuotas del Art. 58 DL 3500`,
+      `Cláusula legalmente autorizada en Sobrevivencia por CMF (CAD220131741) y Compendio SP`
     ]
   };
 }

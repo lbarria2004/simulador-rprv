@@ -30,6 +30,7 @@ import {
   calcularFinanciamientoSobrevivencia,
   calcularCNUSobrevivencia,
   calcularRVAumentoTemporalSobrevivencia,
+  calcularRVSobrevivenciaGarantizada,
   calcularPorcentajesBeneficiarios,
   calcularExpectativaVida,
   BeneficiarioPension,
@@ -326,17 +327,8 @@ export default function SimuladorPage() {
           advertencias: ['Pensión de Sobrevivencia Legal (D.L. 3.500 Art. 58)', 'Recálculo anual por saldo decreciente en AFP']
         };
       } else {
-        // Modalidades de Renta Vitalicia en Sobrevivencia (Art. 61 bis D.L. 3.500)
-        if (mod.tipo === 'rv_aumento_temporal') {
-          resultado = calcularRVAumentoTemporalSobrevivencia(
-            fondosRV,
-            beneficiarios,
-            mod.mesesAumento || 36,
-            mod.porcentajeAumento || 0.50,
-            tasaRVSimple,
-            valorUF
-          );
-        } else if (mod.tipo === 'renta_vitalicia_simple') {
+        // Modalidades de Renta Vitalicia en Sobrevivencia (Normativa Oficial CMF y SP)
+        if (mod.tipo === 'renta_vitalicia_simple') {
           const { cnuTotal: cnuRVBase } = calcularCNUSobrevivencia(beneficiarios, tasaRVSimple, 'renta_vitalicia');
           const pensionRV = cnuRVBase > 0 ? fondosRV / cnuRVBase : 0;
           const pensionPorBen = porcentajes.map(b => ({
@@ -372,8 +364,16 @@ export default function SimuladorPage() {
               'Distribución a beneficiarios legales según Art. 58 D.L. 3.500'
             ]
           };
+        } else if (mod.tipo === 'rv_garantizada') {
+          resultado = calcularRVSobrevivenciaGarantizada(
+            fondosRV,
+            beneficiarios,
+            mod.mesesGarantizados || 180,
+            tasaRVSimple,
+            valorUF
+          );
         } else {
-          // Si llega garantizada o combinada en sobrevivencia (no permitido legalmente)
+          // Aumento Temporal o Combinada en Sobrevivencia (No permitidas por normativa CMF/SP)
           resultado = {
             nombre: `${mod.nombre} (No autorizada en Sobrevivencia)`,
             pensionMensual: 0,
@@ -382,8 +382,9 @@ export default function SimuladorPage() {
             cnu: 0,
             tasaInteres: tasaRVSimple,
             advertencias: [
-              'Modalidad no disponible en Pensión de Sobrevivencia según D.L. 3.500 Art. 61 bis.',
-              'Solo se autoriza Retiro Programado, RV Inmediata Simple y RV con Período Aumentado.'
+              'Cláusula de Aumento Temporal no permitida en Sobrevivencia según normativa CMF/SP.',
+              'El Aumento Temporal es exclusivo de pensiones de Vejez e Invalidez.',
+              'En Sobrevivencia solo procede Retiro Programado, RV Simple o RV con Período Garantizado.'
             ]
           };
         }
@@ -872,16 +873,15 @@ export default function SimuladorPage() {
                     ingresoBaseUF: prev.ingresoBaseUF || (valorUF > 0 ? Math.round((1200000 / valorUF) * 100) / 100 : 29.35)
                   }));
                   setModalidades(prev => {
-                    const filtered = prev.filter(m => m.tipo !== 'rv_garantizada' && m.tipo !== 'rv_combinada');
-                    const hasAumento = filtered.some(m => m.tipo === 'rv_aumento_temporal');
-                    if (!hasAumento) {
+                    const filtered = prev.filter(m => m.tipo !== 'rv_aumento_temporal' && m.tipo !== 'rv_combinada');
+                    const hasGarantizada = filtered.some(m => m.tipo === 'rv_garantizada');
+                    if (!hasGarantizada) {
                       filtered.push({
-                        id: 'base-rv-aumento-sob',
-                        tipo: 'rv_aumento_temporal',
-                        nombre: 'RV Sobrevivencia Período Aumentado (+50% / 3a)',
-                        descripcion: 'Condición especial legal (Art. 61 bis): pensión mayor los primeros 3 años para beneficiarios',
-                        mesesAumento: 36,
-                        porcentajeAumento: 0.50,
+                        id: 'base-rv-garantizada-sob-15',
+                        tipo: 'rv_garantizada' as const,
+                        nombre: 'RV Sobrevivencia Garantizada 15 años (180 meses)',
+                        descripcion: 'Pensión familiar en UF con garantía legal de 15 años transferible a beneficiarios',
+                        mesesGarantizados: 180,
                         activa: true
                       });
                     }

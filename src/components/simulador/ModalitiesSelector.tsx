@@ -47,17 +47,17 @@ export function ModalitiesSelector({
   const [mesesAumento, setMesesAumento] = useState<number>(36); // 3 años
   const [porcentajeAumento, setPorcentajeAumento] = useState<number>(1.0); // +100%
 
-  // En sobrevivencia, la única cláusula adicional permitida por normativa D.L. 3.500 es el aumento temporal
+  // En sobrevivencia, la única cláusula adicional permitida por normativa CMF/SP es el período garantizado
   React.useEffect(() => {
-    if (tipoPension === 'sobrevivencia' && tipoClausula !== 'aumento') {
-      setTipoClausula('aumento');
+    if (tipoPension === 'sobrevivencia' && tipoClausula !== 'garantizada') {
+      setTipoClausula('garantizada');
     }
   }, [tipoPension, tipoClausula]);
 
-  // Cantidad de modalidades activas para cotizar (en sobrevivencia excluye garantizadas)
+  // Cantidad de modalidades activas para cotizar (en sobrevivencia excluye aumento temporal y combinada)
   const modalidadesActivas = modalidades.filter(m => {
     if (!m.activa) return false;
-    if (tipoPension === 'sobrevivencia' && (m.tipo === 'rv_garantizada' || m.tipo === 'rv_combinada')) {
+    if (tipoPension === 'sobrevivencia' && (m.tipo === 'rv_aumento_temporal' || m.tipo === 'rv_combinada')) {
       return false;
     }
     return true;
@@ -65,27 +65,27 @@ export function ModalitiesSelector({
 
   // Manejar incorporación de combinación a la lista
   const handleAgregarCombinacion = () => {
-    if (tipoClausula === 'garantizada' && tipoPension !== 'sobrevivencia') {
+    if (tipoClausula === 'garantizada' || tipoPension === 'sobrevivencia') {
       const anos = (mesesGarantizados / 12).toFixed(1).replace('.0', '');
       onAgregarModalidad({
         tipo: 'rv_garantizada',
-        nombre: `RV Garantizada ${mesesGarantizados} meses (${anos}a)`,
-        descripcion: `Pensión vitalicia fija en UF con garantía de pago por ${mesesGarantizados} meses (${anos} años) a beneficiarios o herederos.`,
+        nombre: tipoPension === 'sobrevivencia'
+          ? `RV Sobrevivencia Garantizada ${mesesGarantizados}m (${anos}a)`
+          : `RV Garantizada ${mesesGarantizados} meses (${anos}a)`,
+        descripcion: tipoPension === 'sobrevivencia'
+          ? `Pensión familiar en UF con garantía legal de pago por ${mesesGarantizados} meses (${anos} años) transferible a beneficiarios o herederos designados.`
+          : `Pensión vitalicia fija en UF con garantía de pago por ${mesesGarantizados} meses (${anos} años) a beneficiarios o herederos.`,
         mesesGarantizados,
         activa: true,
         esPersonalizada: true
       });
-    } else if (tipoClausula === 'aumento' || tipoPension === 'sobrevivencia') {
+    } else if (tipoClausula === 'aumento') {
       const anos = (mesesAumento / 12).toFixed(1).replace('.0', '');
       const pct = Math.round(porcentajeAumento * 100);
       onAgregarModalidad({
         tipo: 'rv_aumento_temporal',
-        nombre: tipoPension === 'sobrevivencia'
-          ? `RV Sobrevivencia con Período Aumentado +${pct}% (${mesesAumento}m / ${anos}a)`
-          : `RV Aumento Temporal +${pct}% (${mesesAumento} meses / ${anos}a)`,
-        descripcion: tipoPension === 'sobrevivencia'
-          ? `Pensión familiar aumentada en +${pct}% durante los primeros ${mesesAumento} meses (${anos} años). Luego continúa la pensión vitalicia en UF.`
-          : `Pensión aumentada en +${pct}% durante los primeros ${mesesAumento} meses (${anos} años), luego pensión vitalicia constante.`,
+        nombre: `RV Aumento Temporal +${pct}% (${mesesAumento} meses / ${anos}a)`,
+        descripcion: `Pensión aumentada en +${pct}% durante los primeros ${mesesAumento} meses (${anos} años), luego pensión vitalicia constante.`,
         mesesAumento,
         porcentajeAumento,
         activa: true,
@@ -112,9 +112,9 @@ export function ModalitiesSelector({
   const rvSimpleConfig = modalidades.find(m => m.tipo === 'renta_vitalicia_simple');
   const otrasModalidades = modalidades.filter(m => {
     if (m.tipo === 'retiro_programado' || m.tipo === 'renta_vitalicia_simple') return false;
-    // Si estamos en sobrevivencia, solo mostramos modalidades válidas (período aumentado)
+    // En sobrevivencia, la única cláusula adicional permitida por normativa CMF/SP es período garantizado
     if (tipoPension === 'sobrevivencia') {
-      return m.tipo === 'rv_aumento_temporal';
+      return m.tipo === 'rv_garantizada';
     }
     return true;
   });
@@ -238,7 +238,7 @@ export function ModalitiesSelector({
             <div className="p-2.5 rounded-lg bg-purple-50 border border-purple-200 text-xs text-purple-950 flex items-start gap-2">
               <span className="text-sm">⚖️</span>
               <div className="leading-snug">
-                <strong>Normativa D.L. 3.500 Art. 61 bis y Compendio SP:</strong> En pensión de sobrevivencia solo es legalmente admisible cotizar <strong>Retiro Programado</strong>, <strong>Renta Vitalicia Inmediata Simple</strong> y <strong>Renta Vitalicia con Condiciones Especiales de Cobertura (Período Aumentado)</strong>. Las cláusulas de período garantizado están reservadas por ley para afiliados de vejez o invalidez.
+                <strong>Normativa Oficial CMF y SP (Compendio de Pensiones):</strong> En pensión de sobrevivencia <strong>NO procede la contratación de cláusulas de Aumento Temporal de Pensión</strong> (reservadas por ley exclusivamente a Vejez e Invalidez). De común acuerdo, los beneficiarios legales pueden optar por <strong>Retiro Programado</strong>, <strong>Renta Vitalicia Simple</strong> o <strong>Renta Vitalicia con Período Garantizado de Pago</strong>.
               </div>
             </div>
           )}
@@ -250,17 +250,18 @@ export function ModalitiesSelector({
               <Select
                 value={tipoClausula}
                 onValueChange={(val: 'garantizada' | 'aumento' | 'combinada') => setTipoClausula(val)}
+                disabled={tipoPension === 'sobrevivencia'}
               >
                 <SelectTrigger className="h-9 text-xs bg-white">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {tipoPension !== 'sobrevivencia' && (
-                    <SelectItem value="garantizada">🛡️ Período Garantizado</SelectItem>
-                  )}
-                  <SelectItem value="aumento">
-                    {tipoPension === 'sobrevivencia' ? '📈 Período Aumentado (Condición Especial)' : '📈 Aumento Temporal'}
+                  <SelectItem value="garantizada">
+                    {tipoPension === 'sobrevivencia' ? '🛡️ Período Garantizado de Pago (Sobrevivencia)' : '🛡️ Período Garantizado'}
                   </SelectItem>
+                  {tipoPension !== 'sobrevivencia' && (
+                    <SelectItem value="aumento">📈 Aumento Temporal</SelectItem>
+                  )}
                   {tipoPension !== 'sobrevivencia' && (
                     <SelectItem value="combinada">⭐ Garantía + Aumento</SelectItem>
                   )}

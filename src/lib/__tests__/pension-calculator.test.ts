@@ -29,6 +29,7 @@ import {
   calcularFinanciamientoSobrevivencia,
   calcularCNUSobrevivencia,
   calcularRVAumentoTemporalSobrevivencia,
+  calcularRVSobrevivenciaGarantizada,
   PGU,
   BAC,
   TASAS_INTERES
@@ -518,6 +519,38 @@ describe('Motor Actuarial de Pensiones - Sistema Chileno', () => {
       const pPosterior50 = rv50.proyeccion[3].pensionMensual;
       const pPosterior100 = rv100.proyeccion[3].pensionMensual;
       assert.ok(pPosterior100 < pPosterior50, 'Con +100% la pensión posterior debe ser menor que con +50%');
+    });
+
+    it('Renta Vitalicia con Período Garantizado en Sobrevivencia es legalmente válida bajo CMF CAD220131741 y ajusta pensión según plazo', () => {
+      const beneficiarios: BeneficiarioPension[] = [
+        { tipo: 'conyuge', edad: 55, sexo: 'F' },
+        { tipo: 'hijo', edad: 12, sexo: 'M' }
+      ];
+
+      const fondos = 50_000_000;
+      const tasa = 0.0301;
+      const valorUF = 40_000;
+
+      const rv10 = calcularRVSobrevivenciaGarantizada(fondos, beneficiarios, 120, tasa, valorUF);
+      const rv20 = calcularRVSobrevivenciaGarantizada(fondos, beneficiarios, 240, tasa, valorUF);
+
+      assert.ok(rv10.pensionMensual > 0, 'Pensión debe ser positiva');
+      assert.ok(rv20.pensionMensual > 0, 'Pensión debe ser positiva');
+
+      // Mayor período de garantía reduce ligeramente la pensión mensual para financiar el costo del período cierto
+      assert.ok(rv10.pensionMensual > rv20.pensionMensual, 'RV con 10 años garantizados debe rendir mayor pensión mensual que con 20 años');
+
+      // Distribución legal a beneficiarios
+      assert.equal(rv10.pensionPorBeneficiario?.length, 2);
+      const conyuge = rv10.pensionPorBeneficiario?.find(b => b.tipo === 'conyuge');
+      const hijo = rv10.pensionPorBeneficiario?.find(b => b.tipo === 'hijo');
+      assert.equal(conyuge?.porcentaje, 0.50);
+      assert.equal(hijo?.porcentaje, 0.15);
+
+      // Cita regulatoria oficial
+      const adv = rv10.advertencias.join(' ');
+      assert.ok(adv.includes('CMF'), 'Debe citar la normativa CMF');
+      assert.ok(adv.includes('Art. 58'), 'Debe citar el Art. 58 DL 3500');
     });
   });
 });
