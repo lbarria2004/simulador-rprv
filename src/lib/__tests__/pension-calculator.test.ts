@@ -19,6 +19,10 @@ import {
   getQx,
   calcularExpectativaVida,
   calcularPorcentajesBeneficiarios,
+  calcularPensionReferenciaInvalidez,
+  calcularCapitalNecesarioInvalidez,
+  calcularAporteAdicionalSIS,
+  calcularFinanciamientoInvalidez,
   PGU,
   BAC,
   TASAS_INTERES
@@ -299,6 +303,60 @@ describe('Motor Actuarial de Pensiones - Sistema Chileno', () => {
         cnuConBenInvalido > cnuSinBen,
         'CNU con beneficiario debe ser mayor al CNU sin beneficiario'
       );
+    });
+
+    it('Pensión de Referencia calcula exactamente 70% para Total y 50% para Parcial', () => {
+      const ingresoBase = 1_000_000;
+      const refTotal = calcularPensionReferenciaInvalidez(ingresoBase, 'total');
+      const refParcial = calcularPensionReferenciaInvalidez(ingresoBase, 'parcial');
+
+      assert.equal(refTotal, 700_000, 'Invalidez Total debe ser el 70% del Ingreso Base');
+      assert.equal(refParcial, 500_000, 'Invalidez Parcial debe ser el 50% del Ingreso Base');
+    });
+
+    it('Capital Necesario de Invalidez es positivo y proporcional a la pensión de referencia', () => {
+      const cnTotal = calcularCapitalNecesarioInvalidez(700_000, 55, 'M', 0.0358);
+      const cnParcial = calcularCapitalNecesarioInvalidez(500_000, 55, 'M', 0.0358);
+
+      assert.ok(cnTotal > 0, 'Capital necesario debe ser mayor a cero');
+      assert.ok(cnTotal > cnParcial, 'Capital necesario para Total (70%) debe superar al de Parcial (50%)');
+    });
+
+    it('Aporte Adicional SIS cubre la brecha cuando el saldo es inferior al Capital Necesario', () => {
+      const capitalNecesario = 80_000_000;
+      const saldoBajo = 30_000_000;
+      const aporte = calcularAporteAdicionalSIS(capitalNecesario, saldoBajo, true);
+
+      assert.equal(aporte, 50_000_000, 'El SIS debe enterar la diferencia exacta de $50M');
+    });
+
+    it('Aporte Adicional SIS es 0 si el afiliado no está cubierto o su saldo supera el CN', () => {
+      const capitalNecesario = 80_000_000;
+      const saldoBajo = 30_000_000;
+      const aporteSinCobertura = calcularAporteAdicionalSIS(capitalNecesario, saldoBajo, false);
+      const aporteSaldoExcedente = calcularAporteAdicionalSIS(capitalNecesario, 100_000_000, true);
+
+      assert.equal(aporteSinCobertura, 0, 'Sin cobertura SIS el aporte debe ser 0');
+      assert.equal(aporteSaldoExcedente, 0, 'Si el saldo supera al CN el aporte debe ser 0');
+    });
+
+    it('Financiamiento integral de invalidez garantiza el Capital Necesario para afiliados con cobertura SIS', () => {
+      const des = calcularFinanciamientoInvalidez(
+        25_000_000, // saldo propio bajo
+        1_200_000,  // ingreso base
+        'total',
+        true,       // cubierto SIS
+        55,
+        'M',
+        0.0358,
+        [],
+        40876.41
+      );
+
+      assert.equal(des.pensionReferenciaCLP, 840_000); // 70% de 1.2M
+      assert.ok(des.capitalNecesarioCLP > 25_000_000);
+      assert.equal(des.saldoTotalFinanciamientoCLP, des.capitalNecesarioCLP);
+      assert.equal(des.aporteAdicionalSISCLP, des.capitalNecesarioCLP - 25_000_000);
     });
   });
 });

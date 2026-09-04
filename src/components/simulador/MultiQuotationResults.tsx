@@ -16,13 +16,15 @@ import {
   Clock,
   Coins
 } from 'lucide-react';
-import { CotizacionItemResultado } from './types';
+import { CotizacionItemResultado, InvalidezFinanciamientoInfo } from './types';
 
 interface MultiQuotationResultsProps {
   items: CotizacionItemResultado[];
   valorUF: number;
   onDescargarPDF: () => void;
   isGeneratingPDF?: boolean;
+  tipoPension?: 'vejez' | 'invalidez' | 'sobrevivencia';
+  invalidezInfo?: InvalidezFinanciamientoInfo;
 }
 
 function formatCLP(val: number): string {
@@ -39,7 +41,9 @@ export function MultiQuotationResults({
   items,
   valorUF,
   onDescargarPDF,
-  isGeneratingPDF = false
+  isGeneratingPDF = false,
+  tipoPension = 'vejez',
+  invalidezInfo
 }: MultiQuotationResultsProps) {
   if (items.length === 0) {
     return (
@@ -67,10 +71,15 @@ export function MultiQuotationResults({
         <div>
           <div className="flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-amber-300" />
-            <h2 className="text-base font-semibold">Resumen Comparativo de Cotización ({items.length} Modalidades)</h2>
+            <h2 className="text-base font-semibold">
+              {tipoPension === 'invalidez' ? 'Cotización de Pensión de Invalidez' : 'Resumen Comparativo de Cotización'} ({items.length} Modalidades)
+            </h2>
           </div>
           <p className="text-xs text-blue-200 mt-0.5">
-            Cálculo actuarial oficial con tablas generacionales TM-2020 a valor UF ${valorUF.toLocaleString('es-CL', { minimumFractionDigits: 2 })}
+            {tipoPension === 'invalidez' 
+              ? `Cálculo con Tablas Generacionales de Invalidez MI-2020 • UF $${valorUF.toLocaleString('es-CL', { minimumFractionDigits: 2 })}`
+              : `Cálculo actuarial oficial con tablas generacionales TM-2020 a valor UF $${valorUF.toLocaleString('es-CL', { minimumFractionDigits: 2 })}`
+            }
           </p>
         </div>
 
@@ -85,6 +94,43 @@ export function MultiQuotationResults({
           <span>{isGeneratingPDF ? 'Generando PDF...' : 'Descargar Estudio Oficial (PDF)'}</span>
         </Button>
       </div>
+
+      {/* Banner de Financiamiento Pensión de Invalidez (D.L. 3.500) */}
+      {tipoPension === 'invalidez' && invalidezInfo && (
+        <div className="p-3.5 rounded-xl border border-amber-300 bg-amber-50/90 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+          <div className="space-y-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge className="bg-amber-600 text-white hover:bg-amber-700 text-xs font-bold">
+                Invalidez {invalidezInfo.grado === 'total' ? 'Total (70% IB)' : 'Parcial (50% IB)'}
+              </Badge>
+              <Badge variant="outline" className={`text-xs font-semibold ${invalidezInfo.cubiertoSIS ? 'bg-emerald-50 text-emerald-800 border-emerald-300' : 'bg-slate-100 text-slate-700 border-slate-300'}`}>
+                {invalidezInfo.cubiertoSIS ? '✓ Cubierto por Seguro SIS' : '✗ Sin Cobertura SIS'}
+              </Badge>
+              <Badge variant="outline" className="text-xs bg-white text-slate-700 border-slate-300 font-mono">
+                Tabla MI-2020
+              </Badge>
+            </div>
+            <p className="text-xs text-amber-950 leading-relaxed">
+              {invalidezInfo.cubiertoSIS ? (
+                <>
+                  Pensión de Referencia por Ley: <strong>{formatCLP(invalidezInfo.pensionReferenciaCLP)} / mes</strong> ({formatUF(invalidezInfo.pensionReferenciaUF)}). 
+                  La compañía del SIS integra un Aporte Adicional de <strong>+{formatCLP(invalidezInfo.aporteAdicionalSISCLP)}</strong> a su saldo en AFP para enterar el Capital Necesario actuarial ({formatCLP(invalidezInfo.capitalNecesarioCLP)}).
+                </>
+              ) : (
+                <>
+                  Pensión financiada exclusivamente con el ahorro propio en la AFP ({formatCLP(invalidezInfo.saldoPropioCLP)}). Al no contar con seguro SIS vigente, no aplica Aporte Adicional.
+                </>
+              )}
+            </p>
+          </div>
+
+          <div className="bg-white p-2.5 rounded-lg border border-amber-200 shrink-0 text-right space-y-0.5 min-w-[180px]">
+            <div className="text-[10px] text-slate-500 font-medium">Saldo Total para Cotizar</div>
+            <div className="text-sm font-extrabold text-indigo-950">{formatCLP(invalidezInfo.saldoTotalFinanciamientoCLP)}</div>
+            <div className="text-[10px] font-semibold text-emerald-700">{formatUF(invalidezInfo.saldoTotalFinanciamientoUF)}</div>
+          </div>
+        </div>
+      )}
 
       {/* Grid de Tarjetas de Cotización */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">

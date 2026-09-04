@@ -2115,3 +2115,129 @@ export function calcularBeneficiosAdicionales(
     detalles
   };
 }
+
+// ==========================================
+// MÓDULO ACTUARIAL DE PENSIÓN DE INVALIDEZ
+// Según D.L. 3.500 y Compendio de Normas SP
+// ==========================================
+
+/**
+ * Calcula la Pensión de Referencia de Invalidez según el D.L. 3.500
+ * - Invalidez Total (≥66,6%): 70% del Ingreso Base
+ * - Invalidez Parcial (50% a 66,5%): 50% del Ingreso Base
+ */
+export function calcularPensionReferenciaInvalidez(
+  ingresoBaseCLP: number,
+  grado: 'total' | 'parcial' = 'total'
+): number {
+  const porcentaje = grado === 'parcial' ? 0.50 : 0.70;
+  return Math.round(Math.max(0, ingresoBaseCLP) * porcentaje);
+}
+
+/**
+ * Calcula el Capital Necesario (CN) actuarial para financiar la Pensión de Referencia de Invalidez
+ * aplicando las tablas generacionales oficiales de invalidez (MI-H-2020 / MI-M-2020)
+ * y contemplando a los beneficiarios legales de sobrevivencia.
+ * 
+ * FÓRMULA (Anexo 7 Compendio SP):
+ * CN = Pensión_Referencia × CNU_MI(edad, sexo, tasa, beneficiarios)
+ */
+export function calcularCapitalNecesarioInvalidez(
+  pensionReferenciaCLP: number,
+  edad: number,
+  sexo: Sexo,
+  tasaInteres: number = 0.0358,
+  beneficiarios: BeneficiarioPension[] = []
+): number {
+  if (pensionReferenciaCLP <= 0) return 0;
+  const cnuInvalidez = calcularCNU(edad, sexo, tasaInteres, beneficiarios, true, 'retiro_programado');
+  return Math.round(pensionReferenciaCLP * cnuInvalidez);
+}
+
+/**
+ * Calcula el Aporte Adicional financiado por la Aseguradora del Seguro de Invalidez y Sobrevivencia (SIS)
+ * - Si el afiliado está cubierto por el SIS: AA = max(0, Capital Necesario - Saldo Acumulado)
+ * - Si el afiliado NO está cubierto: AA = 0 (se financia solo con saldo propio)
+ */
+export function calcularAporteAdicionalSIS(
+  capitalNecesarioCLP: number,
+  saldoAcumuladoCLP: number,
+  cubiertoSIS: boolean = true
+): number {
+  if (!cubiertoSIS) return 0;
+  return Math.max(0, Math.round(capitalNecesarioCLP - saldoAcumuladoCLP));
+}
+
+export interface DesgloseFinanciamientoInvalidez {
+  pensionReferenciaCLP: number;
+  pensionReferenciaUF: number;
+  capitalNecesarioCLP: number;
+  capitalNecesarioUF: number;
+  aporteAdicionalSISCLP: number;
+  aporteAdicionalSISUF: number;
+  saldoPropioCLP: number;
+  saldoPropioUF: number;
+  saldoTotalFinanciamientoCLP: number;
+  saldoTotalFinanciamientoUF: number;
+  cubiertoSIS: boolean;
+  grado: 'total' | 'parcial';
+  porcentajeReferencia: number;
+}
+
+/**
+ * Calcula el financiamiento integral de la Pensión de Invalidez bajo normativa SP / CMF
+ */
+export function calcularFinanciamientoInvalidez(
+  saldoPropioCLP: number,
+  ingresoBaseCLP: number,
+  grado: 'total' | 'parcial' = 'total',
+  cubiertoSIS: boolean = true,
+  edad: number = 55,
+  sexo: Sexo = 'M',
+  tasaInteres: number = 0.0358,
+  beneficiarios: BeneficiarioPension[] = [],
+  valorUF: number = 40876.41
+): DesgloseFinanciamientoInvalidez {
+  const porcentajeReferencia = grado === 'parcial' ? 0.50 : 0.70;
+  const pensionReferenciaCLP = calcularPensionReferenciaInvalidez(ingresoBaseCLP, grado);
+  const pensionReferenciaUF = valorUF > 0 ? Number((pensionReferenciaCLP / valorUF).toFixed(2)) : 0;
+
+  const capitalNecesarioCLP = calcularCapitalNecesarioInvalidez(
+    pensionReferenciaCLP,
+    edad,
+    sexo,
+    tasaInteres,
+    beneficiarios
+  );
+  const capitalNecesarioUF = valorUF > 0 ? Number((capitalNecesarioCLP / valorUF).toFixed(2)) : 0;
+
+  const aporteAdicionalSISCLP = calcularAporteAdicionalSIS(
+    capitalNecesarioCLP,
+    saldoPropioCLP,
+    cubiertoSIS
+  );
+  const aporteAdicionalSISUF = valorUF > 0 ? Number((aporteAdicionalSISCLP / valorUF).toFixed(2)) : 0;
+
+  const saldoPropioUF = valorUF > 0 ? Number((saldoPropioCLP / valorUF).toFixed(2)) : 0;
+  const saldoTotalFinanciamientoCLP = cubiertoSIS 
+    ? Math.max(saldoPropioCLP, capitalNecesarioCLP) 
+    : saldoPropioCLP;
+  const saldoTotalFinanciamientoUF = valorUF > 0 ? Number((saldoTotalFinanciamientoCLP / valorUF).toFixed(2)) : 0;
+
+  return {
+    pensionReferenciaCLP,
+    pensionReferenciaUF,
+    capitalNecesarioCLP,
+    capitalNecesarioUF,
+    aporteAdicionalSISCLP,
+    aporteAdicionalSISUF,
+    saldoPropioCLP,
+    saldoPropioUF,
+    saldoTotalFinanciamientoCLP,
+    saldoTotalFinanciamientoUF,
+    cubiertoSIS,
+    grado,
+    porcentajeReferencia
+  };
+}
+

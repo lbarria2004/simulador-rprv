@@ -10,9 +10,10 @@ import { CompaniasRankingItem } from './types';
 interface InsuranceRankingTableProps {
   items: CompaniasRankingItem[];
   valorUF: number;
+  tipoPension?: 'vejez' | 'invalidez' | 'sobrevivencia';
 }
 
-export function InsuranceRankingTable({ items, valorUF }: InsuranceRankingTableProps) {
+export function InsuranceRankingTable({ items, valorUF, tipoPension = 'vejez' }: InsuranceRankingTableProps) {
   // Ordenar por mayor pensión
   const sortedItems = React.useMemo(() => {
     return [...items].sort((a, b) => b.pensionUF - a.pensionUF);
@@ -62,7 +63,7 @@ export function InsuranceRankingTable({ items, valorUF }: InsuranceRankingTableP
                 <TableHead className="w-12 text-center">#</TableHead>
                 <TableHead>Compañía Aseguradora</TableHead>
                 <TableHead className="text-center">Clasificación Riesgo CMF</TableHead>
-                <TableHead className="text-right">Tasa CMF Vejez</TableHead>
+                <TableHead className="text-right">Tasa CMF {tipoPension === 'invalidez' ? 'Invalidez' : 'Vejez'}</TableHead>
                 <TableHead className="text-right font-bold text-slate-900">Pensión Mensual (UF)</TableHead>
                 <TableHead className="text-right font-bold text-slate-900">Pensión Mensual (Pesos)</TableHead>
               </TableRow>

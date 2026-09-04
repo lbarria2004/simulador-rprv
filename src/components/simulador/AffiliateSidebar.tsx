@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { User, Wallet, HeartHandshake, Sparkles, Building2, RefreshCw, Accessibility } from 'lucide-react';
-import { AfiliadoState } from './types';
+import { AfiliadoState, InvalidezFinanciamientoInfo } from './types';
 import { calcularEdadDesdeFecha } from '@/lib/date-utils';
 import { BeneficiariesManager } from './BeneficiariesManager';
 import { BeneficiarioPension } from '@/lib/pension-calculator';
@@ -21,6 +21,7 @@ interface AffiliateSidebarProps {
   onRefreshUF: () => void;
   isLoadingUF: boolean;
   onApplyPreset?: (presetKey: 'zamora' | 'spuler' | 'soltero') => void;
+  invalidezInfo?: InvalidezFinanciamientoInfo;
 }
 
 export function AffiliateSidebar({
@@ -30,7 +31,8 @@ export function AffiliateSidebar({
   fuenteUF,
   onRefreshUF,
   isLoadingUF,
-  onApplyPreset
+  onApplyPreset,
+  invalidezInfo
 }: AffiliateSidebarProps) {
   // Manejar cambio de fondos en Pesos y sincronizar UF
   const handlePesosChange = (valStr: string) => {
@@ -51,6 +53,28 @@ export function AffiliateSidebar({
       ...prev,
       fondosUF: ufVal,
       fondosCLP: pesosVal
+    }));
+  };
+
+  // Manejar cambio de Ingreso Base en Pesos
+  const handleIngresoBaseCLPChange = (valStr: string) => {
+    const rawVal = parseFloat(valStr.replace(/\D/g, '')) || 0;
+    const ufVal = valorUF > 0 ? Math.round((rawVal / valorUF) * 100) / 100 : 0;
+    setAfiliado(prev => ({
+      ...prev,
+      ingresoBaseCLP: rawVal,
+      ingresoBaseUF: ufVal
+    }));
+  };
+
+  // Manejar cambio de Ingreso Base en UF
+  const handleIngresoBaseUFChange = (valStr: string) => {
+    const ufVal = parseFloat(valStr.replace(',', '.')) || 0;
+    const pesosVal = Math.round(ufVal * valorUF);
+    setAfiliado(prev => ({
+      ...prev,
+      ingresoBaseUF: ufVal,
+      ingresoBaseCLP: pesosVal
     }));
   };
 
@@ -224,73 +248,167 @@ export function AffiliateSidebar({
             </div>
           </div>
 
-          {/* Condición de Invalidez Calificada (Tabla MI-2020) */}
-          <div className={`p-3 rounded-lg border transition-all space-y-2 ${
-            afiliado.esInvalido 
-              ? 'border-amber-300 bg-amber-50/60 shadow-xs ring-1 ring-amber-400/30' 
+          {/* Expediente de Pensión de Invalidez (D.L. 3.500) */}
+          <div className={`p-3 rounded-lg border transition-all space-y-2.5 ${
+            afiliado.tipoPension === 'invalidez' 
+              ? 'border-amber-300 bg-amber-50/50 shadow-xs ring-1 ring-amber-400/30' 
               : 'border-slate-200 bg-slate-50/70'
           }`}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-800">
-                <Accessibility className={`w-3.5 h-3.5 ${afiliado.esInvalido ? 'text-amber-600' : 'text-slate-500'}`} />
-                <span>Condición de Invalidez Calificada</span>
+                <Accessibility className={`w-4 h-4 ${afiliado.tipoPension === 'invalidez' ? 'text-amber-600' : 'text-slate-500'}`} />
+                <span>Expediente de Pensión de Invalidez</span>
               </div>
               <div className="flex items-center gap-1.5">
-                {afiliado.esInvalido && (
+                {afiliado.tipoPension === 'invalidez' && (
                   <Badge variant="outline" className="text-[9px] bg-amber-100 text-amber-900 border-amber-300 font-bold py-0 h-4">
                     Tabla {afiliado.sexo === 'M' ? 'MI-H-2020' : 'MI-M-2020'}
                   </Badge>
                 )}
                 <Switch
-                  checked={!!afiliado.esInvalido}
+                  checked={afiliado.tipoPension === 'invalidez'}
                   onCheckedChange={checked => setAfiliado(prev => ({ 
                     ...prev, 
+                    tipoPension: checked ? 'invalidez' : 'vejez',
                     esInvalido: checked,
-                    tipoPension: checked ? 'invalidez' : 'vejez'
+                    cubiertoSIS: prev.cubiertoSIS ?? true,
+                    ingresoBaseCLP: prev.ingresoBaseCLP || 1200000,
+                    ingresoBaseUF: prev.ingresoBaseUF || (valorUF > 0 ? Math.round((1200000 / valorUF) * 100) / 100 : 29.35)
                   }))}
                 />
               </div>
             </div>
-            {afiliado.esInvalido ? (
-              <div className="space-y-2 pt-1 border-t border-amber-200/60">
-                <div className="flex items-center justify-between gap-2">
-                  <Label className="text-[11px] text-amber-900 font-medium">Grado Dictamen Médico</Label>
-                  <div className="grid grid-cols-2 gap-1">
+
+            {afiliado.tipoPension === 'invalidez' ? (
+              <div className="space-y-3 pt-2 border-t border-amber-200/60">
+                {/* Grado de Invalidez Dictaminado */}
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-[11px] text-amber-950 font-medium">Grado Dictamen Médico</Label>
+                    <span className="text-[10px] text-amber-800 font-semibold">
+                      Ref: {afiliado.gradoInvalidez === 'parcial' ? '50% Ingreso Base' : '70% Ingreso Base'}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-1.5">
                     <Button
                       type="button"
                       variant={afiliado.gradoInvalidez === 'total' || !afiliado.gradoInvalidez ? 'default' : 'outline'}
                       size="sm"
                       onClick={() => setAfiliado(prev => ({ ...prev, gradoInvalidez: 'total' }))}
-                      className={`h-6 text-[10px] px-2 ${
+                      className={`h-7 text-[11px] px-2 font-medium ${
                         afiliado.gradoInvalidez === 'total' || !afiliado.gradoInvalidez 
                           ? 'bg-amber-600 hover:bg-amber-700 text-white' 
-                          : 'bg-white text-slate-700 border-amber-200'
+                          : 'bg-white text-slate-700 border-amber-200 hover:bg-amber-100/50'
                       }`}
                     >
-                      Total (≥66,6%)
+                      Total (≥66,6%) • 70%
                     </Button>
                     <Button
                       type="button"
                       variant={afiliado.gradoInvalidez === 'parcial' ? 'default' : 'outline'}
                       size="sm"
                       onClick={() => setAfiliado(prev => ({ ...prev, gradoInvalidez: 'parcial' }))}
-                      className={`h-6 text-[10px] px-2 ${
+                      className={`h-7 text-[11px] px-2 font-medium ${
                         afiliado.gradoInvalidez === 'parcial' 
                           ? 'bg-amber-600 hover:bg-amber-700 text-white' 
-                          : 'bg-white text-slate-700 border-amber-200'
+                          : 'bg-white text-slate-700 border-amber-200 hover:bg-amber-100/50'
                       }`}
                     >
-                      Parcial (50%-66,5%)
+                      Parcial (50%-66,5%) • 50%
                     </Button>
                   </div>
                 </div>
-                <p className="text-[10px] text-amber-800/90 leading-tight">
-                  Se aplica la tabla oficial <strong>{afiliado.sexo === 'M' ? 'MI-H-2020' : 'MI-M-2020'}</strong>. La mayor tasa de mortalidad disminuye el CNU, lo que incrementa la pensión mensual que rinde el saldo.
-                </p>
+
+                {/* Cobertura del Seguro de Invalidez y Sobrevivencia (SIS) */}
+                <div className="p-2.5 bg-white rounded-md border border-amber-200/80 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-[11px] font-semibold text-slate-800">
+                      Cobertura del Seguro SIS (D.L. 3.500)
+                    </Label>
+                    <Switch
+                      checked={afiliado.cubiertoSIS ?? true}
+                      onCheckedChange={checked => setAfiliado(prev => ({ ...prev, cubiertoSIS: checked }))}
+                    />
+                  </div>
+                  <p className="text-[10px] text-slate-600 leading-tight">
+                    {(afiliado.cubiertoSIS ?? true)
+                      ? 'Trabajador activo o cesante protegido: La compañía del SIS entera el Aporte Adicional ($AA) si el saldo no alcanza para el Capital Necesario.'
+                      : 'Sin cobertura SIS: La pensión se financia exclusivamente con el saldo propio acumulado en AFP.'}
+                  </p>
+                </div>
+
+                {/* Ingreso Base Promedio (Últimos 10 años) */}
+                <div className="space-y-1.5">
+                  <Label className="text-[11px] text-amber-950 font-medium flex items-center justify-between">
+                    <span>Ingreso Base (Promedio últimos 10 años)</span>
+                    <span className="text-[9px] text-slate-400 font-normal">120 cotizaciones</span>
+                  </Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="relative">
+                      <Input
+                        type="text"
+                        value={afiliado.ingresoBaseCLP ? `$${afiliado.ingresoBaseCLP.toLocaleString('es-CL')}` : '$1.200.000'}
+                        onChange={e => handleIngresoBaseCLPChange(e.target.value)}
+                        placeholder="$1.200.000"
+                        className="h-8 text-xs font-semibold text-amber-950 bg-white"
+                      />
+                    </div>
+                    <div className="relative">
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={afiliado.ingresoBaseUF || ''}
+                        onChange={e => handleIngresoBaseUFChange(e.target.value)}
+                        placeholder="29,35"
+                        className="h-8 text-xs font-semibold text-slate-700 bg-white"
+                      />
+                      <span className="absolute right-2 top-2 text-[10px] font-bold text-slate-400">UF</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Resumen Actuarial de Financiamiento en tiempo real */}
+                {invalidezInfo && (
+                  <div className="p-2.5 bg-amber-100/60 rounded-md border border-amber-300 text-[11px] space-y-1.5">
+                    <div className="font-semibold text-amber-950 text-xs flex items-center justify-between border-b border-amber-200 pb-1">
+                      <span>Financiamiento Actuarial SIS</span>
+                      <span className="text-[10px] font-normal text-amber-800">
+                        {invalidezInfo.cubiertoSIS ? 'Con Aporte SIS' : 'Solo Saldo AFP'}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between text-slate-700">
+                      <span>Pensión Referencia ({Math.round(invalidezInfo.porcentajeReferencia * 100)}% IB):</span>
+                      <strong className="text-amber-950">${invalidezInfo.pensionReferenciaCLP.toLocaleString('es-CL')}/mes</strong>
+                    </div>
+
+                    <div className="flex justify-between text-slate-700">
+                      <span>Capital Necesario Actuarial (CN):</span>
+                      <span className="font-medium">${invalidezInfo.capitalNecesarioCLP.toLocaleString('es-CL')}</span>
+                    </div>
+
+                    <div className="flex justify-between text-slate-700">
+                      <span>Saldo Acumulado en AFP:</span>
+                      <span className="font-medium">${invalidezInfo.saldoPropioCLP.toLocaleString('es-CL')}</span>
+                    </div>
+
+                    {invalidezInfo.cubiertoSIS && (
+                      <div className="flex justify-between text-emerald-800 bg-emerald-100/80 px-1.5 py-0.5 rounded font-semibold">
+                        <span>Aporte Adicional SIS (+AA):</span>
+                        <span>+${invalidezInfo.aporteAdicionalSISCLP.toLocaleString('es-CL')}</span>
+                      </div>
+                    )}
+
+                    <div className="flex justify-between text-indigo-950 font-bold border-t border-amber-200 pt-1">
+                      <span>Saldo Total para SCOMP:</span>
+                      <span className="text-emerald-700">${invalidezInfo.saldoTotalFinanciamientoCLP.toLocaleString('es-CL')} ({invalidezInfo.saldoTotalFinanciamientoUF} UF)</span>
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
               <p className="text-[10px] text-slate-500 leading-tight">
-                Aplica tablas de vejez ({afiliado.sexo === 'M' ? 'CB-H-2020' : 'RV-M-2020'}). Active si posee dictamen de invalidez ejecutoriado.
+                Régimen activo: <strong>Pensión de Vejez</strong> ({afiliado.sexo === 'M' ? 'CB-H-2020' : 'RV-M-2020'}). Active este conmutador o seleccione arriba si tramita dictamen de invalidez.
               </p>
             )}
           </div>
