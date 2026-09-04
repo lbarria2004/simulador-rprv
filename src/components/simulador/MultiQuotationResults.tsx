@@ -252,6 +252,16 @@ export function MultiQuotationResults({
                       ({formatUF(item.totalConBeneficiosUF)})
                     </span>
                   </div>
+                  {item.config.tipo === 'rv_aumento_temporal' && item.resultado.proyeccion && item.resultado.proyeccion.length > 0 && (
+                    <div className="text-[10px] text-rose-700 font-medium mt-1">
+                      Fase inicial aumentada por {Math.round((item.config.mesesAumento || 36) / 12)} años.
+                      {item.resultado.proyeccion.find(p => p.fase === 'vitalicia') && (
+                        <span className="text-slate-600 ml-1">
+                          Posterior: {formatCLP(item.resultado.proyeccion.find(p => p.fase === 'vitalicia')?.pensionMensual || 0)} / mes
+                        </span>
+                      )}
+                    </div>
+                  )}
                   {(item.pguMensual > 0 || item.bacMensual > 0) && (
                     <div className="text-[10px] text-slate-500 mt-1 flex flex-wrap gap-1">
                       <span>Base: {formatCLP(item.resultado.pensionMensual)}</span>
@@ -263,9 +273,14 @@ export function MultiQuotationResults({
                   {/* Distribución por Beneficiario en Sobrevivencia */}
                   {tipoPension === 'sobrevivencia' && item.resultado.pensionPorBeneficiario && item.resultado.pensionPorBeneficiario.length > 0 && (
                     <div className="mt-2.5 pt-2 border-t border-purple-200/60 space-y-1 bg-purple-50/50 p-2 rounded">
-                      <span className="text-[10px] font-bold text-purple-950 uppercase tracking-wider block">
-                        Distribución a Beneficiarios:
-                      </span>
+                      <div className="flex justify-between items-center text-[10px] font-bold text-purple-950 uppercase tracking-wider">
+                        <span>Distribución a Beneficiarios:</span>
+                        {item.config.tipo === 'rv_aumento_temporal' && (
+                          <span className="text-purple-700 normal-case font-medium">
+                            (Inicial → Vitalicia)
+                          </span>
+                        )}
+                      </div>
                       <div className="space-y-0.5">
                         {item.resultado.pensionPorBeneficiario.map((ben, bIdx) => (
                           <div key={bIdx} className="flex justify-between items-center text-xs">
@@ -274,6 +289,11 @@ export function MultiQuotationResults({
                             </span>
                             <span className="font-bold text-purple-950 font-mono">
                               {formatCLP(ben.pensionMensual)}
+                              {ben.pensionPosterior !== undefined && ben.pensionPosterior !== ben.pensionMensual && (
+                                <span className="text-slate-500 font-normal text-[10px] ml-1">
+                                  → {formatCLP(ben.pensionPosterior)}
+                                </span>
+                              )}
                             </span>
                           </div>
                         ))}

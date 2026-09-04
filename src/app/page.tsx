@@ -29,6 +29,7 @@ import {
   calcularFinanciamientoInvalidez,
   calcularFinanciamientoSobrevivencia,
   calcularCNUSobrevivencia,
+  calcularRVAumentoTemporalSobrevivencia,
   calcularPorcentajesBeneficiarios,
   calcularExpectativaVida,
   BeneficiarioPension,
@@ -325,45 +326,67 @@ export default function SimuladorPage() {
           advertencias: ['Pensión de Sobrevivencia Legal (D.L. 3.500 Art. 58)', 'Recálculo anual por saldo decreciente en AFP']
         };
       } else {
-        // Modalidades de Renta Vitalicia en Sobrevivencia
-        const { cnuTotal: cnuRVBase } = calcularCNUSobrevivencia(beneficiarios, tasaRVSimple, 'renta_vitalicia');
-        let factorAjusteModalidad = 1.0;
-        if (mod.tipo === 'rv_garantizada') {
-          const mesesGarantizados = mod.mesesGarantizados || 180;
-          factorAjusteModalidad = 1 + (mesesGarantizados / 1200) * 0.45;
-        } else if (mod.tipo === 'rv_aumento_temporal') {
-          const mesesAumento = mod.mesesAumento || 36;
-          const pctAumento = mod.porcentajeAumento || 1.0;
-          factorAjusteModalidad = 1 + (mesesAumento / 120) * pctAumento * 0.25;
-        } else if (mod.tipo === 'rv_combinada') {
-          const mesesGarantizados = mod.mesesGarantizados || 180;
-          const mesesAumento = mod.mesesAumento || 36;
-          const pctAumento = mod.porcentajeAumento || 1.0;
-          factorAjusteModalidad = 1 + ((mesesGarantizados / 1200) * 0.45) + ((mesesAumento / 120) * pctAumento * 0.25);
+        // Modalidades de Renta Vitalicia en Sobrevivencia (Art. 61 bis D.L. 3.500)
+        if (mod.tipo === 'rv_aumento_temporal') {
+          resultado = calcularRVAumentoTemporalSobrevivencia(
+            fondosRV,
+            beneficiarios,
+            mod.mesesAumento || 36,
+            mod.porcentajeAumento || 0.50,
+            tasaRVSimple,
+            valorUF
+          );
+        } else if (mod.tipo === 'renta_vitalicia_simple') {
+          const { cnuTotal: cnuRVBase } = calcularCNUSobrevivencia(beneficiarios, tasaRVSimple, 'renta_vitalicia');
+          const pensionRV = cnuRVBase > 0 ? fondosRV / cnuRVBase : 0;
+          const pensionPorBen = porcentajes.map(b => ({
+            tipo: b.tipo,
+            porcentaje: b.porcentaje,
+            pensionMensual: Math.round(pensionRV * b.porcentaje)
+          }));
+
+          const proyeccionRV: ProyeccionAnual[] = [];
+          for (let y = 0; y <= 25; y++) {
+            proyeccionRV.push({
+              año: y + 1,
+              edad: edad + y,
+              pensionMensual: Math.round(pensionRV),
+              saldoAcumulado: 0,
+              retiroAcumulado: 0,
+              fase: 'vitalicia'
+            });
+          }
+
+          resultado = {
+            nombre: mod.nombre || 'Renta Vitalicia Sobrevivencia Simple',
+            pensionMensual: Math.round(pensionRV),
+            pensionEnUF: valorUF > 0 ? Number((pensionRV / valorUF).toFixed(2)) : 0,
+            pensionAnual: Math.round(pensionRV * 12),
+            cnu: cnuRVBase,
+            tasaInteres: tasaRVSimple,
+            expectativaVida: calcularExpectativaVida(porcentajes[0]?.edad || 60, porcentajes[0]?.sexo || 'F'),
+            pensionPorBeneficiario: pensionPorBen,
+            proyeccion: proyeccionRV,
+            advertencias: [
+              'Renta Vitalicia Sobrevivencia Fija en UF de por vida',
+              'Distribución a beneficiarios legales según Art. 58 D.L. 3.500'
+            ]
+          };
+        } else {
+          // Si llega garantizada o combinada en sobrevivencia (no permitido legalmente)
+          resultado = {
+            nombre: `${mod.nombre} (No autorizada en Sobrevivencia)`,
+            pensionMensual: 0,
+            pensionEnUF: 0,
+            pensionAnual: 0,
+            cnu: 0,
+            tasaInteres: tasaRVSimple,
+            advertencias: [
+              'Modalidad no disponible en Pensión de Sobrevivencia según D.L. 3.500 Art. 61 bis.',
+              'Solo se autoriza Retiro Programado, RV Inmediata Simple y RV con Período Aumentado.'
+            ]
+          };
         }
-
-        const cnuFinal = cnuRVBase * factorAjusteModalidad;
-        const pensionRV = cnuFinal > 0 ? fondosRV / cnuFinal : 0;
-        const pensionPorBen = porcentajes.map(b => ({
-          tipo: b.tipo,
-          porcentaje: b.porcentaje,
-          pensionMensual: Math.round(pensionRV * b.porcentaje)
-        }));
-
-        resultado = {
-          nombre: mod.nombre,
-          pensionMensual: Math.round(pensionRV),
-          pensionEnUF: valorUF > 0 ? Number((pensionRV / valorUF).toFixed(2)) : 0,
-          pensionAnual: Math.round(pensionRV * 12),
-          cnu: cnuFinal,
-          tasaInteres: tasaRVSimple,
-          expectativaVida: calcularExpectativaVida(porcentajes[0]?.edad || 60, porcentajes[0]?.sexo || 'F'),
-          pensionPorBeneficiario: pensionPorBen,
-          advertencias: [
-            'Renta Vitalicia Fija en UF de por vida',
-            'Distribución a beneficiarios según Art. 58 DL 3.500'
-          ]
-        };
       }
     } else if (mod.tipo === 'retiro_programado') {
       resultado = calcularRetiroProgramado(fondosRP, edad, sexo, 0.0358, beneficiarios, esInvalido);
@@ -542,7 +565,9 @@ export default function SimuladorPage() {
         tasaRVSimple = comp4Life?.sobrevivencia || 0.0301;
       }
 
-      const activas = modalidades.filter(m => m.activa);
+      const activas = modalidades
+        .filter(m => m.activa)
+        .filter(m => !esSobrevivencia || (m.tipo !== 'rv_garantizada' && m.tipo !== 'rv_combinada'));
       const resultados = activas.map(mod =>
         calcularModalidad(
           mod,
@@ -757,6 +782,23 @@ export default function SimuladorPage() {
                     tipoPension: 'vejez',
                     esInvalido: false
                   }));
+                  setModalidades(prev => {
+                    const hasGarantizada = prev.some(m => m.tipo === 'rv_garantizada');
+                    if (!hasGarantizada) {
+                      return [
+                        ...prev,
+                        {
+                          id: 'base-rv-garantizada-15',
+                          tipo: 'rv_garantizada' as const,
+                          nombre: 'RV Garantizada 15 años (180 meses)',
+                          descripcion: 'Pensión fija con garantía de pago por 15 años a beneficiarios o herederos',
+                          mesesGarantizados: 180,
+                          activa: true
+                        }
+                      ];
+                    }
+                    return prev;
+                  });
                 }}
                 className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
                   afiliado.tipoPension === 'vejez'
@@ -785,6 +827,23 @@ export default function SimuladorPage() {
                     ingresoBaseCLP: prev.ingresoBaseCLP || 1200000,
                     ingresoBaseUF: prev.ingresoBaseUF || (valorUF > 0 ? Math.round((1200000 / valorUF) * 100) / 100 : 29.35)
                   }));
+                  setModalidades(prev => {
+                    const hasGarantizada = prev.some(m => m.tipo === 'rv_garantizada');
+                    if (!hasGarantizada) {
+                      return [
+                        ...prev,
+                        {
+                          id: 'base-rv-garantizada-15',
+                          tipo: 'rv_garantizada' as const,
+                          nombre: 'RV Garantizada 15 años (180 meses)',
+                          descripcion: 'Pensión fija con garantía de pago por 15 años a beneficiarios o herederos',
+                          mesesGarantizados: 180,
+                          activa: true
+                        }
+                      ];
+                    }
+                    return prev;
+                  });
                 }}
                 className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
                   afiliado.tipoPension === 'invalidez'
@@ -812,6 +871,22 @@ export default function SimuladorPage() {
                     ingresoBaseCLP: prev.ingresoBaseCLP || 1200000,
                     ingresoBaseUF: prev.ingresoBaseUF || (valorUF > 0 ? Math.round((1200000 / valorUF) * 100) / 100 : 29.35)
                   }));
+                  setModalidades(prev => {
+                    const filtered = prev.filter(m => m.tipo !== 'rv_garantizada' && m.tipo !== 'rv_combinada');
+                    const hasAumento = filtered.some(m => m.tipo === 'rv_aumento_temporal');
+                    if (!hasAumento) {
+                      filtered.push({
+                        id: 'base-rv-aumento-sob',
+                        tipo: 'rv_aumento_temporal',
+                        nombre: 'RV Sobrevivencia Período Aumentado (+50% / 3a)',
+                        descripcion: 'Condición especial legal (Art. 61 bis): pensión mayor los primeros 3 años para beneficiarios',
+                        mesesAumento: 36,
+                        porcentajeAumento: 0.50,
+                        activa: true
+                      });
+                    }
+                    return filtered;
+                  });
                 }}
                 className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
                   afiliado.tipoPension === 'sobrevivencia'
@@ -878,6 +953,7 @@ export default function SimuladorPage() {
               onEliminarModalidad={handleEliminarModalidad}
               onGenerarCotizacion={handleGenerarCotizacion}
               isCotizando={isCotizando}
+              tipoPension={afiliado.tipoPension}
             />
 
             {/* 2. Resultados Consolidados de la Multi-Cotización */}

@@ -28,6 +28,7 @@ import {
   calcularAporteAdicionalSISSobrevivencia,
   calcularFinanciamientoSobrevivencia,
   calcularCNUSobrevivencia,
+  calcularRVAumentoTemporalSobrevivencia,
   PGU,
   BAC,
   TASAS_INTERES
@@ -442,6 +443,81 @@ describe('Motor Actuarial de Pensiones - Sistema Chileno', () => {
       // Saldo total para SCOMP garantiza el Capital Necesario
       assert.equal(fin.saldoTotalFinanciamientoCLP, fin.capitalNecesarioCLP);
       assert.equal(fin.aporteAdicionalSISCLP, fin.capitalNecesarioCLP - 15_000_000);
+    });
+
+    it('Renta Vitalicia con Período Aumentado de Sobrevivencia aplica equivalencia actuarial y respeta DL 3500 Art 61 bis', () => {
+      const beneficiarios: BeneficiarioPension[] = [
+        { tipo: 'conyuge', edad: 58, sexo: 'F' },
+        { tipo: 'hijo', edad: 14, sexo: 'M' }
+      ];
+
+      const fondos = 60_000_000;
+      const mesesAumento = 36; // 3 años
+      const pctAumento = 0.50; // +50%
+      const tasa = 0.0305;
+      const valorUF = 40_000;
+
+      const rvAumento = calcularRVAumentoTemporalSobrevivencia(
+        fondos,
+        beneficiarios,
+        mesesAumento,
+        pctAumento,
+        tasa,
+        valorUF
+      );
+
+      // Verificación de montos
+      assert.ok(rvAumento.pensionMensual > 0, 'Pensión aumentada debe ser positiva');
+      assert.ok(rvAumento.pensionEnUF > 0, 'Pensión en UF debe ser positiva');
+
+      // Proyecciones: años 1 a 3 fase aumentada, año 4 en adelante vitalicia
+      assert.equal(rvAumento.proyeccion[0].fase, 'aumentada');
+      assert.equal(rvAumento.proyeccion[1].fase, 'aumentada');
+      assert.equal(rvAumento.proyeccion[2].fase, 'aumentada');
+      assert.equal(rvAumento.proyeccion[3].fase, 'vitalicia');
+
+      const pInicial = rvAumento.proyeccion[0].pensionMensual;
+      const pPosterior = rvAumento.proyeccion[3].pensionMensual;
+
+      // La fase aumentada debe ser un 50% mayor que la fase vitalicia
+      assert.ok(pInicial > pPosterior, 'Pensión de los primeros 3 años debe ser superior a la fase posterior');
+      const ratio = pInicial / pPosterior;
+      assert.ok(Math.abs(ratio - 1.50) < 0.02, `Ratio entre fases debe ser ~1.50 (fue ${ratio})`);
+
+      // Desglose por beneficiario contiene pensionMensual y pensionPosterior
+      assert.equal(rvAumento.pensionPorBeneficiario?.length, 2);
+      const benConyuge = rvAumento.pensionPorBeneficiario?.find(b => b.tipo === 'conyuge');
+      const benHijo = rvAumento.pensionPorBeneficiario?.find(b => b.tipo === 'hijo');
+
+      assert.ok(benConyuge && benHijo);
+      assert.equal(benConyuge.porcentaje, 0.50);
+      assert.equal(benHijo.porcentaje, 0.15);
+      assert.ok((benConyuge.pensionMensual || 0) > (benConyuge.pensionPosterior || 0));
+
+      // Advertencias legales
+      const advTexto = rvAumento.advertencias.join(' ');
+      assert.ok(advTexto.includes('Art. 61 bis'), 'Debe citar la restricción del Art. 61 bis DL 3500');
+      assert.ok(advTexto.includes('Art. 58'), 'Debe citar la distribución legal del Art. 58');
+    });
+
+    it('A mayor porcentaje de aumento temporal, la pensión posterior vitalicia disminuye por equivalencia', () => {
+      const beneficiarios: BeneficiarioPension[] = [
+        { tipo: 'conyuge', edad: 60, sexo: 'F' }
+      ];
+      const fondos = 50_000_000;
+      const tasa = 0.0305;
+      const valorUF = 40_000;
+
+      const rv50 = calcularRVAumentoTemporalSobrevivencia(fondos, beneficiarios, 36, 0.50, tasa, valorUF);
+      const rv100 = calcularRVAumentoTemporalSobrevivencia(fondos, beneficiarios, 36, 1.00, tasa, valorUF);
+
+      // +100% entrega mayor pensión inicial en los primeros 3 años
+      assert.ok(rv100.pensionMensual > rv50.pensionMensual, 'Con +100% la pensión inicial es mayor que con +50%');
+
+      // Pero deja una pensión posterior vitalicia menor para compensar actuarialmente
+      const pPosterior50 = rv50.proyeccion[3].pensionMensual;
+      const pPosterior100 = rv100.proyeccion[3].pensionMensual;
+      assert.ok(pPosterior100 < pPosterior50, 'Con +100% la pensión posterior debe ser menor que con +50%');
     });
   });
 });

@@ -2401,4 +2401,115 @@ export function calcularFinanciamientoSobrevivencia(
   };
 }
 
+/**
+ * Calcula Renta Vitalicia Inmediata de Sobrevivencia con Aumento Temporal (Período Aumentado)
+ * Única cláusula adicional permitida legalmente en Sobrevivencia según D.L. 3.500 Art. 61 bis y Compendio de Normas SP
+ * 
+ * FÓRMULA DE EQUIVALENCIA ACTUARIAL:
+ * Fondos = P_vitalicia × CNU_sob_vitalicio + (porcentajeAumento × P_vitalicia) × CNU_sob_temporal(m)
+ * P_vitalicia = Fondos / [ CNU_sob_vitalicio + porcentajeAumento × CNU_sob_temporal(m) ]
+ * P_aumentada = P_vitalicia × (1 + porcentajeAumento)
+ */
+export function calcularRVAumentoTemporalSobrevivencia(
+  fondosCausante: number,
+  beneficiarios: BeneficiarioPension[],
+  mesesAumento: number,
+  porcentajeAumento: number,
+  tasaInteres: number = TASAS_INTERES.SOBREVIVENCIA,
+  valorUF: number = UF_ACTUAL
+): ResultadoEscenario {
+  const porcentajes = calcularPorcentajesBeneficiarios(beneficiarios);
+  const porcentajeNormalizado = porcentajeAumento > 1 ? porcentajeAumento / 100 : porcentajeAumento;
+
+  if (porcentajes.length === 0) {
+    return {
+      nombre: 'Error: Sin Beneficiarios',
+      pensionMensual: 0,
+      pensionEnUF: 0,
+      pensionAnual: 0,
+      cnu: 0,
+      tasaInteres,
+      expectativaVida: 0,
+      advertencias: ['⚠️ Debe incorporar al menos un beneficiario legal para cotizar sobrevivencia']
+    };
+  }
+
+  // CNU Vitalicio de Sobrevivencia
+  const { cnuTotal: cnuVitalicio } = calcularCNUSobrevivencia(beneficiarios, tasaInteres, 'renta_vitalicia');
+
+  // CNU Temporal de Sobrevivencia para los beneficiarios durante los meses de aumento
+  let cnuTemporalSobrevivencia = 0;
+  for (let i = 0; i < porcentajes.length; i++) {
+    const ben = porcentajes[i];
+    const benOrig = beneficiarios[i] || ben;
+    const esInvalido = !!benOrig.esInvalido;
+    const cnuTempInd = calcularCNUTemporal(
+      ben.edad,
+      ben.sexo,
+      mesesAumento,
+      tasaInteres,
+      esInvalido,
+      'renta_vitalicia'
+    );
+    cnuTemporalSobrevivencia += cnuTempInd * ben.porcentaje;
+  }
+
+  // Divisor actuarial ponderado
+  const divisor = cnuVitalicio + porcentajeNormalizado * cnuTemporalSobrevivencia;
+  const pensionBaseMensual = divisor > 0 ? fondosCausante / divisor : 0;
+  const pensionAumentadaMensual = pensionBaseMensual * (1 + porcentajeNormalizado);
+
+  // Desglose por beneficiario para ambas fases (aumentada y posterior)
+  const pensionPorBen = porcentajes.map(b => ({
+    tipo: b.tipo,
+    porcentaje: b.porcentaje,
+    pensionMensual: Math.round(pensionAumentadaMensual * b.porcentaje),
+    pensionPosterior: Math.round(pensionBaseMensual * b.porcentaje)
+  }));
+
+  const anosAumento = Math.floor(mesesAumento / 12);
+  const mesesRestantes = mesesAumento % 12;
+  const nombrePeriodo = (anosAumento > 0 && mesesRestantes > 0)
+    ? `${anosAumento}a ${mesesRestantes}m`
+    : (anosAumento > 0 ? `${anosAumento} ${anosAumento === 1 ? 'año' : 'años'}` : `${mesesAumento} meses`);
+
+  const pct = Math.round(porcentajeNormalizado * 100);
+
+  // Proyección anual
+  const proyeccion: ProyeccionAnual[] = [];
+  const anosAumentoInt = Math.ceil(mesesAumento / 12);
+  for (let ano = 1; ano <= 25; ano++) {
+    const esFaseAumentada = ano <= anosAumentoInt;
+    const pMensual = esFaseAumentada ? pensionAumentadaMensual : pensionBaseMensual;
+    proyeccion.push({
+      año: ano,
+      edad: (porcentajes[0]?.edad || 60) + ano - 1,
+      pensionMensual: Math.round(pMensual),
+      saldoAcumulado: 0,
+      retiroAcumulado: 0,
+      fase: esFaseAumentada ? 'aumentada' : 'vitalicia'
+    });
+  }
+
+  const ufVal = valorUF > 0 ? valorUF : UF_ACTUAL;
+
+  return {
+    nombre: `RV Sobrevivencia con Período Aumentado (+${pct}% por ${nombrePeriodo})`,
+    pensionMensual: Math.round(pensionAumentadaMensual),
+    pensionEnUF: ufVal > 0 ? Number((pensionAumentadaMensual / ufVal).toFixed(2)) : 0,
+    pensionAnual: Math.round(pensionAumentadaMensual * 12),
+    cnu: divisor,
+    tasaInteres,
+    expectativaVida: calcularExpectativaVida(porcentajes[0]?.edad || 60, porcentajes[0]?.sexo || 'F'),
+    pensionPorBeneficiario: pensionPorBen,
+    proyeccion,
+    advertencias: [
+      `Fase Aumentada (+${pct}%): ${Math.round(pensionAumentadaMensual).toLocaleString('es-CL')} / mes durante ${nombrePeriodo} (${mesesAumento} meses)`,
+      `Fase Vitalicia Posterior: ${Math.round(pensionBaseMensual).toLocaleString('es-CL')} / mes fijo en UF de por vida`,
+      `Única cláusula adicional permitida en sobrevivencia (D.L. 3.500 Art. 61 bis)`,
+      `Distribución a beneficiarios según Art. 58 D.L. 3.500`
+    ]
+  };
+}
+
 

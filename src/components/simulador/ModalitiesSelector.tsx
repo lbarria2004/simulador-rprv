@@ -29,6 +29,7 @@ interface ModalitiesSelectorProps {
   onEliminarModalidad: (id: string) => void;
   onGenerarCotizacion: () => void;
   isCotizando?: boolean;
+  tipoPension?: 'vejez' | 'invalidez' | 'sobrevivencia';
 }
 
 export function ModalitiesSelector({
@@ -37,7 +38,8 @@ export function ModalitiesSelector({
   onAgregarModalidad,
   onEliminarModalidad,
   onGenerarCotizacion,
-  isCotizando = false
+  isCotizando = false,
+  tipoPension = 'vejez'
 }: ModalitiesSelectorProps) {
   // Estado local para el constructor de cláusulas adicionales
   const [tipoClausula, setTipoClausula] = useState<'garantizada' | 'aumento' | 'combinada'>('garantizada');
@@ -45,12 +47,25 @@ export function ModalitiesSelector({
   const [mesesAumento, setMesesAumento] = useState<number>(36); // 3 años
   const [porcentajeAumento, setPorcentajeAumento] = useState<number>(1.0); // +100%
 
-  // Cantidad de modalidades activas para cotizar
-  const modalidadesActivas = modalidades.filter(m => m.activa);
+  // En sobrevivencia, la única cláusula adicional permitida por normativa D.L. 3.500 es el aumento temporal
+  React.useEffect(() => {
+    if (tipoPension === 'sobrevivencia' && tipoClausula !== 'aumento') {
+      setTipoClausula('aumento');
+    }
+  }, [tipoPension, tipoClausula]);
+
+  // Cantidad de modalidades activas para cotizar (en sobrevivencia excluye garantizadas)
+  const modalidadesActivas = modalidades.filter(m => {
+    if (!m.activa) return false;
+    if (tipoPension === 'sobrevivencia' && (m.tipo === 'rv_garantizada' || m.tipo === 'rv_combinada')) {
+      return false;
+    }
+    return true;
+  });
 
   // Manejar incorporación de combinación a la lista
   const handleAgregarCombinacion = () => {
-    if (tipoClausula === 'garantizada') {
+    if (tipoClausula === 'garantizada' && tipoPension !== 'sobrevivencia') {
       const anos = (mesesGarantizados / 12).toFixed(1).replace('.0', '');
       onAgregarModalidad({
         tipo: 'rv_garantizada',
@@ -60,13 +75,17 @@ export function ModalitiesSelector({
         activa: true,
         esPersonalizada: true
       });
-    } else if (tipoClausula === 'aumento') {
+    } else if (tipoClausula === 'aumento' || tipoPension === 'sobrevivencia') {
       const anos = (mesesAumento / 12).toFixed(1).replace('.0', '');
       const pct = Math.round(porcentajeAumento * 100);
       onAgregarModalidad({
         tipo: 'rv_aumento_temporal',
-        nombre: `RV Aumento Temporal +${pct}% (${mesesAumento} meses / ${anos}a)`,
-        descripcion: `Pensión aumentada en +${pct}% durante los primeros ${mesesAumento} meses (${anos} años), luego pensión vitalicia constante.`,
+        nombre: tipoPension === 'sobrevivencia'
+          ? `RV Sobrevivencia con Período Aumentado +${pct}% (${mesesAumento}m / ${anos}a)`
+          : `RV Aumento Temporal +${pct}% (${mesesAumento} meses / ${anos}a)`,
+        descripcion: tipoPension === 'sobrevivencia'
+          ? `Pensión familiar aumentada en +${pct}% durante los primeros ${mesesAumento} meses (${anos} años). Luego continúa la pensión vitalicia en UF.`
+          : `Pensión aumentada en +${pct}% durante los primeros ${mesesAumento} meses (${anos} años), luego pensión vitalicia constante.`,
         mesesAumento,
         porcentajeAumento,
         activa: true,
@@ -91,7 +110,14 @@ export function ModalitiesSelector({
 
   const rpConfig = modalidades.find(m => m.tipo === 'retiro_programado');
   const rvSimpleConfig = modalidades.find(m => m.tipo === 'renta_vitalicia_simple');
-  const otrasModalidades = modalidades.filter(m => m.tipo !== 'retiro_programado' && m.tipo !== 'renta_vitalicia_simple');
+  const otrasModalidades = modalidades.filter(m => {
+    if (m.tipo === 'retiro_programado' || m.tipo === 'renta_vitalicia_simple') return false;
+    // Si estamos en sobrevivencia, solo mostramos modalidades válidas (período aumentado)
+    if (tipoPension === 'sobrevivencia') {
+      return m.tipo === 'rv_aumento_temporal';
+    }
+    return true;
+  });
 
   return (
     <Card className="border-slate-200 shadow-sm overflow-hidden">
@@ -136,13 +162,17 @@ export function ModalitiesSelector({
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
                     <Landmark className={`w-4 h-4 ${rpConfig.activa ? 'text-blue-600' : 'text-slate-400'}`} />
-                    <span className="font-semibold text-sm text-slate-900">Retiro Programado (RP)</span>
+                    <span className="font-semibold text-sm text-slate-900">
+                      {tipoPension === 'sobrevivencia' ? 'Retiro Programado de Sobrevivencia' : 'Retiro Programado (RP)'}
+                    </span>
                     <Badge variant="secondary" className="text-[10px] bg-slate-200 text-slate-700">
                       AFP
                     </Badge>
                   </div>
                   <p className="text-xs text-slate-600 leading-relaxed">
-                    Pensión mensual variable calculada anualmente. Los fondos permanecen en tu cuenta individual y constituyen herencia.
+                    {tipoPension === 'sobrevivencia'
+                      ? 'Pensión familiar mensual calculada anualmente con tablas de sobrevivencia B-2020/MI. Los fondos remanentes constituyen herencia.'
+                      : 'Pensión mensual variable calculada anualmente. Los fondos permanecen en tu cuenta individual y constituyen herencia.'}
                   </p>
                 </div>
                 <div>
@@ -168,13 +198,17 @@ export function ModalitiesSelector({
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
                     <Building2 className={`w-4 h-4 ${rvSimpleConfig.activa ? 'text-indigo-600' : 'text-slate-400'}`} />
-                    <span className="font-semibold text-sm text-slate-900">Renta Vitalicia Simple</span>
+                    <span className="font-semibold text-sm text-slate-900">
+                      {tipoPension === 'sobrevivencia' ? 'Renta Vitalicia Sobrevivencia Simple' : 'Renta Vitalicia Simple'}
+                    </span>
                     <Badge variant="secondary" className="text-[10px] bg-indigo-100 text-indigo-700">
                       Compañía
                     </Badge>
                   </div>
                   <p className="text-xs text-slate-600 leading-relaxed">
-                    Pensión fija e irrevocable en UF de por vida. La aseguradora asume el riesgo financiero y de longevidad.
+                    {tipoPension === 'sobrevivencia'
+                      ? 'Pensión familiar fija e irrevocable en UF de por vida distribuida según Art. 58 DL 3500. La aseguradora asume el riesgo.'
+                      : 'Pensión fija e irrevocable en UF de por vida. La aseguradora asume el riesgo financiero y de longevidad.'}
                   </p>
                 </div>
                 <div>
@@ -199,6 +233,16 @@ export function ModalitiesSelector({
             <span className="text-[11px] text-slate-500">Agrega múltiples opciones a la cotización</span>
           </div>
 
+          {/* Advertencia regulatoria en pensión de sobrevivencia */}
+          {tipoPension === 'sobrevivencia' && (
+            <div className="p-2.5 rounded-lg bg-purple-50 border border-purple-200 text-xs text-purple-950 flex items-start gap-2">
+              <span className="text-sm">⚖️</span>
+              <div className="leading-snug">
+                <strong>Normativa D.L. 3.500 Art. 61 bis y Compendio SP:</strong> En pensión de sobrevivencia solo es legalmente admisible cotizar <strong>Retiro Programado</strong>, <strong>Renta Vitalicia Inmediata Simple</strong> y <strong>Renta Vitalicia con Condiciones Especiales de Cobertura (Período Aumentado)</strong>. Las cláusulas de período garantizado están reservadas por ley para afiliados de vejez o invalidez.
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {/* Selector de Tipo */}
             <div className="space-y-1">
@@ -211,9 +255,15 @@ export function ModalitiesSelector({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="garantizada">🛡️ Período Garantizado</SelectItem>
-                  <SelectItem value="aumento">📈 Aumento Temporal</SelectItem>
-                  <SelectItem value="combinada">⭐ Garantía + Aumento</SelectItem>
+                  {tipoPension !== 'sobrevivencia' && (
+                    <SelectItem value="garantizada">🛡️ Período Garantizado</SelectItem>
+                  )}
+                  <SelectItem value="aumento">
+                    {tipoPension === 'sobrevivencia' ? '📈 Período Aumentado (Condición Especial)' : '📈 Aumento Temporal'}
+                  </SelectItem>
+                  {tipoPension !== 'sobrevivencia' && (
+                    <SelectItem value="combinada">⭐ Garantía + Aumento</SelectItem>
+                  )}
                 </SelectContent>
               </Select>
             </div>
