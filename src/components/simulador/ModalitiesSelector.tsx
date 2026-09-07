@@ -18,7 +18,9 @@ import {
   Calculator,
   Landmark,
   Building2,
-  Sparkles
+  Sparkles,
+  RotateCcw,
+  Percent
 } from 'lucide-react';
 import { ModalidadConfig, ModalidadCotizacionTipo } from './types';
 
@@ -30,6 +32,11 @@ interface ModalitiesSelectorProps {
   onGenerarCotizacion: () => void;
   isCotizando?: boolean;
   tipoPension?: 'vejez' | 'invalidez' | 'sobrevivencia';
+  tasaRP?: number;
+  setTasaRP?: (tasa: number) => void;
+  tasaRV?: number;
+  setTasaRV?: (tasa: number) => void;
+  onRestablecerTasas?: () => void;
 }
 
 export function ModalitiesSelector({
@@ -39,7 +46,12 @@ export function ModalitiesSelector({
   onEliminarModalidad,
   onGenerarCotizacion,
   isCotizando = false,
-  tipoPension = 'vejez'
+  tipoPension = 'vejez',
+  tasaRP = 3.58,
+  setTasaRP,
+  tasaRV = 3.08,
+  setTasaRV,
+  onRestablecerTasas
 }: ModalitiesSelectorProps) {
   // Estado local para el constructor de cláusulas adicionales
   const [tipoClausula, setTipoClausula] = useState<'garantizada' | 'aumento' | 'combinada'>('garantizada');
@@ -143,6 +155,193 @@ export function ModalitiesSelector({
       </CardHeader>
 
       <CardContent className="p-5 space-y-5">
+        {/* Panel de Visualización y Ajuste de Tasas de Cálculo Actuarial */}
+        <div className="p-4 rounded-xl border border-blue-200/80 bg-gradient-to-br from-blue-50/70 via-slate-50 to-indigo-50/50 space-y-3.5 shadow-2xs">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-blue-200/60 pb-2.5">
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 rounded-lg bg-blue-600 text-white shadow-xs">
+                <Percent className="w-4 h-4" />
+              </div>
+              <div>
+                <h4 className="text-xs font-bold text-slate-900 tracking-wide uppercase flex items-center gap-1.5">
+                  Tasas de Interés de Cálculo Actuarial (Vigentes y Ajustables)
+                </h4>
+                <p className="text-[11px] text-slate-500">
+                  Tasas anuales utilizadas para calcular el Capital Necesario Unitario (CNU) y las pensiones mensuales. Modifícalas para evaluar sensibilidad de mercado.
+                </p>
+              </div>
+            </div>
+
+            {onRestablecerTasas && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={onRestablecerTasas}
+                className="text-[11px] h-7 px-2.5 bg-white text-slate-700 hover:text-blue-700 border-slate-300 gap-1.5 self-start sm:self-auto shrink-0 shadow-2xs"
+                title="Restablecer a las tasas oficiales de referencia vigentes"
+              >
+                <RotateCcw className="w-3 h-3" />
+                <span>Restablecer Oficiales</span>
+              </Button>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+            {/* Tasa Retiro Programado (TRP) */}
+            <div className="p-3 bg-white rounded-xl border border-slate-200/90 shadow-2xs space-y-2.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <Landmark className="w-3.5 h-3.5 text-blue-600" />
+                  <span className="text-xs font-bold text-slate-800">Tasa Retiro Programado (TRP)</span>
+                </div>
+                <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-800 border-blue-200 font-mono">
+                  SP Oficial: 3.58%
+                </Badge>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="1.0"
+                    max="8.0"
+                    value={tasaRP ?? 3.58}
+                    onChange={e => setTasaRP && setTasaRP(parseFloat(e.target.value) || 0)}
+                    className="h-8 text-xs font-bold font-mono pl-3 pr-8 bg-slate-50 border-slate-300 focus:bg-white"
+                  />
+                  <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">%</span>
+                </div>
+
+                <div className="flex items-center gap-1">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setTasaRP && setTasaRP(Number(Math.max(1, (tasaRP ?? 3.58) - 0.1).toFixed(2)))}
+                    className="h-8 w-8 p-0 text-xs text-slate-700 border-slate-300 hover:bg-slate-100"
+                    title="Disminuir 0.10%"
+                  >
+                    -0.1
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setTasaRP && setTasaRP(Number(Math.min(10, (tasaRP ?? 3.58) + 0.1).toFixed(2)))}
+                    className="h-8 w-8 p-0 text-xs text-slate-700 border-slate-300 hover:bg-slate-100"
+                    title="Aumentar 0.10%"
+                  >
+                    +0.1
+                  </Button>
+                </div>
+              </div>
+
+              {/* Atajos rápidos TRP */}
+              <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                <span className="text-[10px] text-slate-400 font-medium">Escenarios:</span>
+                {[
+                  { label: '3.20%', val: 3.20 },
+                  { label: '3.41%', val: 3.41 },
+                  { label: '3.58% (Oficial)', val: 3.58 },
+                  { label: '3.80%', val: 3.80 },
+                  { label: '4.00%', val: 4.00 }
+                ].map(sc => (
+                  <button
+                    key={sc.val}
+                    type="button"
+                    onClick={() => setTasaRP && setTasaRP(sc.val)}
+                    className={`text-[10px] px-2 py-0.5 rounded border transition-colors ${
+                      Math.abs((tasaRP ?? 3.58) - sc.val) < 0.001
+                        ? 'bg-blue-600 text-white border-blue-600 font-bold'
+                        : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    {sc.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Tasa Renta Vitalicia (TRV) */}
+            <div className="p-3 bg-white rounded-xl border border-slate-200/90 shadow-2xs space-y-2.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <Building2 className="w-3.5 h-3.5 text-indigo-600" />
+                  <span className="text-xs font-bold text-slate-800">Tasa Renta Vitalicia (TRV)</span>
+                </div>
+                <Badge variant="outline" className="text-[10px] bg-indigo-50 text-indigo-800 border-indigo-200 font-mono">
+                  {tipoPension === 'invalidez' ? 'CMF Invalidez: 3.03%' : tipoPension === 'sobrevivencia' ? 'CMF Sobrevivencia: 3.01%' : 'CMF Líder: 3.08%'}
+                </Badge>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="1.0"
+                    max="7.0"
+                    value={tasaRV ?? 3.08}
+                    onChange={e => setTasaRV && setTasaRV(parseFloat(e.target.value) || 0)}
+                    className="h-8 text-xs font-bold font-mono pl-3 pr-8 bg-slate-50 border-slate-300 focus:bg-white"
+                  />
+                  <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">%</span>
+                </div>
+
+                <div className="flex items-center gap-1">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setTasaRV && setTasaRV(Number(Math.max(1, (tasaRV ?? 3.08) - 0.1).toFixed(2)))}
+                    className="h-8 w-8 p-0 text-xs text-slate-700 border-slate-300 hover:bg-slate-100"
+                    title="Disminuir 0.10%"
+                  >
+                    -0.1
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setTasaRV && setTasaRV(Number(Math.min(10, (tasaRV ?? 3.08) + 0.1).toFixed(2)))}
+                    className="h-8 w-8 p-0 text-xs text-slate-700 border-slate-300 hover:bg-slate-100"
+                    title="Aumentar 0.10%"
+                  >
+                    +0.1
+                  </Button>
+                </div>
+              </div>
+
+              {/* Atajos rápidos TRV */}
+              <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                <span className="text-[10px] text-slate-400 font-medium">Escenarios:</span>
+                {[
+                  { label: '2.85%', val: 2.85 },
+                  { label: '3.01%', val: 3.01 },
+                  { label: '3.08% (Líder)', val: 3.08 },
+                  { label: '3.25%', val: 3.25 },
+                  { label: '3.50%', val: 3.50 }
+                ].map(sc => (
+                  <button
+                    key={sc.val}
+                    type="button"
+                    onClick={() => setTasaRV && setTasaRV(sc.val)}
+                    className={`text-[10px] px-2 py-0.5 rounded border transition-colors ${
+                      Math.abs((tasaRV ?? 3.08) - sc.val) < 0.001
+                        ? 'bg-indigo-600 text-white border-indigo-600 font-bold'
+                        : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    {sc.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* 1. Grilla de Modalidades Base */}
         <div className="space-y-2.5">
           <Label className="text-xs font-semibold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
@@ -174,6 +373,11 @@ export function ModalitiesSelector({
                       ? 'Pensión familiar mensual calculada anualmente con tablas de sobrevivencia B-2020/MI. Los fondos remanentes constituyen herencia.'
                       : 'Pensión mensual variable calculada anualmente. Los fondos permanecen en tu cuenta individual y constituyen herencia.'}
                   </p>
+                  <div className="pt-1">
+                    <Badge variant="outline" className="text-[10px] bg-blue-100/70 text-blue-800 border-blue-300 font-mono">
+                      Tasa aplicada: {(tasaRP ?? 3.58).toFixed(2)}% anual
+                    </Badge>
+                  </div>
                 </div>
                 <div>
                   {rpConfig.activa ? (
@@ -210,6 +414,11 @@ export function ModalitiesSelector({
                       ? 'Pensión familiar fija e irrevocable en UF de por vida distribuida según Art. 58 DL 3500. La aseguradora asume el riesgo.'
                       : 'Pensión fija e irrevocable en UF de por vida. La aseguradora asume el riesgo financiero y de longevidad.'}
                   </p>
+                  <div className="pt-1">
+                    <Badge variant="outline" className="text-[10px] bg-indigo-100/70 text-indigo-800 border-indigo-300 font-mono">
+                      Tasa aplicada: {(tasaRV ?? 3.08).toFixed(2)}% anual
+                    </Badge>
+                  </div>
                 </div>
                 <div>
                   {rvSimpleConfig.activa ? (

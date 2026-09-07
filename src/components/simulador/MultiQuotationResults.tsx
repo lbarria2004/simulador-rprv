@@ -26,6 +26,8 @@ interface MultiQuotationResultsProps {
   tipoPension?: 'vejez' | 'invalidez' | 'sobrevivencia';
   invalidezInfo?: InvalidezFinanciamientoInfo;
   sobrevivenciaInfo?: SobrevivenciaFinanciamientoInfo;
+  tasaRP?: number;
+  tasaRV?: number;
 }
 
 function formatCLP(val: number): string {
@@ -45,7 +47,9 @@ export function MultiQuotationResults({
   isGeneratingPDF = false,
   tipoPension = 'vejez',
   invalidezInfo,
-  sobrevivenciaInfo
+  sobrevivenciaInfo,
+  tasaRP = 3.58,
+  tasaRV = 3.08
 }: MultiQuotationResultsProps) {
   if (items.length === 0) {
     return (
@@ -83,10 +87,10 @@ export function MultiQuotationResults({
           </div>
           <p className="text-xs text-blue-200 mt-0.5">
             {tipoPension === 'invalidez' 
-              ? `Cálculo con Tablas Generacionales de Invalidez MI-2020 • UF $${valorUF.toLocaleString('es-CL', { minimumFractionDigits: 2 })}`
+              ? `Cálculo con Tablas Generacionales MI-2020 • UF $${valorUF.toLocaleString('es-CL', { minimumFractionDigits: 2 })} • TRP: ${tasaRP.toFixed(2)}% | TRV: ${tasaRV.toFixed(2)}%`
               : tipoPension === 'sobrevivencia'
-                ? `Cálculo actuarial oficial según D.L. 3.500 Art. 58 y Tablas B-2020 • UF $${valorUF.toLocaleString('es-CL', { minimumFractionDigits: 2 })}`
-                : `Cálculo actuarial oficial con tablas generacionales TM-2020 a valor UF $${valorUF.toLocaleString('es-CL', { minimumFractionDigits: 2 })}`
+                ? `Cálculo actuarial oficial según D.L. 3.500 Art. 58 y Tablas B-2020 • UF $${valorUF.toLocaleString('es-CL', { minimumFractionDigits: 2 })} • TRP: ${tasaRP.toFixed(2)}% | TRV: ${tasaRV.toFixed(2)}%`
+                : `Cálculo actuarial oficial con tablas generacionales TM-2020 • UF $${valorUF.toLocaleString('es-CL', { minimumFractionDigits: 2 })} • TRP: ${tasaRP.toFixed(2)}% | TRV: ${tasaRV.toFixed(2)}%`
             }
           </p>
         </div>
@@ -305,6 +309,18 @@ export function MultiQuotationResults({
                 {/* Atributos clave */}
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div className="space-y-0.5">
+                    <span className="text-[10px] text-slate-400 block">Tasa Actuarial</span>
+                    <span className="font-semibold text-slate-900 font-mono">
+                      {(item.resultado.tasaInteres * 100).toFixed(2)}% anual
+                    </span>
+                  </div>
+                  <div className="space-y-0.5">
+                    <span className="text-[10px] text-slate-400 block">Factor CNU</span>
+                    <span className="font-semibold text-slate-900 font-mono">
+                      {item.resultado.cnu.toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="space-y-0.5">
                     <span className="text-[10px] text-slate-400 block">Régimen Legal</span>
                     <span className="font-medium text-slate-700">
                       {isRP ? 'Propiedad del afiliado' : 'Contrato irrevocable'}
@@ -348,6 +364,7 @@ export function MultiQuotationResults({
               <tr>
                 <th className="py-2.5 px-3">Modalidad</th>
                 <th className="py-2.5 px-3">Entidad</th>
+                <th className="py-2.5 px-3 text-center">Tasa (%)</th>
                 <th className="py-2.5 px-3 text-right">Pensión Base (UF)</th>
                 <th className="py-2.5 px-3 text-right">Pensión Total ($)</th>
                 <th className="py-2.5 px-3">Cláusulas</th>
@@ -364,6 +381,9 @@ export function MultiQuotationResults({
                     </td>
                     <td className="py-2.5 px-3 text-slate-600">
                       {isRP ? 'AFP (Fondo C)' : 'Compañía de Seguros'}
+                    </td>
+                    <td className="py-2.5 px-3 text-center font-mono font-semibold text-slate-800">
+                      {(item.resultado.tasaInteres * 100).toFixed(2)}%
                     </td>
                     <td className="py-2.5 px-3 text-right font-mono font-medium text-blue-900">
                       {formatUF(item.resultado.pensionEnUF)}

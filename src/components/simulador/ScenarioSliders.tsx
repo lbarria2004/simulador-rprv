@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Slider } from '@/components/ui/slider';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
-import { Sliders, Shield, TrendingUp, Award, Calendar } from 'lucide-react';
+import { Sliders, Shield, TrendingUp, Award, Calendar, Percent, Landmark, Building2 } from 'lucide-react';
 import { CláusulasState } from './types';
 
 interface ScenarioSlidersProps {
@@ -14,6 +14,10 @@ interface ScenarioSlidersProps {
   anosCotizados: number;
   setAnosCotizados: (anos: number) => void;
   bacUF: number;
+  tasaRP?: number;
+  setTasaRP?: (tasa: number) => void;
+  tasaRV?: number;
+  setTasaRV?: (tasa: number) => void;
 }
 
 export function ScenarioSliders({
@@ -21,7 +25,11 @@ export function ScenarioSliders({
   setClausulas,
   anosCotizados,
   setAnosCotizados,
-  bacUF
+  bacUF,
+  tasaRP = 3.58,
+  setTasaRP,
+  tasaRV = 3.08,
+  setTasaRV
 }: ScenarioSlidersProps) {
   const anosGarantia = Math.floor(clausulas.mesesGarantizados / 12);
   const anosAumento = Math.floor(clausulas.mesesAumento / 12);
@@ -169,6 +177,78 @@ export function ScenarioSliders({
             </span>
           </div>
         </div>
+
+        {/* 4. Slider Sensibilidad: Tasa Retiro Programado (TRP) */}
+        {setTasaRP && (
+          <div className="space-y-3 p-3 bg-blue-50/50 rounded-xl border border-blue-200/70">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <Landmark className="w-4 h-4 text-blue-600" />
+                <Label className="text-xs font-semibold text-slate-800">Tasa Retiro Programado (TRP)</Label>
+              </div>
+              <Badge className="bg-blue-600 text-white font-mono text-xs">
+                {tasaRP.toFixed(2)}% anual
+              </Badge>
+            </div>
+
+            <Slider
+              min={1.5}
+              max={6.0}
+              step={0.05}
+              value={[tasaRP]}
+              onValueChange={([val]) => setTasaRP(Number(val.toFixed(2)))}
+              className="py-1"
+            />
+
+            <div className="flex justify-between text-[10px] text-slate-400 font-medium">
+              <span>1.5%</span>
+              <span>2.5%</span>
+              <span className="text-blue-700 font-bold">3.58% (SP)</span>
+              <span>4.5%</span>
+              <span>6.0%</span>
+            </div>
+
+            <p className="text-[11px] text-slate-500 leading-tight">
+              Afecta el factor CNU del Retiro Programado. Una tasa mayor incrementa la pensión inicial en la AFP.
+            </p>
+          </div>
+        )}
+
+        {/* 5. Slider Sensibilidad: Tasa Renta Vitalicia (TRV) */}
+        {setTasaRV && (
+          <div className="space-y-3 p-3 bg-indigo-50/50 rounded-xl border border-indigo-200/70">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <Building2 className="w-4 h-4 text-indigo-600" />
+                <Label className="text-xs font-semibold text-slate-800">Tasa Renta Vitalicia (TRV)</Label>
+              </div>
+              <Badge className="bg-indigo-600 text-white font-mono text-xs">
+                {tasaRV.toFixed(2)}% anual
+              </Badge>
+            </div>
+
+            <Slider
+              min={1.5}
+              max={5.0}
+              step={0.05}
+              value={[tasaRV]}
+              onValueChange={([val]) => setTasaRV(Number(val.toFixed(2)))}
+              className="py-1"
+            />
+
+            <div className="flex justify-between text-[10px] text-slate-400 font-medium">
+              <span>1.5%</span>
+              <span>2.5%</span>
+              <span className="text-indigo-700 font-bold">3.08% (CMF)</span>
+              <span>4.0%</span>
+              <span>5.0%</span>
+            </div>
+
+            <p className="text-[11px] text-slate-500 leading-tight">
+              Tasa de descuento de la aseguradora. Una tasa mayor eleva la renta vitalicia mensual en UF garantizada.
+            </p>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

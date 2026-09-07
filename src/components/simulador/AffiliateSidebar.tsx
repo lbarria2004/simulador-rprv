@@ -23,6 +23,8 @@ interface AffiliateSidebarProps {
   onApplyPreset?: (presetKey: 'zamora' | 'spuler' | 'soltero') => void;
   invalidezInfo?: InvalidezFinanciamientoInfo;
   sobrevivenciaInfo?: SobrevivenciaFinanciamientoInfo;
+  tasaRP?: number;
+  tasaRV?: number;
 }
 
 export function AffiliateSidebar({
@@ -34,7 +36,9 @@ export function AffiliateSidebar({
   isLoadingUF,
   onApplyPreset,
   invalidezInfo,
-  sobrevivenciaInfo
+  sobrevivenciaInfo,
+  tasaRP = 3.58,
+  tasaRV = 3.08
 }: AffiliateSidebarProps) {
   // Manejar cambio de fondos en Pesos y sincronizar UF
   const handlePesosChange = (valStr: string) => {
@@ -533,6 +537,23 @@ export function AffiliateSidebar({
               </Badge>
             </div>
           )}
+
+          {/* Indicador de Tasas Actuariales Activas */}
+          <div className="p-2.5 rounded-lg border border-slate-200 bg-slate-50/80 text-[11px] space-y-1.5">
+            <div className="flex items-center justify-between text-slate-700 font-semibold text-[10px] uppercase tracking-wider">
+              <span>Tasas Actuariales en Uso:</span>
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="p-1.5 bg-white rounded border border-blue-100 flex items-center justify-between">
+                <span className="text-blue-900 font-medium text-[11px]">RP (AFP):</span>
+                <span className="font-mono font-bold text-blue-700">{(tasaRP ?? 3.58).toFixed(2)}%</span>
+              </div>
+              <div className="p-1.5 bg-white rounded border border-indigo-100 flex items-center justify-between">
+                <span className="text-indigo-900 font-medium text-[11px]">RV (CMF):</span>
+                <span className="font-mono font-bold text-indigo-700">{(tasaRV ?? 3.08).toFixed(2)}%</span>
+              </div>
+            </div>
+          </div>
 
           {/* Asesor Previsional SCOMP Toggle */}
           <div className="flex items-center justify-between p-3 rounded-lg border border-indigo-100 bg-indigo-50/40">
