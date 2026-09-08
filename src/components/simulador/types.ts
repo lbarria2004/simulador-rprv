@@ -93,6 +93,8 @@ export interface ModalidadConfig {
   mesesGarantizados?: number;
   mesesAumento?: number;
   porcentajeAumento?: number;
+  tasaEspecialRV?: number; // Tasa específica asignada en % (ej. 3.45 para 3.45% anual)
+  esTasaEspecial?: boolean; // Bandera que indica si utiliza una tasa especial/ajustada
   activa: boolean;
   esPersonalizada?: boolean;
 }

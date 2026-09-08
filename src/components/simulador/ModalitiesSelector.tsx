@@ -20,7 +20,9 @@ import {
   Building2,
   Sparkles,
   RotateCcw,
-  Percent
+  Percent,
+  Zap,
+  SlidersHorizontal
 } from 'lucide-react';
 import { ModalidadConfig, ModalidadCotizacionTipo } from './types';
 
@@ -53,15 +55,19 @@ export function ModalitiesSelector({
   setTasaRV,
   onRestablecerTasas
 }: ModalitiesSelectorProps) {
-  // Estado local para el constructor de cláusulas adicionales
-  const [tipoClausula, setTipoClausula] = useState<'garantizada' | 'aumento' | 'combinada'>('garantizada');
+  // Estado local para el constructor de cláusulas adicionales y ofertas especiales
+  const [tipoClausula, setTipoClausula] = useState<'garantizada' | 'aumento' | 'combinada' | 'tasa_especial'>('garantizada');
   const [mesesGarantizados, setMesesGarantizados] = useState<number>(180); // 15 años
   const [mesesAumento, setMesesAumento] = useState<number>(36); // 3 años
   const [porcentajeAumento, setPorcentajeAumento] = useState<number>(1.0); // +100%
+  const [tasaEspecialManual, setTasaEspecialManual] = useState<number>(3.40); // Tasa en % para modalidad especial
+  const [nombreOfertaEspecial, setNombreOfertaEspecial] = useState<string>('');
+  const [aplicarTasaEspecialEnClausula, setAplicarTasaEspecialEnClausula] = useState<boolean>(false);
+  const [modoTasaEspecialGlobal, setModoTasaEspecialGlobal] = useState<boolean>(false);
 
-  // En sobrevivencia, la única cláusula adicional permitida por normativa CMF/SP es el período garantizado
+  // En sobrevivencia, las opciones permitidas por normativa CMF/SP son período garantizado o tasa especial
   React.useEffect(() => {
-    if (tipoPension === 'sobrevivencia' && tipoClausula !== 'garantizada') {
+    if (tipoPension === 'sobrevivencia' && tipoClausula !== 'garantizada' && tipoClausula !== 'tasa_especial') {
       setTipoClausula('garantizada');
     }
   }, [tipoPension, tipoClausula]);
@@ -75,19 +81,45 @@ export function ModalitiesSelector({
     return true;
   });
 
-  // Manejar incorporación de combinación a la lista
+  // Manejar incorporación de combinación u oferta especial a la lista
   const handleAgregarCombinacion = () => {
+    if (tipoClausula === 'tasa_especial') {
+      const anos = mesesGarantizados > 0 ? (mesesGarantizados / 12).toFixed(1).replace('.0', '') : '';
+      const autoNombre = mesesGarantizados > 0 
+        ? `RV Garantizada ${mesesGarantizados}m - Tasa Especial ${tasaEspecialManual.toFixed(2)}%`
+        : `RV Simple - Tasa Especial ${tasaEspecialManual.toFixed(2)}%`;
+      const nombreFinal = nombreOfertaEspecial.trim() || autoNombre;
+      onAgregarModalidad({
+        tipo: mesesGarantizados > 0 ? 'rv_garantizada' : 'renta_vitalicia_simple',
+        nombre: nombreFinal,
+        descripcion: `Cotización con tasa especial ajustada manualmente a ${tasaEspecialManual.toFixed(2)}% anual${mesesGarantizados > 0 ? ` con garantía de ${mesesGarantizados} meses (${anos}a)` : ' (vitalicia simple)'}.`,
+        mesesGarantizados: mesesGarantizados > 0 ? mesesGarantizados : undefined,
+        tasaEspecialRV: tasaEspecialManual,
+        esTasaEspecial: true,
+        activa: true,
+        esPersonalizada: true
+      });
+      setNombreOfertaEspecial('');
+      return;
+    }
+
+    const tasaEspecialOpt = aplicarTasaEspecialEnClausula ? tasaEspecialManual : undefined;
+    const esEspecialOpt = aplicarTasaEspecialEnClausula;
+    const sufijoTasa = esEspecialOpt ? ` (Tasa Especial ${tasaEspecialManual.toFixed(2)}%)` : '';
+
     if (tipoClausula === 'garantizada' || tipoPension === 'sobrevivencia') {
       const anos = (mesesGarantizados / 12).toFixed(1).replace('.0', '');
       onAgregarModalidad({
         tipo: 'rv_garantizada',
         nombre: tipoPension === 'sobrevivencia'
-          ? `RV Sobrevivencia Garantizada ${mesesGarantizados}m (${anos}a)`
-          : `RV Garantizada ${mesesGarantizados} meses (${anos}a)`,
+          ? `RV Sobrevivencia Garantizada ${mesesGarantizados}m (${anos}a)${sufijoTasa}`
+          : `RV Garantizada ${mesesGarantizados} meses (${anos}a)${sufijoTasa}`,
         descripcion: tipoPension === 'sobrevivencia'
-          ? `Pensión familiar en UF con garantía legal de pago por ${mesesGarantizados} meses (${anos} años) transferible a beneficiarios o herederos designados.`
-          : `Pensión vitalicia fija en UF con garantía de pago por ${mesesGarantizados} meses (${anos} años) a beneficiarios o herederos.`,
+          ? `Pensión familiar en UF con garantía legal de pago por ${mesesGarantizados} meses (${anos} años) transferible a beneficiarios o herederos designados.${esEspecialOpt ? ` Tasa especial: ${tasaEspecialManual.toFixed(2)}%.` : ''}`
+          : `Pensión vitalicia fija en UF con garantía de pago por ${mesesGarantizados} meses (${anos} años) a beneficiarios o herederos.${esEspecialOpt ? ` Tasa especial: ${tasaEspecialManual.toFixed(2)}%.` : ''}`,
         mesesGarantizados,
+        tasaEspecialRV: tasaEspecialOpt,
+        esTasaEspecial: esEspecialOpt,
         activa: true,
         esPersonalizada: true
       });
@@ -96,10 +128,12 @@ export function ModalitiesSelector({
       const pct = Math.round(porcentajeAumento * 100);
       onAgregarModalidad({
         tipo: 'rv_aumento_temporal',
-        nombre: `RV Aumento Temporal +${pct}% (${mesesAumento} meses / ${anos}a)`,
-        descripcion: `Pensión aumentada en +${pct}% durante los primeros ${mesesAumento} meses (${anos} años), luego pensión vitalicia constante.`,
+        nombre: `RV Aumento Temporal +${pct}% (${mesesAumento} meses / ${anos}a)${sufijoTasa}`,
+        descripcion: `Pensión aumentada en +${pct}% durante los primeros ${mesesAumento} meses (${anos} años), luego pensión vitalicia constante.${esEspecialOpt ? ` Tasa especial: ${tasaEspecialManual.toFixed(2)}%.` : ''}`,
         mesesAumento,
         porcentajeAumento,
+        tasaEspecialRV: tasaEspecialOpt,
+        esTasaEspecial: esEspecialOpt,
         activa: true,
         esPersonalizada: true
       });
@@ -109,24 +143,29 @@ export function ModalitiesSelector({
       const pct = Math.round(porcentajeAumento * 100);
       onAgregarModalidad({
         tipo: 'rv_combinada',
-        nombre: `RV Combinada (Garantía ${mesesGarantizados}m + Aumento +${pct}%)`,
-        descripcion: `Máxima protección: garantía de ${mesesGarantizados} meses (${anosG}a) y pensión aumentada por ${mesesAumento} meses (${anosA}a) simultáneamente.`,
+        nombre: `RV Combinada (Garantía ${mesesGarantizados}m + Aumento +${pct}%)${sufijoTasa}`,
+        descripcion: `Máxima protección: garantía de ${mesesGarantizados} meses (${anosG}a) y pensión aumentada por ${mesesAumento} meses (${anosA}a) simultáneamente.${esEspecialOpt ? ` Tasa especial: ${tasaEspecialManual.toFixed(2)}%.` : ''}`,
         mesesGarantizados,
         mesesAumento,
         porcentajeAumento,
+        tasaEspecialRV: tasaEspecialOpt,
+        esTasaEspecial: esEspecialOpt,
         activa: true,
         esPersonalizada: true
       });
     }
   };
 
-  const rpConfig = modalidades.find(m => m.tipo === 'retiro_programado');
-  const rvSimpleConfig = modalidades.find(m => m.tipo === 'renta_vitalicia_simple');
+  const rpConfig = modalidades.find(m => m.tipo === 'retiro_programado' && !m.esPersonalizada);
+  const rvSimpleConfig = modalidades.find(m => m.tipo === 'renta_vitalicia_simple' && !m.esPersonalizada);
   const otrasModalidades = modalidades.filter(m => {
-    if (m.tipo === 'retiro_programado' || m.tipo === 'renta_vitalicia_simple') return false;
-    // En sobrevivencia, la única cláusula adicional permitida por normativa CMF/SP es período garantizado
+    // Los dos bloques base de la sección 1 se filtran
+    if ((m.tipo === 'retiro_programado' || m.tipo === 'renta_vitalicia_simple') && !m.esPersonalizada) {
+      return false;
+    }
+    // En sobrevivencia, las cláusulas adicionales permitidas son garantía o modalidades personalizadas con tasa especial
     if (tipoPension === 'sobrevivencia') {
-      return m.tipo === 'rv_garantizada';
+      return m.tipo === 'rv_garantizada' || m.esPersonalizada;
     }
     return true;
   });
@@ -265,15 +304,57 @@ export function ModalitiesSelector({
             </div>
 
             {/* Tasa Renta Vitalicia (TRV) */}
-            <div className="p-3 bg-white rounded-xl border border-slate-200/90 shadow-2xs space-y-2.5">
+            <div className={`p-3 rounded-xl border transition-all space-y-2.5 shadow-2xs ${
+              modoTasaEspecialGlobal
+                ? 'bg-amber-50/50 border-amber-300 ring-1 ring-amber-400/30'
+                : 'bg-white border-slate-200/90'
+            }`}>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
-                  <Building2 className="w-3.5 h-3.5 text-indigo-600" />
-                  <span className="text-xs font-bold text-slate-800">Tasa Renta Vitalicia (TRV)</span>
+                  <Building2 className={`w-3.5 h-3.5 ${modoTasaEspecialGlobal ? 'text-amber-600' : 'text-indigo-600'}`} />
+                  <span className="text-xs font-bold text-slate-800">
+                    {modoTasaEspecialGlobal ? 'Tasa RV Especial / Ajustada' : 'Tasa Renta Vitalicia (TRV)'}
+                  </span>
                 </div>
-                <Badge variant="outline" className="text-[10px] bg-indigo-50 text-indigo-800 border-indigo-200 font-mono">
-                  {tipoPension === 'invalidez' ? 'CMF Invalidez: 3.03%' : tipoPension === 'sobrevivencia' ? 'CMF Sobrevivencia: 3.01%' : 'CMF Líder: 3.08%'}
-                </Badge>
+                {modoTasaEspecialGlobal ? (
+                  <Badge className="text-[10px] bg-amber-500 text-white hover:bg-amber-600 font-mono gap-1 py-0">
+                    <Zap className="w-2.5 h-2.5" /> Especial Activa
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="text-[10px] bg-indigo-50 text-indigo-800 border-indigo-200 font-mono">
+                    {tipoPension === 'invalidez' ? 'CMF Invalidez: 3.03%' : tipoPension === 'sobrevivencia' ? 'CMF Sobrevivencia: 3.01%' : 'CMF Líder: 3.08%'}
+                  </Badge>
+                )}
+              </div>
+
+              {/* Selector de Modo: Oficial CMF vs Especial Manual */}
+              <div className="flex items-center gap-1 p-0.5 bg-slate-100 rounded-lg border border-slate-200 text-[11px]">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setModoTasaEspecialGlobal(false);
+                    if (onRestablecerTasas) onRestablecerTasas();
+                  }}
+                  className={`flex-1 py-1 px-2 rounded-md font-semibold transition-all text-center ${
+                    !modoTasaEspecialGlobal
+                      ? 'bg-white text-indigo-900 shadow-2xs border border-slate-200/80'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  🏛️ Tasa Mercado CMF
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setModoTasaEspecialGlobal(true)}
+                  className={`flex-1 py-1 px-2 rounded-md font-semibold transition-all text-center flex items-center justify-center gap-1 ${
+                    modoTasaEspecialGlobal
+                      ? 'bg-amber-600 text-white shadow-2xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <Zap className="w-3 h-3" />
+                  <span>Tasa Especial Manual</span>
+                </button>
               </div>
 
               <div className="flex items-center gap-2">
@@ -284,8 +365,16 @@ export function ModalitiesSelector({
                     min="1.0"
                     max="7.0"
                     value={tasaRV ?? 3.08}
-                    onChange={e => setTasaRV && setTasaRV(parseFloat(e.target.value) || 0)}
-                    className="h-8 text-xs font-bold font-mono pl-3 pr-8 bg-slate-50 border-slate-300 focus:bg-white"
+                    onChange={e => {
+                      const val = parseFloat(e.target.value) || 0;
+                      if (setTasaRV) setTasaRV(val);
+                      setModoTasaEspecialGlobal(true);
+                    }}
+                    className={`h-8 text-xs font-bold font-mono pl-3 pr-8 focus:bg-white ${
+                      modoTasaEspecialGlobal
+                        ? 'bg-white border-amber-400 text-amber-950 ring-1 ring-amber-400/20'
+                        : 'bg-slate-50 border-slate-300'
+                    }`}
                   />
                   <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">%</span>
                 </div>
@@ -295,7 +384,10 @@ export function ModalitiesSelector({
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() => setTasaRV && setTasaRV(Number(Math.max(1, (tasaRV ?? 3.08) - 0.1).toFixed(2)))}
+                    onClick={() => {
+                      if (setTasaRV) setTasaRV(Number(Math.max(1, (tasaRV ?? 3.08) - 0.1).toFixed(2)));
+                      setModoTasaEspecialGlobal(true);
+                    }}
                     className="h-8 w-8 p-0 text-xs text-slate-700 border-slate-300 hover:bg-slate-100"
                     title="Disminuir 0.10%"
                   >
@@ -305,7 +397,10 @@ export function ModalitiesSelector({
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() => setTasaRV && setTasaRV(Number(Math.min(10, (tasaRV ?? 3.08) + 0.1).toFixed(2)))}
+                    onClick={() => {
+                      if (setTasaRV) setTasaRV(Number(Math.min(10, (tasaRV ?? 3.08) + 0.1).toFixed(2)));
+                      setModoTasaEspecialGlobal(true);
+                    }}
                     className="h-8 w-8 p-0 text-xs text-slate-700 border-slate-300 hover:bg-slate-100"
                     title="Aumentar 0.10%"
                   >
@@ -316,21 +411,33 @@ export function ModalitiesSelector({
 
               {/* Atajos rápidos TRV */}
               <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
-                <span className="text-[10px] text-slate-400 font-medium">Escenarios:</span>
-                {[
+                <span className="text-[10px] text-slate-400 font-medium">
+                  {modoTasaEspecialGlobal ? 'Sugerencias:' : 'Escenarios CMF:'}
+                </span>
+                {(modoTasaEspecialGlobal ? [
+                  { label: '3.15%', val: 3.15 },
+                  { label: '3.30%', val: 3.30 },
+                  { label: '3.45%', val: 3.45 },
+                  { label: '3.60%', val: 3.60 },
+                  { label: '3.75%', val: 3.75 }
+                ] : [
                   { label: '2.85%', val: 2.85 },
                   { label: '3.01%', val: 3.01 },
                   { label: '3.08% (Líder)', val: 3.08 },
                   { label: '3.25%', val: 3.25 },
                   { label: '3.50%', val: 3.50 }
-                ].map(sc => (
+                ]).map(sc => (
                   <button
                     key={sc.val}
                     type="button"
-                    onClick={() => setTasaRV && setTasaRV(sc.val)}
+                    onClick={() => {
+                      if (setTasaRV) setTasaRV(sc.val);
+                    }}
                     className={`text-[10px] px-2 py-0.5 rounded border transition-colors ${
                       Math.abs((tasaRV ?? 3.08) - sc.val) < 0.001
-                        ? 'bg-indigo-600 text-white border-indigo-600 font-bold'
+                        ? modoTasaEspecialGlobal
+                          ? 'bg-amber-600 text-white border-amber-600 font-bold'
+                          : 'bg-indigo-600 text-white border-indigo-600 font-bold'
                         : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
                     }`}
                   >
@@ -414,9 +521,15 @@ export function ModalitiesSelector({
                       ? 'Pensión familiar fija e irrevocable en UF de por vida distribuida según Art. 58 DL 3500. La aseguradora asume el riesgo.'
                       : 'Pensión fija e irrevocable en UF de por vida. La aseguradora asume el riesgo financiero y de longevidad.'}
                   </p>
-                  <div className="pt-1">
-                    <Badge variant="outline" className="text-[10px] bg-indigo-100/70 text-indigo-800 border-indigo-300 font-mono">
-                      Tasa aplicada: {(tasaRV ?? 3.08).toFixed(2)}% anual
+                  <div className="pt-1 flex items-center gap-1.5">
+                    <Badge variant="outline" className={`text-[10px] font-mono ${
+                      modoTasaEspecialGlobal
+                        ? 'bg-amber-100 text-amber-900 border-amber-300 font-bold'
+                        : 'bg-indigo-100/70 text-indigo-800 border-indigo-300'
+                    }`}>
+                      {modoTasaEspecialGlobal 
+                        ? `⚡ Tasa Especial: ${(tasaRV ?? 3.08).toFixed(2)}% anual` 
+                        : `Tasa aplicada: ${(tasaRV ?? 3.08).toFixed(2)}% anual`}
                     </Badge>
                   </div>
                 </div>
@@ -432,14 +545,14 @@ export function ModalitiesSelector({
           </div>
         </div>
 
-        {/* 2. Constructor de Cláusulas Adicionales */}
+        {/* 2. Constructor de Cláusulas Adicionales y Ofertas Especiales */}
         <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/60 space-y-3.5">
           <div className="flex items-center justify-between">
             <Label className="text-xs font-semibold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
               <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-              <span>2. Diseñar e Incorporar Cláusula Adicional</span>
+              <span>2. Diseñar e Incorporar Cláusula Adicional u Oferta Especial</span>
             </Label>
-            <span className="text-[11px] text-slate-500">Agrega múltiples opciones a la cotización</span>
+            <span className="text-[11px] text-slate-500">Cotiza múltiples escenarios o tasas especiales en lote</span>
           </div>
 
           {/* Advertencia regulatoria en pensión de sobrevivencia */}
@@ -447,7 +560,7 @@ export function ModalitiesSelector({
             <div className="p-2.5 rounded-lg bg-purple-50 border border-purple-200 text-xs text-purple-950 flex items-start gap-2">
               <span className="text-sm">⚖️</span>
               <div className="leading-snug">
-                <strong>Normativa Oficial CMF y SP (Compendio de Pensiones):</strong> En pensión de sobrevivencia <strong>NO procede la contratación de cláusulas de Aumento Temporal de Pensión</strong> (reservadas por ley exclusivamente a Vejez e Invalidez). De común acuerdo, los beneficiarios legales pueden optar por <strong>Retiro Programado</strong>, <strong>Renta Vitalicia Simple</strong> o <strong>Renta Vitalicia con Período Garantizado de Pago</strong>.
+                <strong>Normativa Oficial CMF y SP (Compendio de Pensiones):</strong> En pensión de sobrevivencia no procede la contratación de cláusulas de Aumento Temporal. Sí es plenamente legal cotizar <strong>Retiro Programado</strong>, <strong>Renta Vitalicia Simple</strong>, <strong>Período Garantizado</strong> o cotizaciones con <strong>Tasa Especial de Aseguradora</strong>.
               </div>
             </div>
           )}
@@ -455,18 +568,17 @@ export function ModalitiesSelector({
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {/* Selector de Tipo */}
             <div className="space-y-1">
-              <Label className="text-xs text-slate-600">Tipo de Cláusula</Label>
+              <Label className="text-xs text-slate-600 font-medium">Tipo de Modalidad / Cláusula</Label>
               <Select
                 value={tipoClausula}
-                onValueChange={(val: 'garantizada' | 'aumento' | 'combinada') => setTipoClausula(val)}
-                disabled={tipoPension === 'sobrevivencia'}
+                onValueChange={(val: 'garantizada' | 'aumento' | 'combinada' | 'tasa_especial') => setTipoClausula(val)}
               >
                 <SelectTrigger className="h-9 text-xs bg-white">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="garantizada">
-                    {tipoPension === 'sobrevivencia' ? '🛡️ Período Garantizado de Pago (Sobrevivencia)' : '🛡️ Período Garantizado'}
+                    {tipoPension === 'sobrevivencia' ? '🛡️ Período Garantizado (Sobrevivencia)' : '🛡️ Período Garantizado'}
                   </SelectItem>
                   {tipoPension !== 'sobrevivencia' && (
                     <SelectItem value="aumento">📈 Aumento Temporal</SelectItem>
@@ -474,115 +586,249 @@ export function ModalitiesSelector({
                   {tipoPension !== 'sobrevivencia' && (
                     <SelectItem value="combinada">⭐ Garantía + Aumento</SelectItem>
                   )}
+                  <SelectItem value="tasa_especial">
+                    ⚡ Renta Vitalicia con Tasa Especial (Manual)
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
-            {/* Parámetro 1: Garantía (en meses manual) */}
-            {(tipoClausula === 'garantizada' || tipoClausula === 'combinada') && (
-              <div className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <Label className="text-xs text-slate-600 font-medium">Garantía (meses)</Label>
-                  <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-800 border-amber-200 py-0 h-4 font-semibold">
-                    {(mesesGarantizados / 12).toFixed(1).replace('.0', '')} años
-                  </Badge>
+            {/* Configuración cuando se selecciona Tasa Especial Manual */}
+            {tipoClausula === 'tasa_especial' ? (
+              <>
+                {/* Tasa Especial Manual */}
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs text-slate-700 font-semibold flex items-center gap-1">
+                      <Zap className="w-3.5 h-3.5 text-amber-600" />
+                      <span>Tasa Especial (% anual)</span>
+                    </Label>
+                    <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-800 border-amber-300 font-mono">
+                      Ingreso manual
+                    </Badge>
+                  </div>
+                  <div className="relative">
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="1.0"
+                      max="8.0"
+                      value={tasaEspecialManual || ''}
+                      onChange={e => setTasaEspecialManual(parseFloat(e.target.value) || 0)}
+                      placeholder="3.40"
+                      className="h-9 text-xs bg-white pr-8 font-bold text-amber-950 font-mono border-amber-300 focus:border-amber-500"
+                    />
+                    <span className="absolute right-2.5 top-2 text-xs font-bold text-slate-400 pointer-events-none">%</span>
+                  </div>
+                  <div className="flex items-center gap-1 pt-0.5">
+                    {[3.20, 3.35, 3.45, 3.60].map(t => (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => setTasaEspecialManual(t)}
+                        className={`text-[9px] px-1.5 py-0.5 rounded border transition-colors ${
+                          Math.abs(tasaEspecialManual - t) < 0.001
+                            ? 'bg-amber-100 text-amber-900 border-amber-300 font-bold'
+                            : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
+                        }`}
+                      >
+                        {t.toFixed(2)}%
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                <div className="relative">
-                  <Input
-                    type="number"
-                    min={1}
-                    max={360}
-                    step={1}
-                    value={mesesGarantizados || ''}
-                    onChange={e => setMesesGarantizados(Math.max(0, parseInt(e.target.value) || 0))}
-                    placeholder="180"
-                    className="h-9 text-xs bg-white pr-14 font-semibold text-slate-900 font-mono"
-                  />
-                  <span className="absolute right-2.5 top-2.5 text-[10px] text-slate-400 font-semibold pointer-events-none">
-                    meses
-                  </span>
-                </div>
-                <div className="flex items-center gap-1 pt-0.5">
-                  {[120, 180, 240, 300].map(m => (
-                    <button
-                      key={m}
-                      type="button"
-                      onClick={() => setMesesGarantizados(m)}
-                      className={`text-[9px] px-1.5 py-0.5 rounded border transition-colors ${
-                        mesesGarantizados === m
-                          ? 'bg-amber-100 text-amber-900 border-amber-300 font-bold'
-                          : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
-                      }`}
-                    >
-                      {m / 12}a ({m}m)
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
 
-            {/* Parámetro 2: Plazo Aumento (en meses manual) */}
-            {(tipoClausula === 'aumento' || tipoClausula === 'combinada') && (
-              <div className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <Label className="text-xs text-slate-600 font-medium">Plazo Aumento (meses)</Label>
-                  <Badge variant="outline" className="text-[10px] bg-rose-50 text-rose-800 border-rose-200 py-0 h-4 font-semibold">
-                    {(mesesAumento / 12).toFixed(1).replace('.0', '')} años
-                  </Badge>
+                {/* Garantía Opcional */}
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs text-slate-600 font-medium">Garantía Opcional (meses)</Label>
+                    <Badge variant="outline" className="text-[10px] bg-slate-50 text-slate-700 border-slate-200 py-0 h-4">
+                      {mesesGarantizados === 0 ? 'Sin Garantía (Simple)' : `${(mesesGarantizados / 12).toFixed(1).replace('.0', '')} años`}
+                    </Badge>
+                  </div>
+                  <div className="relative">
+                    <Input
+                      type="number"
+                      min={0}
+                      max={360}
+                      step={12}
+                      value={mesesGarantizados}
+                      onChange={e => setMesesGarantizados(Math.max(0, parseInt(e.target.value) || 0))}
+                      className="h-9 text-xs bg-white pr-14 font-semibold text-slate-900 font-mono"
+                    />
+                    <span className="absolute right-2.5 top-2.5 text-[10px] text-slate-400 font-semibold pointer-events-none">
+                      meses
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1 pt-0.5">
+                    {[0, 120, 180, 240].map(m => (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => setMesesGarantizados(m)}
+                        className={`text-[9px] px-1.5 py-0.5 rounded border transition-colors ${
+                          mesesGarantizados === m
+                            ? 'bg-amber-100 text-amber-900 border-amber-300 font-bold'
+                            : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
+                        }`}
+                      >
+                        {m === 0 ? '0m (Simple)' : `${m / 12}a (${m}m)`}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                <div className="relative">
-                  <Input
-                    type="number"
-                    min={1}
-                    max={120}
-                    step={1}
-                    value={mesesAumento || ''}
-                    onChange={e => setMesesAumento(Math.max(0, parseInt(e.target.value) || 0))}
-                    placeholder="36"
-                    className="h-9 text-xs bg-white pr-14 font-semibold text-slate-900 font-mono"
-                  />
-                  <span className="absolute right-2.5 top-2.5 text-[10px] text-slate-400 font-semibold pointer-events-none">
-                    meses
-                  </span>
-                </div>
-                <div className="flex items-center gap-1 pt-0.5">
-                  {[12, 24, 36, 48, 60].map(m => (
-                    <button
-                      key={m}
-                      type="button"
-                      onClick={() => setMesesAumento(m)}
-                      className={`text-[9px] px-1.5 py-0.5 rounded border transition-colors ${
-                        mesesAumento === m
-                          ? 'bg-rose-100 text-rose-900 border-rose-300 font-bold'
-                          : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
-                      }`}
-                    >
-                      {m / 12}a ({m}m)
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
 
-            {/* Parámetro 3: Porcentaje de Aumento (si aplica) */}
-            {(tipoClausula === 'aumento' || tipoClausula === 'combinada') && (
-              <div className="space-y-1">
-                <Label className="text-xs text-slate-600">Monto del Aumento</Label>
-                <Select
-                  value={String(porcentajeAumento)}
-                  onValueChange={val => setPorcentajeAumento(Number(val))}
-                >
-                  <SelectTrigger className="h-9 text-xs bg-white">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="0.30">+30% de pensión</SelectItem>
-                    <SelectItem value="0.50">+50% de pensión</SelectItem>
-                    <SelectItem value="0.75">+75% de pensión</SelectItem>
-                    <SelectItem value="1.00">+100% (Duplica la pensión)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+                {/* Nombre personalizado / Aseguradora */}
+                <div className="sm:col-span-3 space-y-1 pt-1">
+                  <Label className="text-xs text-slate-600">Nombre / Identificador de la Oferta Especial (Opcional)</Label>
+                  <Input
+                    type="text"
+                    value={nombreOfertaEspecial}
+                    onChange={e => setNombreOfertaEspecial(e.target.value)}
+                    placeholder="Ej. Oferta Especial Consorcio, Tasa Negociada Bice, etc."
+                    className="h-9 text-xs bg-white"
+                  />
+                </div>
+              </>
+            ) : (
+              <>
+                {/* Parámetro 1: Garantía (en meses manual) */}
+                {(tipoClausula === 'garantizada' || tipoClausula === 'combinada') && (
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs text-slate-600 font-medium">Garantía (meses)</Label>
+                      <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-800 border-amber-200 py-0 h-4 font-semibold">
+                        {(mesesGarantizados / 12).toFixed(1).replace('.0', '')} años
+                      </Badge>
+                    </div>
+                    <div className="relative">
+                      <Input
+                        type="number"
+                        min={1}
+                        max={360}
+                        step={1}
+                        value={mesesGarantizados || ''}
+                        onChange={e => setMesesGarantizados(Math.max(0, parseInt(e.target.value) || 0))}
+                        placeholder="180"
+                        className="h-9 text-xs bg-white pr-14 font-semibold text-slate-900 font-mono"
+                      />
+                      <span className="absolute right-2.5 top-2.5 text-[10px] text-slate-400 font-semibold pointer-events-none">
+                        meses
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1 pt-0.5">
+                      {[120, 180, 240, 300].map(m => (
+                        <button
+                          key={m}
+                          type="button"
+                          onClick={() => setMesesGarantizados(m)}
+                          className={`text-[9px] px-1.5 py-0.5 rounded border transition-colors ${
+                            mesesGarantizados === m
+                              ? 'bg-amber-100 text-amber-900 border-amber-300 font-bold'
+                              : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
+                          }`}
+                        >
+                          {m / 12}a ({m}m)
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Parámetro 2: Plazo Aumento (en meses manual) */}
+                {(tipoClausula === 'aumento' || tipoClausula === 'combinada') && (
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs text-slate-600 font-medium">Plazo Aumento (meses)</Label>
+                      <Badge variant="outline" className="text-[10px] bg-rose-50 text-rose-800 border-rose-200 py-0 h-4 font-semibold">
+                        {(mesesAumento / 12).toFixed(1).replace('.0', '')} años
+                      </Badge>
+                    </div>
+                    <div className="relative">
+                      <Input
+                        type="number"
+                        min={1}
+                        max={120}
+                        step={1}
+                        value={mesesAumento || ''}
+                        onChange={e => setMesesAumento(Math.max(0, parseInt(e.target.value) || 0))}
+                        placeholder="36"
+                        className="h-9 text-xs bg-white pr-14 font-semibold text-slate-900 font-mono"
+                      />
+                      <span className="absolute right-2.5 top-2.5 text-[10px] text-slate-400 font-semibold pointer-events-none">
+                        meses
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1 pt-0.5">
+                      {[12, 24, 36, 48, 60].map(m => (
+                        <button
+                          key={m}
+                          type="button"
+                          onClick={() => setMesesAumento(m)}
+                          className={`text-[9px] px-1.5 py-0.5 rounded border transition-colors ${
+                            mesesAumento === m
+                              ? 'bg-rose-100 text-rose-900 border-rose-300 font-bold'
+                              : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
+                          }`}
+                        >
+                          {m / 12}a ({m}m)
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Parámetro 3: Porcentaje de Aumento (si aplica) */}
+                {(tipoClausula === 'aumento' || tipoClausula === 'combinada') && (
+                  <div className="space-y-1">
+                    <Label className="text-xs text-slate-600">Monto del Aumento</Label>
+                    <Select
+                      value={String(porcentajeAumento)}
+                      onValueChange={val => setPorcentajeAumento(Number(val))}
+                    >
+                      <SelectTrigger className="h-9 text-xs bg-white">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="0.30">+30% de pensión</SelectItem>
+                        <SelectItem value="0.50">+50% de pensión</SelectItem>
+                        <SelectItem value="0.75">+75% de pensión</SelectItem>
+                        <SelectItem value="1.00">+100% (Duplica la pensión)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                {/* Checkbox opcional para aplicar Tasa Especial Manual a esta combinación */}
+                <div className="sm:col-span-3 pt-2 border-t border-slate-200/60 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                  <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-700 font-medium">
+                    <input
+                      type="checkbox"
+                      checked={aplicarTasaEspecialEnClausula}
+                      onChange={e => setAplicarTasaEspecialEnClausula(e.target.checked)}
+                      className="rounded border-slate-300 text-amber-600 focus:ring-amber-500 w-4 h-4"
+                    />
+                    <span>⚡ Aplicar Tasa Especial Manual a esta modalidad específica</span>
+                  </label>
+                  {aplicarTasaEspecialEnClausula && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-slate-500 font-medium">Tasa manual:</span>
+                      <div className="relative w-28">
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="1.0"
+                          max="8.0"
+                          value={tasaEspecialManual || ''}
+                          onChange={e => setTasaEspecialManual(parseFloat(e.target.value) || 0)}
+                          className="h-7 text-xs font-bold text-amber-950 font-mono pr-6 border-amber-300 bg-amber-50/50"
+                        />
+                        <span className="absolute right-2 top-1 text-xs text-slate-400 font-bold">%</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </>
             )}
           </div>
 
@@ -624,7 +870,14 @@ export function ModalitiesSelector({
                       <Circle className="w-4 h-4 text-slate-400 flex-shrink-0" />
                     )}
                     <div className="truncate">
-                      <p className="text-xs font-semibold text-slate-900 truncate">{mod.nombre}</p>
+                      <div className="flex items-center gap-1.5 truncate">
+                        <p className="text-xs font-semibold text-slate-900 truncate">{mod.nombre}</p>
+                        {mod.esTasaEspecial && (
+                          <Badge variant="outline" className="text-[9px] px-1 py-0 bg-amber-50 text-amber-800 border-amber-300 font-mono flex items-center gap-0.5 shrink-0">
+                            ⚡ {mod.tasaEspecialRV?.toFixed(2)}%
+                          </Badge>
+                        )}
+                      </div>
                       <p className="text-[10px] text-slate-500 truncate">{mod.descripcion}</p>
                     </div>
                   </div>

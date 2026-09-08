@@ -236,6 +236,11 @@ export function MultiQuotationResults({
                       📈 +{Math.round((item.config.porcentajeAumento || 1) * 100)}% ({Math.round(item.config.mesesAumento / 12)}a)
                     </Badge>
                   ) : null}
+                  {item.config.esTasaEspecial ? (
+                    <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-800 border-amber-300 font-mono py-0">
+                      ⚡ Tasa Esp: {(item.resultado.tasaInteres * 100).toFixed(2)}%
+                    </Badge>
+                  ) : null}
                 </div>
                 <CardTitle className="text-sm font-semibold text-slate-900 leading-snug">
                   {item.config.nombre}
@@ -310,8 +315,8 @@ export function MultiQuotationResults({
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div className="space-y-0.5">
                     <span className="text-[10px] text-slate-400 block">Tasa Actuarial</span>
-                    <span className="font-semibold text-slate-900 font-mono">
-                      {(item.resultado.tasaInteres * 100).toFixed(2)}% anual
+                    <span className={`font-semibold font-mono ${item.config.esTasaEspecial ? 'text-amber-700' : 'text-slate-900'}`}>
+                      {(item.resultado.tasaInteres * 100).toFixed(2)}% anual {item.config.esTasaEspecial ? '(⚡ Especial)' : ''}
                     </span>
                   </div>
                   <div className="space-y-0.5">
@@ -383,7 +388,13 @@ export function MultiQuotationResults({
                       {isRP ? 'AFP (Fondo C)' : 'Compañía de Seguros'}
                     </td>
                     <td className="py-2.5 px-3 text-center font-mono font-semibold text-slate-800">
-                      {(item.resultado.tasaInteres * 100).toFixed(2)}%
+                      {item.config.esTasaEspecial ? (
+                        <span className="inline-flex items-center gap-1 text-amber-800 font-bold bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                          ⚡ {(item.resultado.tasaInteres * 100).toFixed(2)}%
+                        </span>
+                      ) : (
+                        `${(item.resultado.tasaInteres * 100).toFixed(2)}%`
+                      )}
                     </td>
                     <td className="py-2.5 px-3 text-right font-mono font-medium text-blue-900">
                       {formatUF(item.resultado.pensionEnUF)}
