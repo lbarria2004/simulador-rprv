@@ -16,6 +16,7 @@ import {
   calcularRVConAmbasClausulas,
   calcularPGU,
   calcularBAC,
+  calcularCompensacionExpectativaVidaMujer,
   getQx,
   calcularExpectativaVida,
   calcularPorcentajesBeneficiarios,
@@ -155,6 +156,22 @@ describe('Motor Actuarial de Pensiones - Sistema Chileno', () => {
       assert.equal(bac10Anos.beneficioUF, 1.0);
       // Con 35 años sobrepasa el tope de 2.5 UF
       assert.equal(bac35Anos.beneficioUF, BAC.TOPE_MENSUAL_UF);
+    });
+
+    it('Compensación por Expectativa de Vida aplica a mujeres y garantiza 0,25 UF/mes', () => {
+      const bonoMujer = calcularCompensacionExpectativaVidaMujer('F', 65, 40_000, 'vejez');
+      assert.equal(bonoMujer.aplica, true);
+      assert.equal(bonoMujer.beneficioUF, 0.25);
+      assert.equal(bonoMujer.beneficioMensualPesos, 10_000);
+
+      // No aplica a hombres
+      const bonoHombre = calcularCompensacionExpectativaVidaMujer('M', 65, 40_000, 'vejez');
+      assert.equal(bonoHombre.aplica, false);
+      assert.equal(bonoHombre.beneficioMensualPesos, 0);
+
+      // No aplica en sobrevivencia al causante
+      const bonoSobrevivencia = calcularCompensacionExpectativaVidaMujer('F', 65, 40_000, 'sobrevivencia');
+      assert.equal(bonoSobrevivencia.aplica, false);
     });
   });
 

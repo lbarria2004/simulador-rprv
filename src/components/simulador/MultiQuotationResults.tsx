@@ -28,6 +28,7 @@ interface MultiQuotationResultsProps {
   sobrevivenciaInfo?: SobrevivenciaFinanciamientoInfo;
   tasaRP?: number;
   tasaRV?: number;
+  sexo?: 'M' | 'F';
 }
 
 function formatCLP(val: number): string {
@@ -49,7 +50,8 @@ export function MultiQuotationResults({
   invalidezInfo,
   sobrevivenciaInfo,
   tasaRP = 3.58,
-  tasaRV = 3.08
+  tasaRV = 3.08,
+  sexo = 'M'
 }: MultiQuotationResultsProps) {
   if (items.length === 0) {
     return (
@@ -248,21 +250,80 @@ export function MultiQuotationResults({
               </CardHeader>
 
               <CardContent className="px-4 pb-4 space-y-3">
-                {/* Monto Total Pensión */}
-                <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100">
-                  <span className="text-[10px] text-slate-500 font-medium uppercase tracking-wider block">
-                    {tipoPension === 'sobrevivencia' ? 'Pensión Familiar Total' : 'Pensión Total Mensual'}
-                  </span>
-                  <div className="flex items-baseline gap-1.5 mt-0.5">
-                    <span className="text-xl font-black text-slate-900">
-                      {formatCLP(item.totalConBeneficiosCLP)}
+                {/* Desglose Estructurado de Pensión: 1. Base destacada (superior) -> 2. PGU -> 3. Total (más grande) */}
+                <div className="p-3 rounded-xl bg-slate-50/90 border border-slate-200/90 shadow-2xs space-y-2.5">
+                  {/* 1. Renglón Superior: Pensión de Base (En negrita y destacada, en pesos y en UF) */}
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                      {tipoPension === 'sobrevivencia' ? 'Pensión de Base Causante' : 'Pensión de Base'}
                     </span>
-                    <span className="text-xs font-semibold text-blue-700 font-mono">
-                      ({formatUF(item.totalConBeneficiosUF)})
-                    </span>
+                    <div className="flex items-baseline gap-1.5 mt-0.5">
+                      <span className="text-xl font-black text-slate-900 tracking-tight">
+                        {formatCLP(item.resultado.pensionMensual)}
+                      </span>
+                      <span className="text-xs font-bold text-blue-700 font-mono">
+                        ({formatUF(item.resultado.pensionEnUF)})
+                      </span>
+                    </div>
                   </div>
+
+                  {/* 2. Segundo Renglón: PGU */}
+                  <div className="pt-2 border-t border-slate-200/70 flex items-center justify-between text-xs">
+                    <span className="text-[11px] font-semibold text-slate-600 flex items-center gap-1.5">
+                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                      PGU:
+                    </span>
+                    {item.pguMensual > 0 ? (
+                      <div className="flex items-baseline gap-1">
+                        <span className="font-extrabold text-emerald-700 font-mono text-xs">
+                          +{formatCLP(item.pguMensual)}
+                        </span>
+                        <span className="text-[10px] text-emerald-600 font-mono font-medium">
+                          ({formatUF(item.pguMensual / valorUF)})
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-[11px] text-slate-400 font-medium">No aplica / $0</span>
+                    )}
+                  </div>
+
+                  {/* 3. Tercer Renglón: Pensión Total un poco más grande (Base + PGU + BAC + Bono Mujer si aplica) */}
+                  <div className="pt-2.5 border-t border-slate-200/90 space-y-1">
+                    <span className="text-[10.5px] font-black text-indigo-950 uppercase tracking-wide block">
+                      {tipoPension === 'sobrevivencia' ? 'Pensión Total Familiar' : 'Pensión Total Mensual'}
+                    </span>
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-2xl font-black text-indigo-950 tracking-tight">
+                        {formatCLP(item.totalConBeneficiosCLP)}
+                      </span>
+                      <span className="text-xs font-black text-blue-800 font-mono">
+                        ({formatUF(item.totalConBeneficiosUF)})
+                      </span>
+                    </div>
+
+                    {/* Desglose de componentes de la pensión total */}
+                    <div className="text-[10px] text-slate-600 font-medium leading-relaxed pt-1 border-t border-slate-200/60 flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+                      <span className="text-slate-800 font-bold">Base: {formatCLP(item.resultado.pensionMensual)}</span>
+                      {item.pguMensual > 0 && (
+                        <span className="text-emerald-700 font-semibold">
+                          + PGU ({formatCLP(item.pguMensual)})
+                        </span>
+                      )}
+                      {item.bacMensual > 0 && (
+                        <span className="text-indigo-700 font-semibold" title="Bono por Años Cotizados">
+                          + BAC ({formatCLP(item.bacMensual)})
+                        </span>
+                      )}
+                      {item.bonoMujerMensual && item.bonoMujerMensual > 0 ? (
+                        <span className="text-rose-700 font-bold bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200" title="Compensación por Expectativa de Vida (Mujer)">
+                          + Bono Expectativa de Vida ({formatCLP(item.bonoMujerMensual)} / {item.bonoMujerUF?.toFixed(2)} UF)
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+
                   {item.config.tipo === 'rv_aumento_temporal' && item.resultado.proyeccion && item.resultado.proyeccion.length > 0 && (
-                    <div className="text-[10px] text-rose-700 font-medium mt-1">
+                    <div className="text-[10px] text-rose-700 font-medium pt-1.5 border-t border-slate-200/60">
                       Fase inicial aumentada por {Math.round((item.config.mesesAumento || 36) / 12)} años.
                       {item.resultado.proyeccion.find(p => p.fase === 'vitalicia') && (
                         <span className="text-slate-600 ml-1">
@@ -271,13 +332,7 @@ export function MultiQuotationResults({
                       )}
                     </div>
                   )}
-                  {(item.pguMensual > 0 || item.bacMensual > 0) && (
-                    <div className="text-[10px] text-slate-500 mt-1 flex flex-wrap gap-1">
-                      <span>Base: {formatCLP(item.resultado.pensionMensual)}</span>
-                      {item.pguMensual > 0 && <span className="text-emerald-700 font-medium">+ PGU ({formatCLP(item.pguMensual)})</span>}
-                      {item.bacMensual > 0 && <span className="text-indigo-700 font-medium">+ BAC ({formatCLP(item.bacMensual)})</span>}
-                    </div>
-                  )}
+                </div>
 
                   {/* Distribución por Beneficiario en Sobrevivencia */}
                   {tipoPension === 'sobrevivencia' && item.resultado.pensionPorBeneficiario && item.resultado.pensionPorBeneficiario.length > 0 && (

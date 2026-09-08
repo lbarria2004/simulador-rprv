@@ -2087,8 +2087,57 @@ export function calcularBAC(
   };
 }
 
+// ==========================================
+// COMPENSACIÓN POR EXPECTATIVA DE VIDA PARA MUJERES (CEV)
+// Ley de Reforma Previsional / Seguro Social Previsional
+// ==========================================
+
+export interface ResultadoCompensacionMujer {
+  aplica: boolean;
+  beneficioUF: number;
+  beneficioMensualPesos: number;
+  explicacion: string;
+}
+
 /**
- * Calcula los beneficios adicionales completos (PGU + BAC)
+ * Calcula la Compensación por Diferencias de Expectativa de Vida (CEV) para Mujeres
+ * Beneficio previsional legal que compensa la menor pensión derivada de las tablas
+ * de mortalidad diferenciadas por sexo (mayor expectativa de vida en mujeres).
+ * 
+ * - Monto mínimo legal garantizado: 0,25 UF mensuales.
+ * - Aplica a pensionadas mujeres de Vejez o Invalidez (sin cobertura SIS).
+ * - En Sobrevivencia no aplica al causante fallecido.
+ */
+export function calcularCompensacionExpectativaVidaMujer(
+  sexo: Sexo,
+  edad: number,
+  valorUF: number = UF_ACTUAL,
+  tipoPension: 'vejez' | 'invalidez' | 'sobrevivencia' = 'vejez',
+  cubiertoSIS: boolean = false
+): ResultadoCompensacionMujer {
+  if (sexo !== 'F' || tipoPension === 'sobrevivencia' || (tipoPension === 'invalidez' && cubiertoSIS)) {
+    return {
+      aplica: false,
+      beneficioUF: 0,
+      beneficioMensualPesos: 0,
+      explicacion: 'No aplica (beneficio exclusivo para mujeres pensionadas de vejez o invalidez no cubierta por SIS)'
+    };
+  }
+
+  // Base mínima legal garantizada por el Seguro Social Previsional: 0,25 UF mensuales
+  const beneficioUF = 0.25;
+  const beneficioMensualPesos = Math.round(beneficioUF * valorUF);
+
+  return {
+    aplica: true,
+    beneficioUF,
+    beneficioMensualPesos,
+    explicacion: `Compensación por Expectativa de Vida (Mujer) = ${beneficioUF.toFixed(2)} UF = $${beneficioMensualPesos.toLocaleString('es-CL')}/mes`
+  };
+}
+
+/**
+ * Calcula los beneficios adicionales completos (PGU + BAC + Compensación Mujer)
  */
 export function calcularBeneficiosAdicionales(
   pensionMensual: number, 
@@ -2096,10 +2145,14 @@ export function calcularBeneficiosAdicionales(
   sexo: Sexo, 
   anosCotizados: number,
   mesesAdicionales: number = 0,
-  anosResidenciaChile: number = 20
+  anosResidenciaChile: number = 20,
+  valorUF: number = UF_ACTUAL,
+  tipoPension: 'vejez' | 'invalidez' | 'sobrevivencia' = 'vejez',
+  cubiertoSIS: boolean = false
 ): {
   pgu?: ResultadoPGU;
   bac?: ResultadoBAC;
+  bonoMujer?: ResultadoCompensacionMujer;
   totalBeneficios: number;
   pensionTotal: number;
   detalles: string[];
@@ -2115,7 +2168,7 @@ export function calcularBeneficiosAdicionales(
   }
   
   // Calcular BAC
-  const bac = calcularBAC(anosCotizados, mesesAdicionales);
+  const bac = calcularBAC(anosCotizados, mesesAdicionales, valorUF);
   if (bac.aplica) {
     totalBeneficios += bac.beneficioMensualPesos;
     detalles.push(`BAC: ${bac.beneficioUF.toFixed(2)} UF ($${bac.beneficioMensualPesos.toLocaleString('es-CL')}/mes)`);
@@ -2123,12 +2176,20 @@ export function calcularBeneficiosAdicionales(
       detalles.push(`BAC: Tope máximo de 2,5 UF aplicado`);
     }
   }
+
+  // Calcular Compensación Expectativa de Vida Mujer
+  const bonoMujer = calcularCompensacionExpectativaVidaMujer(sexo, edad, valorUF, tipoPension, cubiertoSIS);
+  if (bonoMujer.aplica) {
+    totalBeneficios += bonoMujer.beneficioMensualPesos;
+    detalles.push(`Bono Expectativa Vida (Mujer): ${bonoMujer.beneficioUF.toFixed(2)} UF ($${bonoMujer.beneficioMensualPesos.toLocaleString('es-CL')}/mes)`);
+  }
   
   const pensionTotal = pensionMensual + totalBeneficios;
   
   return {
     pgu: pgu.aplica ? pgu : undefined,
     bac: bac.aplica ? bac : undefined,
+    bonoMujer: bonoMujer.aplica ? bonoMujer : undefined,
     totalBeneficios,
     pensionTotal,
     detalles

@@ -225,6 +225,19 @@ export function AffiliateSidebar({
             />
           </div>
 
+          {/* Beneficio de Compensación por Expectativa de Vida para Mujeres */}
+          {afiliado.sexo === 'F' && afiliado.tipoPension !== 'sobrevivencia' && (
+            <div className="p-2.5 rounded-lg bg-rose-50 border border-rose-200/80 space-y-1">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-rose-950">
+                <span>🌸</span>
+                <span>Bono por Expectativa de Vida (Mujer)</span>
+              </div>
+              <p className="text-[11px] text-rose-800 leading-tight">
+                Se incorpora automáticamente la compensación legal de <strong>+0,25 UF/mes</strong> (~${Math.round(0.25 * valorUF).toLocaleString('es-CL')}) para mitigar la brecha de género por mayor sobrevida en tablas de mortalidad.
+              </p>
+            </div>
+          )}
+
           {/* Saldo de Fondos en UF y Pesos */}
           <div className="p-3 bg-slate-50 rounded-lg border border-slate-200/80 space-y-2.5">
             <div className="flex items-center justify-between">

@@ -76,6 +76,7 @@ export interface CláusulasState {
   afpSeleccionada: AFP;
   incluirPGU: boolean;
   incluirBAC: boolean;
+  incluirBonoMujer?: boolean;
 }
 
 export type ModalidadCotizacionTipo = 
@@ -104,6 +105,8 @@ export interface CotizacionItemResultado {
   resultado: ResultadoEscenario;
   pguMensual: number;
   bacMensual: number;
+  bonoMujerMensual?: number;
+  bonoMujerUF?: number;
   totalConBeneficiosCLP: number;
   totalConBeneficiosUF: number;
 }

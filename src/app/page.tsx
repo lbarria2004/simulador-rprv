@@ -26,6 +26,7 @@ import {
   calcularRVConAmbasClausulas,
   calcularPGU,
   calcularBAC,
+  calcularCompensacionExpectativaVidaMujer,
   calcularFinanciamientoInvalidez,
   calcularFinanciamientoSobrevivencia,
   calcularCNUSobrevivencia,
@@ -169,7 +170,8 @@ export default function SimuladorPage() {
     porcentajeAumento: 1.0,  // +100%
     afpSeleccionada: 'PLANVITAL',
     incluirPGU: true,
-    incluirBAC: true
+    incluirBAC: true,
+    incluirBonoMujer: true
   });
 
   // Consultar UF oficial al montar el componente
@@ -507,8 +509,15 @@ export default function SimuladorPage() {
       : null;
     const bacMensual = (bacObj && bacObj.aplica) ? (bacObj.beneficioMensualPesos || 0) : 0;
 
+    // Compensación por Diferencias de Expectativa de Vida para Mujeres (Seguro Social Previsional)
+    const bonoMujerObj = ((clausulas.incluirBonoMujer ?? true) && afiliado.sexo === 'F' && tipoPension !== 'sobrevivencia')
+      ? calcularCompensacionExpectativaVidaMujer(afiliado.sexo, edad, valorUF, tipoPension, afiliado.cubiertoSIS)
+      : null;
+    const bonoMujerMensual = (bonoMujerObj && bonoMujerObj.aplica) ? bonoMujerObj.beneficioMensualPesos : 0;
+    const bonoMujerUF = (bonoMujerObj && bonoMujerObj.aplica) ? bonoMujerObj.beneficioUF : 0;
+
     const baseCLP = Number(resultado.pensionMensual) || 0;
-    const totalCLP = baseCLP + pguMensual + bacMensual;
+    const totalCLP = baseCLP + pguMensual + bacMensual + bonoMujerMensual;
     const totalUF = valorUF > 0 ? totalCLP / valorUF : 0;
 
     return {
@@ -516,10 +525,12 @@ export default function SimuladorPage() {
       resultado,
       pguMensual,
       bacMensual,
+      bonoMujerMensual,
+      bonoMujerUF,
       totalConBeneficiosCLP: Math.round(totalCLP),
       totalConBeneficiosUF: Number(totalUF.toFixed(2))
     };
-  }, [afiliado.anosCotizados, clausulas.incluirPGU, clausulas.incluirBAC, valorUF]);
+  }, [afiliado.anosCotizados, afiliado.sexo, afiliado.cubiertoSIS, clausulas.incluirPGU, clausulas.incluirBAC, clausulas.incluirBonoMujer, valorUF]);
 
   // Desglose actuarial de financiamiento para Pensión de Invalidez (D.L. 3.500)
   const financiamientoInvalidez = useMemo<InvalidezFinanciamientoInfo | undefined>(() => {
@@ -1045,6 +1056,7 @@ export default function SimuladorPage() {
               sobrevivenciaInfo={financiamientoSobrevivencia}
               tasaRP={tasaRP}
               tasaRV={tasaRV}
+              sexo={afiliado.sexo}
             />
 
             {/* 3. Pestañas de Análisis Detallado (Curva a 25 años, Ranking Aseguradoras, Sliders y Matriz) */}

@@ -843,13 +843,17 @@ export async function POST(request: NextRequest) {
     }
 
     // ===== RESUMEN TOTAL (si alguno aplica) =====
-    if (incluirPGU || incluirBAC) {
-      if (pguAplica || bacPesos > 0) {
+    const esMujer = body.afiliado?.sexo === 'F';
+    const bonoMujerUF = esMujer ? 0.25 : 0;
+    const bonoMujerPesos = esMujer ? Math.round(0.25 * uf) : 0;
+
+    if (incluirPGU || incluirBAC || esMujer) {
+      if (pguAplica || bacPesos > 0 || esMujer) {
         if (y < 100) {
           nuevaPagina();
         }
 
-        const totalBeneficios = pguMonto + bacPesos;
+        const totalBeneficios = pguMonto + bacPesos + bonoMujerPesos;
         const pensionTotalConBeneficios = mejorPension + totalBeneficios;
 
         y -= 10;
@@ -868,8 +872,8 @@ export async function POST(request: NextRequest) {
           size: 9, font: fontBold, color: { r: 0.1, g: 0.35, b: 0.15 } 
         });
         y -= 12;
-        drawText(page, `Pension Base: $${formatNumber(mejorPension)}  |  PGU: $${formatNumber(pguMonto)}  |  BAC: $${formatNumber(bacPesos)}`, 60, y, { 
-          size: 8, font: fontRegular 
+        drawText(page, `Pension Base: $${formatNumber(mejorPension)}  |  PGU: $${formatNumber(pguMonto)}  |  BAC: $${formatNumber(bacPesos)}${esMujer ? `  |  Bono Mujer: $${formatNumber(bonoMujerPesos)}` : ''}`, 60, y, { 
+          size: 7.5, font: fontRegular 
         });
         y -= 12;
         drawText(page, `TOTAL MENSUAL CON BENEFICIOS: $${formatNumber(pensionTotalConBeneficios)}`, 60, y, { 
