@@ -332,7 +332,6 @@ export function MultiQuotationResults({
                       )}
                     </div>
                   )}
-                </div>
 
                   {/* Distribución por Beneficiario en Sobrevivencia */}
                   {tipoPension === 'sobrevivencia' && item.resultado.pensionPorBeneficiario && item.resultado.pensionPorBeneficiario.length > 0 && (
