@@ -784,12 +784,25 @@ export default function SimuladorPage() {
             incluirBAC: clausulas.incluirBAC,
             afpSeleccionada: clausulas.afpSeleccionada
           },
-          resultados: cotizacionResultados.map(r => r.resultado),
+          resultados: cotizacionResultados.map(r => ({
+            ...r.resultado,
+            nombre: r.config.nombre || r.resultado.nombre || (r.config.tipo === 'retiro_programado' ? 'Retiro Programado' : 'Renta Vitalicia Inmediata Simple'),
+            periodoGarantizado: r.config.mesesGarantizados || r.resultado.periodoGarantizado,
+            aumentoTemporal: r.resultado.aumentoTemporal || (r.config.mesesAumento ? {
+              meses: r.config.mesesAumento,
+              porcentaje: r.config.porcentajeAumento || 1,
+              pensionAumentada: r.resultado.pensionMensual,
+              pensionFinal: r.resultado.proyeccion?.find(p => p.fase === 'vitalicia')?.pensionMensual || r.resultado.pensionMensual
+            } : undefined)
+          })),
           beneficiarios: beneficiariosReporte
         })
       });
 
-      if (!res.ok) throw new Error('Error al generar PDF');
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => null);
+        throw new Error(errJson?.error || 'Error al generar PDF');
+      }
 
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);

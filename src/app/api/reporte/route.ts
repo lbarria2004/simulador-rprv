@@ -261,11 +261,11 @@ export async function POST(request: NextRequest) {
     // ========== PENSIÓN DE VEJEZ ==========
     if (tipoPension === 'vejez') {
       // Clasificar resultados por tipo usando propiedades del objeto
-      const retiroProgramado = resultados.find(r => r.nombre.includes('Retiro Programado'));
+      const retiroProgramado = resultados.find(r => (r.nombre || '').includes('Retiro Programado'));
       
       // RV Inmediata: sin período garantizado ni aumento temporal
       const rvInmediata = resultados.find(r => 
-        (r.nombre.includes('Inmediata') || r.nombre.includes('RV') || r.nombre.includes('Renta Vitalicia')) && 
+        ((r.nombre || '').includes('Inmediata') || (r.nombre || '').includes('RV') || (r.nombre || '').includes('Renta Vitalicia')) && 
         !r.periodoGarantizado && !r.aumentoTemporal
       );
       
@@ -489,11 +489,16 @@ export async function POST(request: NextRequest) {
 
     // ========== PENSIÓN DE INVALIDEZ ==========
     if (tipoPension === 'invalidez') {
-      const retiroProgramado = resultados.find(r => r.nombre.includes('Retiro Programado'));
-      const rvInmediata = resultados.find(r => r.nombre.includes('RV Inmediata') && r.nombre.includes('Invalidez'));
-      const rvGarantizados = resultados.filter(r => r.nombre.includes('RV Invalidez Garantia'));
-      const rvAumentos = resultados.filter(r => r.nombre.includes('RV Invalidez +') && r.nombre.includes('x'));
-      const pensionInvalidez = resultados.find(r => r.nombre.includes('Pension Invalidez'));
+      const retiroProgramado = resultados.find(r => (r.nombre || '').includes('Retiro Programado') || (r.nombre || '').includes('RP'));
+      const rvInmediata = resultados.find(r => 
+        ((r.nombre || '').includes('Inmediata') || (r.nombre || '').includes('RV') || (r.nombre || '').includes('Renta Vitalicia')) &&
+        !r.periodoGarantizado && !r.aumentoTemporal
+      );
+      const rvGarantizados = resultados.filter(r => 
+        r.periodoGarantizado && r.periodoGarantizado > 0 && !r.aumentoTemporal
+      );
+      const rvAumentos = resultados.filter(r => r.aumentoTemporal);
+      const pensionInvalidez = resultados.find(r => (r.nombre || '').includes('Pension Invalidez'));
 
       // Información del grado de invalidez
       if (afiliado.gradoInvalidez || pensionInvalidez?.gradoInvalidez) {
@@ -605,7 +610,7 @@ export async function POST(request: NextRequest) {
         const pensionLiquida = pensionBruto - descuentoSalud;
 
         const pensionBase = rv.aumentoTemporal?.pensionFinal || pensionBruto;
-        const pensionBaseUF = (pensionBase / 38500).toFixed(2);
+        const pensionBaseUF = (pensionBase / (parametros?.uf || 40000)).toFixed(2);
         const descBase = Math.round(pensionBase * 0.07);
         const pensionBaseLiq = pensionBase - descBase;
 
@@ -684,7 +689,8 @@ export async function POST(request: NextRequest) {
         const descuentoSalud = Math.round(pensionBruto * 0.07);
         const pensionLiquida = pensionBruto - descuentoSalud;
 
-        drawText(page, `${contador}. ${resultado.nombre}`, 50, y, { 
+        const nombreModalidad = resultado.nombre || 'Modalidad';
+        drawText(page, `${contador}. ${nombreModalidad}`, 50, y, { 
           size: 11, 
           font: fontBold, 
           color: { r: 0.122, g: 0.306, b: 0.475 } 
@@ -693,7 +699,7 @@ export async function POST(request: NextRequest) {
 
         const sobData = [
           ['Modalidad', 'Pension (UF)', 'Pension M. Bruto', 'Dscto. 7% Salud', 'Pension Liquida'],
-          [resultado.nombre.substring(0, 25), `${pensionUF} UF`, `$${formatNumber(pensionBruto)}`, `-$${formatNumber(descuentoSalud)}`, `$${formatNumber(pensionLiquida)}`]
+          [nombreModalidad.substring(0, 25), `${pensionUF} UF`, `$${formatNumber(pensionBruto)}`, `-$${formatNumber(descuentoSalud)}`, `$${formatNumber(pensionLiquida)}`]
         ];
         const colWidths = [130, 70, 100, 90, 90];
         y = drawTable(page, sobData, 50, y, colWidths, { regular: fontRegular, bold: fontBold });
@@ -721,14 +727,14 @@ export async function POST(request: NextRequest) {
     }
 
     // ========== BENEFICIOS ADICIONALES (PGU y BAC) ==========
-    // Obtener parámetros de beneficios adicionales del body
-    const incluirPGU = body.incluirPGU || false;
-    const incluirBAC = body.incluirBAC || false;
-    const mesesAdicionalesBAC = body.mesesAdicionalesBAC || 0;
+    // Obtener parámetros de beneficios adicionales del body o parametros
+    const incluirPGU = parametros?.incluirPGU ?? body.incluirPGU ?? false;
+    const incluirBAC = parametros?.incluirBAC ?? body.incluirBAC ?? false;
+    const mesesAdicionalesBAC = parametros?.mesesAdicionalesBAC ?? body.mesesAdicionalesBAC ?? 0;
 
     // Obtener la pensión más alta para cálculos
-    const mejorPension = resultados.length > 0 
-      ? Math.max(...resultados.map(r => r.pensionMensual)) 
+    const mejorPension = resultados && resultados.length > 0 
+      ? Math.max(...resultados.map(r => r.pensionMensual || 0)) 
       : 0;
 
     // Variables para almacenar montos calculados
@@ -843,9 +849,9 @@ export async function POST(request: NextRequest) {
     }
 
     // ===== RESUMEN TOTAL (si alguno aplica) =====
-    const esMujer = body.afiliado?.sexo === 'F';
+    const esMujer = (afiliado?.sexo || body.afiliado?.sexo) === 'F';
     const bonoMujerUF = esMujer ? 0.25 : 0;
-    const bonoMujerPesos = esMujer ? Math.round(0.25 * uf) : 0;
+    const bonoMujerPesos = esMujer ? Math.round(0.25 * (parametros?.uf || 40000)) : 0;
 
     if (incluirPGU || incluirBAC || esMujer) {
       if (pguAplica || bacPesos > 0 || esMujer) {
