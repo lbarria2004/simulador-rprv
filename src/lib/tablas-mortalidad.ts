@@ -50,41 +50,44 @@ export const TABLA_MI_M_2020: Record<number, number> = TABLA_MI_M_2026;
 // ==========================================
 
 export const TASAS_INTERES_TECNICAS = {
-  RETIRO_PROGRAMADO: 0.0381,
-  RENTA_VITALICIA_VEJEZ: 0.0305,
-  RENTA_VITALICIA_INVALIDEZ: 0.0295,
+  RETIRO_PROGRAMADO: 0.0367,
+  RENTA_VITALICIA_VEJEZ: 0.0282,
+  RENTA_VITALICIA_INVALIDEZ: 0.0293,
   FACTOR_AJUSTE_FEMENINO: 0.0015,
 } as const;
 
 export const TASAS_RENTA_VITALICIA = {
-  fecha_actualizacion: '2026-03-01',
+  fecha_actualizacion: '2026-09-01',
   media_mercado: {
-    vejez: 0.0305,
-    vejez_anticipada: 0.0298,
-    invalidez_total: 0.0295,
-    invalidez_parcial: 0.0260,
-    sobrevivencia: 0.0290,
-    media: 0.0305
+    vejez: 0.0282,
+    vejez_anticipada: 0.0284,
+    invalidez_total: 0.0293,
+    invalidez_parcial: 0.0256,
+    sobrevivencia: 0.0287,
+    media: 0.0284
   },
   companias: {
-    '4LIFE': { vejez: 0.0308, vejez_anticipada: 0.0303, invalidez_total: 0.0303, invalidez_parcial: 0, sobrevivencia: 0.0301, media: 0.0308 },
-    'AUGUSTAR': { vejez: 0.0299, vejez_anticipada: 0.0296, invalidez_total: 0, invalidez_parcial: 0, sobrevivencia: 0.0309, media: 0.0299 },
-    'BICE': { vejez: 0.0315, vejez_anticipada: 0.0290, invalidez_total: 0.0285, invalidez_parcial: 0.0265, sobrevivencia: 0.0280, media: 0.0305 },
-    'CN_LIFE': { vejez: 0.0287, vejez_anticipada: 0.0287, invalidez_total: 0.0304, invalidez_parcial: 0, sobrevivencia: 0.0309, media: 0.0296 },
-    'CONFUTURO': { vejez: 0.0305, vejez_anticipada: 0.0295, invalidez_total: 0.0298, invalidez_parcial: 0.0246, sobrevivencia: 0.0293, media: 0.0301 },
-    'CONSORCIO_NACIONAL': { vejez: 0.0308, vejez_anticipada: 0.0290, invalidez_total: 0.0309, invalidez_parcial: 0.0250, sobrevivencia: 0.0295, media: 0.0300 },
-    'EUROAMERICA': { vejez: 0.0292, vejez_anticipada: 0.0300, invalidez_total: 0.0296, invalidez_parcial: 0.0282, sobrevivencia: 0.0282, media: 0.0293 },
-    'METLIFE': { vejez: 0.0310, vejez_anticipada: 0.0285, invalidez_total: 0.0296, invalidez_parcial: 0.0205, sobrevivencia: 0.0290, media: 0.0300 },
-    'PENTA': { vejez: 0.0298, vejez_anticipada: 0.0291, invalidez_total: 0.0296, invalidez_parcial: 0.0282, sobrevivencia: 0.0290, media: 0.0295 },
-    'RENTA_NACIONAL': { vejez: 0.0292, vejez_anticipada: 0.0301, invalidez_total: 0.0287, invalidez_parcial: 0.0281, sobrevivencia: 0.0284, media: 0.0290 }
+    '4LIFE': { vejez: 0.0293, vejez_anticipada: 0.0270, invalidez_total: 0.0288, invalidez_parcial: 0.0245, sobrevivencia: 0.0283, media: 0.0293 },
+    'AUGUSTAR': { vejez: 0.0294, vejez_anticipada: 0.0294, invalidez_total: 0.0000, invalidez_parcial: 0.0000, sobrevivencia: 0.0292, media: 0.0294 },
+    'BICE': { vejez: 0.0262, vejez_anticipada: 0.0270, invalidez_total: 0.0274, invalidez_parcial: 0.0268, sobrevivencia: 0.0265, media: 0.0265 },
+    'CN_LIFE': { vejez: 0.0286, vejez_anticipada: 0.0000, invalidez_total: 0.0311, invalidez_parcial: 0.0000, sobrevivencia: 0.0292, media: 0.0299 },
+    'CONFUTURO': { vejez: 0.0294, vejez_anticipada: 0.0292, invalidez_total: 0.0300, invalidez_parcial: 0.0272, sobrevivencia: 0.0286, media: 0.0294 },
+    'CONSORCIO_NACIONAL': { vejez: 0.0279, vejez_anticipada: 0.0287, invalidez_total: 0.0298, invalidez_parcial: 0.0246, sobrevivencia: 0.0288, media: 0.0283 },
+    'EUROAMERICA': { vejez: 0.0299, vejez_anticipada: 0.0299, invalidez_total: 0.0302, invalidez_parcial: 0.0000, sobrevivencia: 0.0295, media: 0.0299 },
+    'METLIFE': { vejez: 0.0273, vejez_anticipada: 0.0280, invalidez_total: 0.0295, invalidez_parcial: 0.0202, sobrevivencia: 0.0292, media: 0.0280 },
+    'PENTA': { vejez: 0.0291, vejez_anticipada: 0.0285, invalidez_total: 0.0291, invalidez_parcial: 0.0255, sobrevivencia: 0.0285, media: 0.0290 },
+    'RENTA_NACIONAL': { vejez: 0.0293, vejez_anticipada: 0.0286, invalidez_total: 0.0296, invalidez_parcial: 0.0261, sobrevivencia: 0.0287, media: 0.0290 }
   },
-  bice_vida: 0.0315,
-  metlife: 0.0310,
-  consorcio: 0.0308,
-  confuturo: 0.0305,
-  security: 0.0300,
-  principal: 0.0298,
-  penta: 0.0298,
+  euroamerica: 0.0299,
+  confuturo: 0.0294,
+  augustar: 0.0294,
+  four_life: 0.0293,
+  renta_nacional: 0.0293,
+  penta: 0.0291,
+  cn_life: 0.0286,
+  consorcio: 0.0279,
+  metlife: 0.0273,
+  bice_vida: 0.0262,
   spot_rate_10y: 0.0285,
   spot_rate_20y: 0.0303
 } as const;

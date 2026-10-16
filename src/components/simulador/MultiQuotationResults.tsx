@@ -49,8 +49,8 @@ export function MultiQuotationResults({
   tipoPension = 'vejez',
   invalidezInfo,
   sobrevivenciaInfo,
-  tasaRP = 3.58,
-  tasaRV = 3.08,
+  tasaRP = 3.67,
+  tasaRV = 2.99,
   sexo = 'M'
 }: MultiQuotationResultsProps) {
   if (items.length === 0) {

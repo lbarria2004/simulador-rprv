@@ -26,9 +26,9 @@ export function ScenarioSliders({
   anosCotizados,
   setAnosCotizados,
   bacUF,
-  tasaRP = 3.58,
+  tasaRP = 3.67,
   setTasaRP,
-  tasaRV = 3.08,
+  tasaRV = 2.99,
   setTasaRV
 }: ScenarioSlidersProps) {
   const anosGarantia = Math.floor(clausulas.mesesGarantizados / 12);
@@ -203,7 +203,7 @@ export function ScenarioSliders({
             <div className="flex justify-between text-[10px] text-slate-400 font-medium">
               <span>1.5%</span>
               <span>2.5%</span>
-              <span className="text-blue-700 font-bold">3.58% (SP)</span>
+              <span className="text-blue-700 font-bold">3.67% (SP)</span>
               <span>4.5%</span>
               <span>6.0%</span>
             </div>
@@ -239,7 +239,7 @@ export function ScenarioSliders({
             <div className="flex justify-between text-[10px] text-slate-400 font-medium">
               <span>1.5%</span>
               <span>2.5%</span>
-              <span className="text-indigo-700 font-bold">3.08% (CMF)</span>
+              <span className="text-indigo-700 font-bold">2.99% (CMF)</span>
               <span>4.0%</span>
               <span>5.0%</span>
             </div>

@@ -145,10 +145,10 @@ export const EDAD_JUBILACION = {
 } as const;
 
 export const TASAS_INTERES = {
-  RETIRO_PROGRAMADO: 0.0341,
-  RENTA_VITALICIA_VEJEZ: 0.0279,
-  RENTA_VITALICIA_INVALIDEZ: 0.0296,
-  SOBREVIVENCIA: 0.0279
+  RETIRO_PROGRAMADO: 0.0367,
+  RENTA_VITALICIA_VEJEZ: 0.0282,
+  RENTA_VITALICIA_INVALIDEZ: 0.0293,
+  SOBREVIVENCIA: 0.0287
 } as const;
 
 export const UF_ACTUAL = 38500;
@@ -2226,7 +2226,7 @@ export function calcularCapitalNecesarioInvalidez(
   pensionReferenciaCLP: number,
   edad: number,
   sexo: Sexo,
-  tasaInteres: number = 0.0358,
+  tasaInteres: number = 0.0367,
   beneficiarios: BeneficiarioPension[] = []
 ): number {
   if (pensionReferenciaCLP <= 0) return 0;
@@ -2274,7 +2274,7 @@ export function calcularFinanciamientoInvalidez(
   cubiertoSIS: boolean = true,
   edad: number = 55,
   sexo: Sexo = 'M',
-  tasaInteres: number = 0.0358,
+  tasaInteres: number = 0.0367,
   beneficiarios: BeneficiarioPension[] = [],
   valorUF: number = 40876.41
 ): DesgloseFinanciamientoInvalidez {
@@ -2342,7 +2342,7 @@ export function calcularPensionReferenciaCausante(ingresoBaseCausanteCLP: number
 export function calcularCapitalNecesarioSobrevivencia(
   pensionReferenciaCausanteCLP: number,
   beneficiarios: BeneficiarioPension[],
-  tasaInteres: number = 0.0358
+  tasaInteres: number = 0.0367
 ): number {
   if (pensionReferenciaCausanteCLP <= 0 || beneficiarios.length === 0) return 0;
   const { cnuTotal } = calcularCNUSobrevivencia(beneficiarios, tasaInteres, 'retiro_programado');
@@ -2400,7 +2400,7 @@ export function calcularFinanciamientoSobrevivencia(
   ingresoBaseCausanteCLP: number,
   cubiertoSIS: boolean = true,
   beneficiarios: BeneficiarioPension[] = [],
-  tasaInteres: number = 0.0358,
+  tasaInteres: number = 0.0367,
   valorUF: number = 40876.41
 ): DesgloseFinanciamientoSobrevivencia {
   const pensionReferenciaCausanteCLP = calcularPensionReferenciaCausante(ingresoBaseCausanteCLP);

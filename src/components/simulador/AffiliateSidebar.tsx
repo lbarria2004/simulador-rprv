@@ -37,8 +37,8 @@ export function AffiliateSidebar({
   onApplyPreset,
   invalidezInfo,
   sobrevivenciaInfo,
-  tasaRP = 3.58,
-  tasaRV = 3.08
+  tasaRP = 3.67,
+  tasaRV = 2.99
 }: AffiliateSidebarProps) {
   // Manejar cambio de fondos en Pesos y sincronizar UF
   const handlePesosChange = (valStr: string) => {
@@ -559,11 +559,11 @@ export function AffiliateSidebar({
             <div className="grid grid-cols-2 gap-2 text-xs">
               <div className="p-1.5 bg-white rounded border border-blue-100 flex items-center justify-between">
                 <span className="text-blue-900 font-medium text-[11px]">RP (AFP):</span>
-                <span className="font-mono font-bold text-blue-700">{(tasaRP ?? 3.58).toFixed(2)}%</span>
+                <span className="font-mono font-bold text-blue-700">{(tasaRP ?? 3.67).toFixed(2)}%</span>
               </div>
               <div className="p-1.5 bg-white rounded border border-indigo-100 flex items-center justify-between">
                 <span className="text-indigo-900 font-medium text-[11px]">RV (CMF):</span>
-                <span className="font-mono font-bold text-indigo-700">{(tasaRV ?? 3.08).toFixed(2)}%</span>
+                <span className="font-mono font-bold text-indigo-700">{(tasaRV ?? 2.99).toFixed(2)}%</span>
               </div>
             </div>
           </div>

@@ -139,27 +139,28 @@ export default function SimuladorPage() {
   // Resultados de la cotización generada
   const [cotizacionResultados, setCotizacionResultados] = useState<CotizacionItemResultado[]>([]);
 
-  // Tasas de Interés de Cálculo Actuarial (en porcentaje %, ej. 3.58 para 3.58%)
-  const [tasaRP, setTasaRP] = useState<number>(3.58);
-  const [tasaRV, setTasaRV] = useState<number>(3.08);
+  // Tasas de Interés de Cálculo Actuarial (en porcentaje %, ej. 3.67 para 3.67%)
+  const [tasaRP, setTasaRP] = useState<number>(3.67);
+  const [tasaRV, setTasaRV] = useState<number>(2.99);
 
   // Función para obtener la tasa oficial recomendada según régimen previsional
   const getTasaRVOficial = useCallback((tipo: 'vejez' | 'invalidez' | 'sobrevivencia', grado?: 'total' | 'parcial') => {
-    const comp4Life = TASAS_RENTA_VITALICIA?.companias?.['4LIFE'];
     if (tipo === 'invalidez') {
-      const val = (grado === 'parcial' ? comp4Life?.invalidez_parcial : comp4Life?.invalidez_total) || 0.0303;
+      const val = grado === 'parcial'
+        ? (TASAS_RENTA_VITALICIA?.companias?.['CONFUTURO']?.invalidez_parcial || 0.0272)
+        : (TASAS_RENTA_VITALICIA?.companias?.['EUROAMERICA']?.invalidez_total || 0.0302);
       return Number((val * 100).toFixed(2));
     }
     if (tipo === 'sobrevivencia') {
-      const val = comp4Life?.sobrevivencia || 0.0301;
+      const val = TASAS_RENTA_VITALICIA?.companias?.['EUROAMERICA']?.sobrevivencia || 0.0295;
       return Number((val * 100).toFixed(2));
     }
-    const val = comp4Life?.vejez || 0.0308;
+    const val = TASAS_RENTA_VITALICIA?.companias?.['EUROAMERICA']?.vejez || 0.0299;
     return Number((val * 100).toFixed(2));
   }, []);
 
   const handleRestablecerTasas = useCallback(() => {
-    setTasaRP(3.58);
+    setTasaRP(3.67);
     setTasaRV(getTasaRVOficial(afiliado.tipoPension, afiliado.gradoInvalidez));
   }, [afiliado.tipoPension, afiliado.gradoInvalidez, getTasaRVOficial]);
 
@@ -556,7 +557,7 @@ export default function SimuladorPage() {
       cubiertoSIS,
       afiliado.edad,
       afiliado.sexo,
-      (tasaRP || 3.58) / 100,
+      (tasaRP || 3.67) / 100,
       beneficiarios,
       valorUF
     );
@@ -597,7 +598,7 @@ export default function SimuladorPage() {
       ingresoBase,
       cubiertoSIS,
       beneficiarios,
-      (tasaRP || 3.58) / 100,
+      (tasaRP || 3.67) / 100,
       valorUF
     );
   }, [
@@ -639,8 +640,8 @@ export default function SimuladorPage() {
       const fondosRP = afiliado.conAsesor ? fondosEfectivos * (1 - 0.012) : fondosEfectivos;
       const fondosRV = afiliado.conAsesor ? fondosEfectivos * (1 - 0.015) : fondosEfectivos;
       
-      const tasaRPAct = (tasaRP || 3.58) / 100;
-      const tasaRVAct = (tasaRV || 3.08) / 100;
+      const tasaRPAct = (tasaRP || 3.67) / 100;
+      const tasaRVAct = (tasaRV || 2.99) / 100;
 
       const activas = modalidades
         .filter(m => m.activa)
@@ -778,8 +779,8 @@ export default function SimuladorPage() {
           },
           parametros: {
             uf: valorUF,
-            tasaRP: (tasaRP || 3.58) / 100,
-            tasaRV: (tasaRV || 3.08) / 100,
+            tasaRP: (tasaRP || 3.67) / 100,
+            tasaRV: (tasaRV || 2.99) / 100,
             incluirPGU: clausulas.incluirPGU,
             incluirBAC: clausulas.incluirBAC,
             afpSeleccionada: clausulas.afpSeleccionada

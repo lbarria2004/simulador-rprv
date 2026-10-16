@@ -49,9 +49,9 @@ export function ModalitiesSelector({
   onGenerarCotizacion,
   isCotizando = false,
   tipoPension = 'vejez',
-  tasaRP = 3.58,
+  tasaRP = 3.67,
   setTasaRP,
-  tasaRV = 3.08,
+  tasaRV = 2.99,
   setTasaRV,
   onRestablecerTasas
 }: ModalitiesSelectorProps) {
@@ -235,7 +235,7 @@ export function ModalitiesSelector({
                   <span className="text-xs font-bold text-slate-800">Tasa Retiro Programado (TRP)</span>
                 </div>
                 <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-800 border-blue-200 font-mono">
-                  SP Oficial: 3.58%
+                  SP Oficial: 3.67%
                 </Badge>
               </div>
 
@@ -246,7 +246,7 @@ export function ModalitiesSelector({
                     step="0.01"
                     min="1.0"
                     max="8.0"
-                    value={tasaRP ?? 3.58}
+                    value={tasaRP ?? 3.67}
                     onChange={e => setTasaRP && setTasaRP(parseFloat(e.target.value) || 0)}
                     className="h-8 text-xs font-bold font-mono pl-3 pr-8 bg-slate-50 border-slate-300 focus:bg-white"
                   />
@@ -258,7 +258,7 @@ export function ModalitiesSelector({
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() => setTasaRP && setTasaRP(Number(Math.max(1, (tasaRP ?? 3.58) - 0.1).toFixed(2)))}
+                    onClick={() => setTasaRP && setTasaRP(Number(Math.max(1, (tasaRP ?? 3.67) - 0.1).toFixed(2)))}
                     className="h-8 w-8 p-0 text-xs text-slate-700 border-slate-300 hover:bg-slate-100"
                     title="Disminuir 0.10%"
                   >
@@ -268,7 +268,7 @@ export function ModalitiesSelector({
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() => setTasaRP && setTasaRP(Number(Math.min(10, (tasaRP ?? 3.58) + 0.1).toFixed(2)))}
+                    onClick={() => setTasaRP && setTasaRP(Number(Math.min(10, (tasaRP ?? 3.67) + 0.1).toFixed(2)))}
                     className="h-8 w-8 p-0 text-xs text-slate-700 border-slate-300 hover:bg-slate-100"
                     title="Aumentar 0.10%"
                   >
@@ -281,9 +281,9 @@ export function ModalitiesSelector({
               <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
                 <span className="text-[10px] text-slate-400 font-medium">Escenarios:</span>
                 {[
-                  { label: '3.20%', val: 3.20 },
-                  { label: '3.41%', val: 3.41 },
-                  { label: '3.58% (Oficial)', val: 3.58 },
+                  { label: '3.40%', val: 3.40 },
+                  { label: '3.50%', val: 3.50 },
+                  { label: '3.67% (Oficial)', val: 3.67 },
                   { label: '3.80%', val: 3.80 },
                   { label: '4.00%', val: 4.00 }
                 ].map(sc => (
@@ -292,7 +292,7 @@ export function ModalitiesSelector({
                     type="button"
                     onClick={() => setTasaRP && setTasaRP(sc.val)}
                     className={`text-[10px] px-2 py-0.5 rounded border transition-colors ${
-                      Math.abs((tasaRP ?? 3.58) - sc.val) < 0.001
+                      Math.abs((tasaRP ?? 3.67) - sc.val) < 0.001
                         ? 'bg-blue-600 text-white border-blue-600 font-bold'
                         : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
                     }`}
@@ -322,7 +322,7 @@ export function ModalitiesSelector({
                   </Badge>
                 ) : (
                   <Badge variant="outline" className="text-[10px] bg-indigo-50 text-indigo-800 border-indigo-200 font-mono">
-                    {tipoPension === 'invalidez' ? 'CMF Invalidez: 3.03%' : tipoPension === 'sobrevivencia' ? 'CMF Sobrevivencia: 3.01%' : 'CMF Líder: 3.08%'}
+                    {tipoPension === 'invalidez' ? 'CMF Invalidez: 3.02%' : tipoPension === 'sobrevivencia' ? 'CMF Sobrevivencia: 2.95%' : 'CMF Líder: 2.99%'}
                   </Badge>
                 )}
               </div>
@@ -364,7 +364,7 @@ export function ModalitiesSelector({
                     step="0.01"
                     min="1.0"
                     max="7.0"
-                    value={tasaRV ?? 3.08}
+                    value={tasaRV ?? 2.99}
                     onChange={e => {
                       const val = parseFloat(e.target.value) || 0;
                       if (setTasaRV) setTasaRV(val);
@@ -385,7 +385,7 @@ export function ModalitiesSelector({
                     variant="outline"
                     size="sm"
                     onClick={() => {
-                      if (setTasaRV) setTasaRV(Number(Math.max(1, (tasaRV ?? 3.08) - 0.1).toFixed(2)));
+                      if (setTasaRV) setTasaRV(Number(Math.max(1, (tasaRV ?? 2.99) - 0.1).toFixed(2)));
                       setModoTasaEspecialGlobal(true);
                     }}
                     className="h-8 w-8 p-0 text-xs text-slate-700 border-slate-300 hover:bg-slate-100"
@@ -398,7 +398,7 @@ export function ModalitiesSelector({
                     variant="outline"
                     size="sm"
                     onClick={() => {
-                      if (setTasaRV) setTasaRV(Number(Math.min(10, (tasaRV ?? 3.08) + 0.1).toFixed(2)));
+                      if (setTasaRV) setTasaRV(Number(Math.min(10, (tasaRV ?? 2.99) + 0.1).toFixed(2)));
                       setModoTasaEspecialGlobal(true);
                     }}
                     className="h-8 w-8 p-0 text-xs text-slate-700 border-slate-300 hover:bg-slate-100"
@@ -421,11 +421,11 @@ export function ModalitiesSelector({
                   { label: '3.60%', val: 3.60 },
                   { label: '3.75%', val: 3.75 }
                 ] : [
-                  { label: '2.85%', val: 2.85 },
-                  { label: '3.01%', val: 3.01 },
-                  { label: '3.08% (Líder)', val: 3.08 },
-                  { label: '3.25%', val: 3.25 },
-                  { label: '3.50%', val: 3.50 }
+                  { label: '2.82% (Media)', val: 2.82 },
+                  { label: '2.87%', val: 2.87 },
+                  { label: '2.93%', val: 2.93 },
+                  { label: '2.99% (Líder)', val: 2.99 },
+                  { label: '3.11%', val: 3.11 }
                 ]).map(sc => (
                   <button
                     key={sc.val}
@@ -434,7 +434,7 @@ export function ModalitiesSelector({
                       if (setTasaRV) setTasaRV(sc.val);
                     }}
                     className={`text-[10px] px-2 py-0.5 rounded border transition-colors ${
-                      Math.abs((tasaRV ?? 3.08) - sc.val) < 0.001
+                      Math.abs((tasaRV ?? 2.99) - sc.val) < 0.001
                         ? modoTasaEspecialGlobal
                           ? 'bg-amber-600 text-white border-amber-600 font-bold'
                           : 'bg-indigo-600 text-white border-indigo-600 font-bold'
@@ -482,7 +482,7 @@ export function ModalitiesSelector({
                   </p>
                   <div className="pt-1">
                     <Badge variant="outline" className="text-[10px] bg-blue-100/70 text-blue-800 border-blue-300 font-mono">
-                      Tasa aplicada: {(tasaRP ?? 3.58).toFixed(2)}% anual
+                      Tasa aplicada: {(tasaRP ?? 3.67).toFixed(2)}% anual
                     </Badge>
                   </div>
                 </div>
@@ -528,8 +528,8 @@ export function ModalitiesSelector({
                         : 'bg-indigo-100/70 text-indigo-800 border-indigo-300'
                     }`}>
                       {modoTasaEspecialGlobal 
-                        ? `⚡ Tasa Especial: ${(tasaRV ?? 3.08).toFixed(2)}% anual` 
-                        : `Tasa aplicada: ${(tasaRV ?? 3.08).toFixed(2)}% anual`}
+                        ? `⚡ Tasa Especial: ${(tasaRV ?? 2.99).toFixed(2)}% anual` 
+                        : `Tasa aplicada: ${(tasaRV ?? 2.99).toFixed(2)}% anual`}
                     </Badge>
                   </div>
                 </div>
