@@ -2562,6 +2562,12 @@ export function calcularRVAumentoTemporalSobrevivencia(
     cnu: divisor,
     tasaInteres,
     expectativaVida: calcularExpectativaVida(porcentajes[0]?.edad || 60, porcentajes[0]?.sexo || 'F'),
+    aumentoTemporal: {
+      meses: mesesAumento,
+      porcentaje: porcentajeAumento,
+      pensionAumentada: Math.round(pensionAumentadaMensual),
+      pensionFinal: Math.round(pensionBaseMensual)
+    },
     pensionPorBeneficiario: pensionPorBen,
     proyeccion,
     advertencias: [

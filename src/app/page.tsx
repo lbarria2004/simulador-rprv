@@ -783,6 +783,7 @@ export default function SimuladorPage() {
             tasaRV: (tasaRV || 2.99) / 100,
             incluirPGU: clausulas.incluirPGU,
             incluirBAC: clausulas.incluirBAC,
+            incluirBonoMujer: clausulas.incluirBonoMujer ?? true,
             afpSeleccionada: clausulas.afpSeleccionada
           },
           resultados: cotizacionResultados.map(r => ({
@@ -793,7 +794,9 @@ export default function SimuladorPage() {
               meses: r.config.mesesAumento,
               porcentaje: r.config.porcentajeAumento || 1,
               pensionAumentada: r.resultado.pensionMensual,
-              pensionFinal: r.resultado.proyeccion?.find(p => p.fase === 'vitalicia')?.pensionMensual || r.resultado.pensionMensual
+              pensionFinal: r.resultado.aumentoTemporal?.pensionFinal 
+                || r.resultado.proyeccion?.find(p => p.fase === 'normal' || p.fase === 'vitalicia')?.pensionMensual 
+                || r.resultado.pensionMensual
             } : undefined)
           })),
           beneficiarios: beneficiariosReporte

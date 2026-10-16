@@ -258,6 +258,42 @@ export async function POST(request: NextRequest) {
     const comisionAFPPct = (comisionAFP * 100).toFixed(2).replace('.', ',');
     const afpLabel = AFP_LABELS[afpSeleccionada] || 'AFP Habitat (0,95%)';
 
+    // Cálculo dinámico de beneficios del Estado (PGU, BAC, Bono Mujer)
+    const mejorPension = resultados && resultados.length > 0 
+      ? Math.max(...resultados.map(r => r.pensionMensual || 0)) 
+      : 0;
+
+    const incluirPGU = parametros?.incluirPGU ?? (body as any)?.incluirPGU ?? false;
+    let pguMonto = 0;
+    let pguAplica = false;
+    let pguExplicacion = '';
+    if (incluirPGU && tipoPension !== 'sobrevivencia') {
+      const pguResultado = calcularPGU(mejorPension, afiliado.edad);
+      if (pguResultado.aplica) {
+        pguAplica = true;
+        pguMonto = pguResultado.montoMensual;
+        pguExplicacion = pguResultado.explicacion;
+      } else {
+        pguExplicacion = pguResultado.explicacion;
+      }
+    }
+
+    const incluirBAC = parametros?.incluirBAC ?? (body as any)?.incluirBAC ?? false;
+    const mesesAdicionalesBAC = parametros?.mesesAdicionalesBAC ?? (body as any)?.mesesAdicionalesBAC ?? 0;
+    let bacUF = 0;
+    let bacPesos = 0;
+    const anosTotalesBAC = (afiliado.anosCotizados || 0) + (mesesAdicionalesBAC / 12);
+    if (incluirBAC && tipoPension !== 'sobrevivencia') {
+      bacUF = Math.min(anosTotalesBAC * BAC_UF_POR_ANO, BAC_TOPE_UF);
+      bacPesos = Math.round(bacUF * parametros.uf);
+    }
+
+    const esMujer = (afiliado?.sexo || (body as any)?.afiliado?.sexo) === 'F';
+    const incluirBonoMujer = (parametros as any)?.incluirBonoMujer ?? true;
+    const bonoMujerUF = (esMujer && incluirBonoMujer && tipoPension !== 'sobrevivencia') ? 0.25 : 0;
+    const bonoMujerPesos = Math.round(bonoMujerUF * (parametros?.uf || 40000));
+    const totalBeneficiosEstado = pguMonto + bacPesos + bonoMujerPesos;
+
     // ========== PENSIÓN DE VEJEZ ==========
     if (tipoPension === 'vejez') {
       // Clasificar resultados por tipo usando propiedades del objeto
@@ -323,14 +359,15 @@ export async function POST(request: NextRequest) {
         const pensionUF = rvInmediata.pensionEnUF.toFixed(2);
         const descuentoSalud = Math.round(pensionBruto * 0.07);
         const pensionLiquida = pensionBruto - descuentoSalud;
-        const pguMonto = 231732;
         const pensionConPGU = pensionLiquida + pguMonto;
 
         const rviData = [
           ['Modalidad', 'Tasa (%)', 'Pension (UF)', 'Pension M. Bruto', 'Dscto. 7% Salud', 'Pension Liquida'],
-          ['RVI SIMPLE (Media Mercado)', `${tasaRVPct}%`, `${pensionUF} UF`, `$${formatNumber(pensionBruto)}`, `-$${formatNumber(descuentoSalud)}`, `$${formatNumber(pensionLiquida)}`],
-          ['Pension + PGU ($231.732)', '', '', '', '', `$${formatNumber(pensionConPGU)}`]
+          ['RVI SIMPLE (Media Mercado)', `${tasaRVPct}%`, `${pensionUF} UF`, `$${formatNumber(pensionBruto)}`, `-$${formatNumber(descuentoSalud)}`, `$${formatNumber(pensionLiquida)}`]
         ];
+        if (pguMonto > 0) {
+          rviData.push([`Pension + PGU ($${formatNumber(pguMonto)})`, '', '', '', '', `$${formatNumber(pensionConPGU)}`]);
+        }
         const colWidths = [120, 55, 70, 85, 75, 85];
         y = drawTable(page, rviData, 50, y, colWidths, { regular: fontRegular, bold: fontBold });
         y -= 10;
@@ -359,15 +396,16 @@ export async function POST(request: NextRequest) {
         const pensionUF = rv.pensionEnUF.toFixed(2);
         const descuentoSalud = Math.round(pensionBruto * 0.07);
         const pensionLiquida = pensionBruto - descuentoSalud;
-        const pguMonto = 231732;
         const pensionConPGU = pensionLiquida + pguMonto;
         const tasa = (rv.tasaInteres * 100).toFixed(2);
 
         const rvgData = [
           ['Modalidad', 'Tasa (%)', 'Pension (UF)', 'Pension M. Bruto', 'Dscto. 7% Salud', 'Pension Liquida'],
-          [`RV GARANTIA ${meses} MESES`, `${tasa}%`, `${pensionUF} UF`, `$${formatNumber(pensionBruto)}`, `-$${formatNumber(descuentoSalud)}`, `$${formatNumber(pensionLiquida)}`],
-          ['Pension + PGU ($231.732)', '', '', '', '', `$${formatNumber(pensionConPGU)}`]
+          [`RV GARANTIA ${meses} MESES`, `${tasa}%`, `${pensionUF} UF`, `$${formatNumber(pensionBruto)}`, `-$${formatNumber(descuentoSalud)}`, `$${formatNumber(pensionLiquida)}`]
         ];
+        if (pguMonto > 0) {
+          rvgData.push([`Pension + PGU ($${formatNumber(pguMonto)})`, '', '', '', '', `$${formatNumber(pensionConPGU)}`]);
+        }
         const colWidths = [120, 55, 70, 85, 75, 85];
         y = drawTable(page, rvgData, 50, y, colWidths, { regular: fontRegular, bold: fontBold });
         y -= 10;
@@ -436,14 +474,14 @@ export async function POST(request: NextRequest) {
           const pensionAumentadaUF = rv.pensionEnUF.toFixed(2);
           const descSaludAum = Math.round(pensionAumentada * 0.07);
           const pensionAumentadaLiq = pensionAumentada - descSaludAum;
-          const pensionAumConPGU = pensionAumentadaLiq + 231732;
+          const pensionAumConPGU = pensionAumentadaLiq + pguMonto;
 
           // Cálculos para DESPUÉS del período de aumento
           const pensionBase = rv.aumentoTemporal?.pensionFinal || pensionAumentada;
           const pensionBaseUF = (pensionBase / parametros.uf).toFixed(2);
           const descSaludBase = Math.round(pensionBase * 0.07);
           const pensionBaseLiq = pensionBase - descSaludBase;
-          const pensionBaseConPGU = pensionBaseLiq + 231732;
+          const pensionBaseConPGU = pensionBaseLiq + pguMonto;
 
           // Calcular UF proyectada si está activado
           let ufFutura = parametros.uf;
@@ -459,16 +497,17 @@ export async function POST(request: NextRequest) {
             pensionBaseProyectadaUF = pensionBaseUF; // UF se mantiene igual
             const descSaludProyectada = Math.round(pensionBaseProyectada * 0.07);
             pensionBaseLiqProyectada = pensionBaseProyectada - descSaludProyectada;
-            pensionBaseConPGUProyectada = pensionBaseLiqProyectada + 231732;
+            pensionBaseConPGUProyectada = pensionBaseLiqProyectada + pguMonto;
           }
 
-          // Tabla con dos períodos
+          // Tabla con dos períodos reflejando UF y Pesos para ambas fases
+          const colHeaderPGU = pguMonto > 0 ? `+ PGU ($${formatNumber(pguMonto)})` : 'Total Liquido';
           const tablaRV = [
-            ['Periodo', 'Pension (UF)', 'Bruto', '-7% Salud', 'Liquido', '+ PGU'],
-            [`Primeros ${mesesAumento} meses`, `${pensionAumentadaUF} UF`, `$${formatNumber(pensionAumentada)}`, `-$${formatNumber(descSaludAum)}`, `$${formatNumber(pensionAumentadaLiq)}`, `$${formatNumber(pensionAumConPGU)}`],
-            [`Desde el mes ${mesesAumento + 1}`, `${pensionBaseUF} UF`, `$${formatNumber(pensionBaseProyectada)}`, `-$${formatNumber(Math.round(pensionBaseProyectada * 0.07))}`, `$${formatNumber(pensionBaseLiqProyectada)}`, `$${formatNumber(pensionBaseConPGUProyectada)}`]
+            ['Fase / Periodo', 'Pension (UF)', 'Pension Base ($)', '-7% Salud', 'Liquido ($)', colHeaderPGU],
+            [`Fase Aumentada (1 a ${mesesAumento}m)`, `${pensionAumentadaUF} UF`, `$${formatNumber(pensionAumentada)}`, `-$${formatNumber(descSaludAum)}`, `$${formatNumber(pensionAumentadaLiq)}`, `$${formatNumber(pensionAumConPGU)}`],
+            [`Fase Definitiva (Mes ${mesesAumento + 1}+)`, `${pensionBaseUF} UF`, `$${formatNumber(pensionBaseProyectada)}`, `-$${formatNumber(Math.round(pensionBaseProyectada * 0.07))}`, `$${formatNumber(pensionBaseLiqProyectada)}`, `$${formatNumber(pensionBaseConPGUProyectada)}`]
           ];
-          const colWidthsRV = [110, 70, 75, 70, 75, 80];
+          const colWidthsRV = [115, 68, 75, 67, 75, 80];
           y = drawTable(page, tablaRV, 50, y, colWidthsRV, { regular: fontRegular, bold: fontBold });
           
           // Nota de UF proyectada si está activado
@@ -615,11 +654,11 @@ export async function POST(request: NextRequest) {
         const pensionBaseLiq = pensionBase - descBase;
 
         const rvaData = [
-          ['Modalidad', 'Pension (UF)', 'Pension M. Bruto', 'Dscto. 7% Salud', 'Pension Liquida'],
-          [`RV AUMENTADA ${meses} MESES`, `${pensionUF} UF`, `$${formatNumber(pensionBruto)}`, `-$${formatNumber(descuentoSalud)}`, `$${formatNumber(pensionLiquida)}`],
-          [`PENSION BASE (desde mes ${meses + 1})`, `${pensionBaseUF} UF`, `$${formatNumber(pensionBase)}`, `-$${formatNumber(descBase)}`, `$${formatNumber(pensionBaseLiq)}`]
+          ['Fase / Periodo', 'Pension (UF)', 'Pension Base ($)', 'Dscto. 7% Salud', 'Pension Liquida'],
+          [`Fase Aumentada (1 a ${meses}m)`, `${pensionUF} UF`, `$${formatNumber(pensionBruto)}`, `-$${formatNumber(descuentoSalud)}`, `$${formatNumber(pensionLiquida)}`],
+          [`Fase Definitiva (Desde mes ${meses + 1})`, `${pensionBaseUF} UF`, `$${formatNumber(pensionBase)}`, `-$${formatNumber(descBase)}`, `$${formatNumber(pensionBaseLiq)}`]
         ];
-        const colWidths = [140, 70, 100, 90, 100];
+        const colWidths = [140, 70, 95, 85, 90];
         y = drawTable(page, rvaData, 50, y, colWidths, { regular: fontRegular, bold: fontBold });
       }
 
@@ -697,11 +736,29 @@ export async function POST(request: NextRequest) {
         });
         y -= 20;
 
-        const sobData = [
-          ['Modalidad', 'Pension (UF)', 'Pension M. Bruto', 'Dscto. 7% Salud', 'Pension Liquida'],
-          [nombreModalidad.substring(0, 25), `${pensionUF} UF`, `$${formatNumber(pensionBruto)}`, `-$${formatNumber(descuentoSalud)}`, `$${formatNumber(pensionLiquida)}`]
-        ];
-        const colWidths = [130, 70, 100, 90, 90];
+        let sobData: string[][];
+        let colWidths: number[];
+
+        if (resultado.aumentoTemporal && resultado.aumentoTemporal.meses > 0) {
+          const meses = resultado.aumentoTemporal.meses;
+          const pensionBase = resultado.aumentoTemporal.pensionFinal;
+          const pensionBaseUF = (pensionBase / (parametros?.uf || 40000)).toFixed(2);
+          const descBase = Math.round(pensionBase * 0.07);
+          const pensionBaseLiq = pensionBase - descBase;
+
+          sobData = [
+            ['Fase / Periodo', 'Pension (UF)', 'Pension Base ($)', 'Dscto. 7% Salud', 'Pension Liquida'],
+            [`Fase Aumentada (1 a ${meses}m)`, `${pensionUF} UF`, `$${formatNumber(pensionBruto)}`, `-$${formatNumber(descuentoSalud)}`, `$${formatNumber(pensionLiquida)}`],
+            [`Fase Definitiva (Mes ${meses + 1}+)`, `${pensionBaseUF} UF`, `$${formatNumber(pensionBase)}`, `-$${formatNumber(descBase)}`, `$${formatNumber(pensionBaseLiq)}`]
+          ];
+          colWidths = [140, 70, 95, 85, 90];
+        } else {
+          sobData = [
+            ['Modalidad', 'Pension (UF)', 'Pension M. Bruto', 'Dscto. 7% Salud', 'Pension Liquida'],
+            [nombreModalidad.substring(0, 25), `${pensionUF} UF`, `$${formatNumber(pensionBruto)}`, `-$${formatNumber(descuentoSalud)}`, `$${formatNumber(pensionLiquida)}`]
+          ];
+          colWidths = [130, 70, 100, 90, 90];
+        }
         y = drawTable(page, sobData, 50, y, colWidths, { regular: fontRegular, bold: fontBold });
 
         // Pensión por beneficiario
@@ -727,24 +784,8 @@ export async function POST(request: NextRequest) {
     }
 
     // ========== BENEFICIOS ADICIONALES (PGU y BAC) ==========
-    // Obtener parámetros de beneficios adicionales del body o parametros
-    const incluirPGU = parametros?.incluirPGU ?? body.incluirPGU ?? false;
-    const incluirBAC = parametros?.incluirBAC ?? body.incluirBAC ?? false;
-    const mesesAdicionalesBAC = parametros?.mesesAdicionalesBAC ?? body.mesesAdicionalesBAC ?? 0;
-
-    // Obtener la pensión más alta para cálculos
-    const mejorPension = resultados && resultados.length > 0 
-      ? Math.max(...resultados.map(r => r.pensionMensual || 0)) 
-      : 0;
-
-    // Variables para almacenar montos calculados
-    let pguMonto = 0;
-    let pguAplica = false;
-    let bacUF = 0;
-    let bacPesos = 0;
-
     // ===== PGU - Pensión Garantizada Universal =====
-    if (incluirPGU) {
+    if (incluirPGU && tipoPension !== 'sobrevivencia') {
       if (y < 150) {
         nuevaPagina();
       }
@@ -764,13 +805,8 @@ export async function POST(request: NextRequest) {
       drawText(page, `Tope Máximo: $${formatNumber(PGU.TOPE_INGRESO)}/mes (100% PGU bajo $${formatNumber(PGU.UMBRAL_INFERIOR)})`, 50, y, { size: 9, font: fontRegular });
       y -= 15;
 
-      // Calcular PGU
-      const pguResultado = calcularPGU(mejorPension, afiliado.edad);
-      if (pguResultado.aplica) {
-        pguAplica = true;
-        pguMonto = pguResultado.montoMensual;
-        
-        drawText(page, pguResultado.explicacion, 50, y, { size: 8, font: fontRegular, color: { r: 0.4, g: 0.4, b: 0.4 } });
+      if (pguAplica) {
+        drawText(page, pguExplicacion, 50, y, { size: 8, font: fontRegular, color: { r: 0.4, g: 0.4, b: 0.4 } });
         y -= 15;
         
         const pguData = [
@@ -780,7 +816,7 @@ export async function POST(request: NextRequest) {
         const colWidthsPGU = [300, 150];
         y = drawTable(page, pguData, 50, y, colWidthsPGU, { regular: fontRegular, bold: fontBold });
       } else {
-        drawText(page, `No aplica: ${pguResultado.explicacion}`, 50, y, { 
+        drawText(page, `No aplica: ${pguExplicacion}`, 50, y, { 
           size: 9, font: fontRegular, color: { r: 0.7, g: 0.3, b: 0.3 } 
         });
         y -= 12;
@@ -789,7 +825,7 @@ export async function POST(request: NextRequest) {
     }
 
     // ===== BAC - Bono por Años Cotizados =====
-    if (incluirBAC) {
+    if (incluirBAC && tipoPension !== 'sobrevivencia') {
       if (y < 180) {
         nuevaPagina();
       }
@@ -804,15 +840,7 @@ export async function POST(request: NextRequest) {
       });
       y -= 20;
       
-      const anosTotalesBAC = afiliado.anosCotizados + (mesesAdicionalesBAC / 12);
-      bacUF = anosTotalesBAC * BAC_UF_POR_ANO;
-      const topeAplicado = bacUF > BAC_TOPE_UF;
-      
-      if (topeAplicado) {
-        bacUF = BAC_TOPE_UF;
-      }
-      
-      bacPesos = Math.round(bacUF * parametros.uf);
+      const topeAplicado = (anosTotalesBAC * BAC_UF_POR_ANO) > BAC_TOPE_UF;
       
       drawText(page, `Anos cotizados: ${afiliado.anosCotizados} anos`, 50, y, { size: 9, font: fontRegular });
       y -= 12;
@@ -849,42 +877,57 @@ export async function POST(request: NextRequest) {
     }
 
     // ===== RESUMEN TOTAL (si alguno aplica) =====
-    const esMujer = (afiliado?.sexo || body.afiliado?.sexo) === 'F';
-    const bonoMujerUF = esMujer ? 0.25 : 0;
-    const bonoMujerPesos = esMujer ? Math.round(0.25 * (parametros?.uf || 40000)) : 0;
-
-    if (incluirPGU || incluirBAC || esMujer) {
-      if (pguAplica || bacPesos > 0 || esMujer) {
-        if (y < 100) {
+    if (incluirPGU || incluirBAC || (esMujer && bonoMujerPesos > 0)) {
+      if (pguAplica || bacPesos > 0 || bonoMujerPesos > 0) {
+        if (y < 130) {
           nuevaPagina();
         }
 
-        const totalBeneficios = pguMonto + bacPesos + bonoMujerPesos;
-        const pensionTotalConBeneficios = mejorPension + totalBeneficios;
+        const rvConAumItem = resultados.find(r => r.aumentoTemporal && r.aumentoTemporal.meses > 0);
+        const boxHeight = rvConAumItem ? 72 : 52;
 
         y -= 10;
         page.drawRectangle({
           x: 50,
           y: y - 5,
           width: 500,
-          height: 50,
+          height: boxHeight,
           color: rgb(0.95, 0.98, 0.95),
           borderColor: rgb(0.2, 0.5, 0.2),
           borderWidth: 1,
         });
-        y += 40;
+        y += (boxHeight - 10);
         
-        drawText(page, 'RESUMEN TOTAL CON BENEFICIOS ADICIONALES', 60, y, { 
+        drawText(page, 'RESUMEN TOTAL CON BENEFICIOS ADICIONALES DEL ESTADO', 60, y, { 
           size: 9, font: fontBold, color: { r: 0.1, g: 0.35, b: 0.15 } 
         });
         y -= 12;
-        drawText(page, `Pension Base: $${formatNumber(mejorPension)}  |  PGU: $${formatNumber(pguMonto)}  |  BAC: $${formatNumber(bacPesos)}${esMujer ? `  |  Bono Mujer: $${formatNumber(bonoMujerPesos)}` : ''}`, 60, y, { 
+        drawText(page, `PGU: $${formatNumber(pguMonto)}  |  BAC: $${formatNumber(bacPesos)}${bonoMujerPesos > 0 ? `  |  Bono Mujer: $${formatNumber(bonoMujerPesos)}` : ''}`, 60, y, { 
           size: 7.5, font: fontRegular 
         });
         y -= 12;
-        drawText(page, `TOTAL MENSUAL CON BENEFICIOS: $${formatNumber(pensionTotalConBeneficios)}`, 60, y, { 
-          size: 10, font: fontBold, color: { r: 0.1, g: 0.35, b: 0.15 } 
-        });
+
+        if (rvConAumItem && rvConAumItem.aumentoTemporal) {
+          const aum = rvConAumItem.aumentoTemporal;
+          const totalAum = aum.pensionAumentada + totalBeneficiosEstado;
+          const totalDef = aum.pensionFinal + totalBeneficiosEstado;
+          const totalAumUF = (totalAum / parametros.uf).toFixed(2);
+          const totalDefUF = (totalDef / parametros.uf).toFixed(2);
+
+          drawText(page, `Fase Aumentada (Meses 1-${aum.meses}): $${formatNumber(totalAum)} / mes (${totalAumUF} UF) con beneficios`, 60, y, { 
+            size: 8.5, font: fontBold, color: { r: 0.1, g: 0.35, b: 0.15 } 
+          });
+          y -= 12;
+          drawText(page, `Fase Definitiva (Desde mes ${aum.meses + 1}+): $${formatNumber(totalDef)} / mes (${totalDefUF} UF) con beneficios`, 60, y, { 
+            size: 8.5, font: fontBold, color: { r: 0.1, g: 0.35, b: 0.15 } 
+          });
+        } else {
+          const pensionTotalConBeneficios = mejorPension + totalBeneficiosEstado;
+          const totalUF = (pensionTotalConBeneficios / parametros.uf).toFixed(2);
+          drawText(page, `TOTAL MENSUAL ESTIMADO CON BENEFICIOS: $${formatNumber(pensionTotalConBeneficios)} (${totalUF} UF)`, 60, y, { 
+            size: 9.5, font: fontBold, color: { r: 0.1, g: 0.35, b: 0.15 } 
+          });
+        }
         y -= 20;
       }
     }
