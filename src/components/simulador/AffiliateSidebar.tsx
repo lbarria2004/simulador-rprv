@@ -7,15 +7,17 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { User, Wallet, HeartHandshake, Sparkles, Building2, RefreshCw, Accessibility, Users } from 'lucide-react';
-import { AfiliadoState, InvalidezFinanciamientoInfo, SobrevivenciaFinanciamientoInfo } from './types';
+import { User, Wallet, HeartHandshake, Sparkles, Building2, RefreshCw, Accessibility, Users, CheckSquare, Square, FileText } from 'lucide-react';
+import { AfiliadoState, CláusulasState, InvalidezFinanciamientoInfo, SobrevivenciaFinanciamientoInfo } from './types';
 import { calcularEdadDesdeFecha } from '@/lib/date-utils';
 import { BeneficiariesManager } from './BeneficiariesManager';
-import { BeneficiarioPension } from '@/lib/pension-calculator';
+import { BeneficiarioPension, PGU } from '@/lib/pension-calculator';
 
 interface AffiliateSidebarProps {
   afiliado: AfiliadoState;
   setAfiliado: React.Dispatch<React.SetStateAction<AfiliadoState>>;
+  clausulas: CláusulasState;
+  setClausulas: React.Dispatch<React.SetStateAction<CláusulasState>>;
   valorUF: number;
   fuenteUF: string;
   onRefreshUF: () => void;
@@ -30,6 +32,8 @@ interface AffiliateSidebarProps {
 export function AffiliateSidebar({
   afiliado,
   setAfiliado,
+  clausulas,
+  setClausulas,
   valorUF,
   fuenteUF,
   onRefreshUF,
@@ -592,6 +596,150 @@ export function AffiliateSidebar({
         beneficiarios={afiliado.beneficiarios || []}
         onChange={handleBeneficiariosChange}
       />
+
+      {/* 3 Grillas de Beneficios del Estado para Última Columna del Estudio PDF */}
+      <Card className="shadow-sm border-slate-200">
+        <CardHeader className="pb-2.5 pt-3.5 px-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 rounded-md bg-emerald-600 text-white">
+                <FileText className="w-4 h-4" />
+              </div>
+              <div>
+                <CardTitle className="text-sm font-semibold text-slate-900">
+                  Beneficios del Estado (Informe PDF)
+                </CardTitle>
+                <CardDescription className="text-[10px] text-slate-500 leading-tight mt-0.5">
+                  Seleccione los beneficios a sumar en la última columna del Estudio PDF (Pensión Bruta + PGU + BAC + BEV)
+                </CardDescription>
+              </div>
+            </div>
+          </div>
+        </CardHeader>
+
+        <CardContent className="px-4 pb-4 space-y-2.5">
+          <div className="grid grid-cols-3 gap-2">
+            {/* Grilla 1: PGU */}
+            <button
+              type="button"
+              onClick={() => setClausulas(prev => ({ ...prev, incluirPGU: !prev.incluirPGU }))}
+              className={`flex flex-col justify-between p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                clausulas.incluirPGU
+                  ? 'bg-emerald-50/90 border-emerald-500 ring-1 ring-emerald-500/30 shadow-xs'
+                  : 'bg-slate-50/70 border-slate-200 opacity-75 hover:opacity-100 hover:bg-slate-100/70'
+              }`}
+            >
+              <div className="flex items-center justify-between w-full mb-1">
+                <span className={`text-xs font-extrabold tracking-tight ${
+                  clausulas.incluirPGU ? 'text-emerald-950' : 'text-slate-600'
+                }`}>
+                  PGU
+                </span>
+                {clausulas.incluirPGU ? (
+                  <CheckSquare className="w-4 h-4 text-emerald-600 shrink-0" />
+                ) : (
+                  <Square className="w-4 h-4 text-slate-400 shrink-0" />
+                )}
+              </div>
+              <div className="text-[10px] font-medium text-slate-600 leading-tight mb-1.5">
+                Pensión Garantizada Universal
+              </div>
+              <div className={`text-[10px] font-mono font-bold pt-1 border-t ${
+                clausulas.incluirPGU ? 'border-emerald-200 text-emerald-800' : 'border-slate-200 text-slate-500'
+              }`}>
+                Hasta ${PGU.MONTO_BASE.toLocaleString('es-CL')}
+              </div>
+            </button>
+
+            {/* Grilla 2: BAC */}
+            {(() => {
+              const bacUF = Math.min((afiliado.anosCotizados || 0) * 0.1, 2.5);
+              const bacCLP = Math.round(bacUF * valorUF);
+              return (
+                <button
+                  type="button"
+                  onClick={() => setClausulas(prev => ({ ...prev, incluirBAC: !prev.incluirBAC }))}
+                  className={`flex flex-col justify-between p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                    clausulas.incluirBAC
+                      ? 'bg-blue-50/90 border-blue-500 ring-1 ring-blue-500/30 shadow-xs'
+                      : 'bg-slate-50/70 border-slate-200 opacity-75 hover:opacity-100 hover:bg-slate-100/70'
+                  }`}
+                >
+                  <div className="flex items-center justify-between w-full mb-1">
+                    <span className={`text-xs font-extrabold tracking-tight ${
+                      clausulas.incluirBAC ? 'text-blue-950' : 'text-slate-600'
+                    }`}>
+                      BAC
+                    </span>
+                    {clausulas.incluirBAC ? (
+                      <CheckSquare className="w-4 h-4 text-blue-600 shrink-0" />
+                    ) : (
+                      <Square className="w-4 h-4 text-slate-400 shrink-0" />
+                    )}
+                  </div>
+                  <div className="text-[10px] font-medium text-slate-600 leading-tight mb-1.5">
+                    Bono por Años Cotizados
+                  </div>
+                  <div className={`text-[10px] font-mono font-bold pt-1 border-t ${
+                    clausulas.incluirBAC ? 'border-blue-200 text-blue-800' : 'border-slate-200 text-slate-500'
+                  }`}>
+                    {bacUF.toFixed(1).replace('.', ',')} UF (${bacCLP.toLocaleString('es-CL')})
+                  </div>
+                </button>
+              );
+            })()}
+
+            {/* Grilla 3: BEV */}
+            {(() => {
+              const bevActivo = clausulas.incluirBonoMujer ?? true;
+              const bevCLP = Math.round(0.25 * valorUF);
+              const aplicaMujer = afiliado.sexo === 'F' && afiliado.tipoPension !== 'sobrevivencia';
+              return (
+                <button
+                  type="button"
+                  onClick={() => setClausulas(prev => ({ ...prev, incluirBonoMujer: !(prev.incluirBonoMujer ?? true) }))}
+                  className={`flex flex-col justify-between p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                    bevActivo
+                      ? 'bg-rose-50/90 border-rose-500 ring-1 ring-rose-500/30 shadow-xs'
+                      : 'bg-slate-50/70 border-slate-200 opacity-75 hover:opacity-100 hover:bg-slate-100/70'
+                  }`}
+                >
+                  <div className="flex items-center justify-between w-full mb-1">
+                    <span className={`text-xs font-extrabold tracking-tight ${
+                      bevActivo ? 'text-rose-950' : 'text-slate-600'
+                    }`}>
+                      BEV
+                    </span>
+                    {bevActivo ? (
+                      <CheckSquare className="w-4 h-4 text-rose-600 shrink-0" />
+                    ) : (
+                      <Square className="w-4 h-4 text-slate-400 shrink-0" />
+                    )}
+                  </div>
+                  <div className="text-[10px] font-medium text-slate-600 leading-tight mb-1.5">
+                    Bonif. Expectativa de Vida (Mujer)
+                  </div>
+                  <div className={`text-[10px] font-mono font-bold pt-1 border-t ${
+                    bevActivo ? 'border-rose-200 text-rose-800' : 'border-slate-200 text-slate-500'
+                  }`}>
+                    {aplicaMujer ? `0,25 UF ($${bevCLP.toLocaleString('es-CL')})` : 'Solo Mujeres'}
+                  </div>
+                </button>
+              );
+            })()}
+          </div>
+
+          <div className="px-2.5 py-1.5 rounded-lg bg-slate-100 border border-slate-200/80 text-[10px] text-slate-600 flex items-center justify-between">
+            <span>Última columna PDF:</span>
+            <span className="font-mono font-semibold text-slate-800">
+              Pensión Bruta
+              {clausulas.incluirPGU ? ' + PGU' : ''}
+              {clausulas.incluirBAC ? ' + BAC' : ''}
+              {(clausulas.incluirBonoMujer ?? true) ? ' + BEV' : ''}
+            </span>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

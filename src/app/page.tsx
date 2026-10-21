@@ -500,18 +500,18 @@ export default function SimuladorPage() {
       }
     }
 
-    const pguObj = (clausulas.incluirPGU && tipoPension !== 'sobrevivencia')
+    const pguObj = (tipoPension !== 'sobrevivencia')
       ? calcularPGU(resultado.pensionMensual, edad) 
       : null;
     const pguMensual = (pguObj && pguObj.aplica) ? (pguObj.montoMensual || 0) : 0;
 
-    const bacObj = (clausulas.incluirBAC && tipoPension !== 'sobrevivencia')
+    const bacObj = (tipoPension !== 'sobrevivencia')
       ? calcularBAC(afiliado.anosCotizados, 0, valorUF) 
       : null;
     const bacMensual = (bacObj && bacObj.aplica) ? (bacObj.beneficioMensualPesos || 0) : 0;
 
     // Compensación por Diferencias de Expectativa de Vida para Mujeres (Seguro Social Previsional)
-    const bonoMujerObj = ((clausulas.incluirBonoMujer ?? true) && afiliado.sexo === 'F' && tipoPension !== 'sobrevivencia')
+    const bonoMujerObj = (afiliado.sexo === 'F' && tipoPension !== 'sobrevivencia')
       ? calcularCompensacionExpectativaVidaMujer(afiliado.sexo, edad, valorUF, tipoPension, afiliado.cubiertoSIS)
       : null;
     const bonoMujerMensual = (bonoMujerObj && bonoMujerObj.aplica) ? bonoMujerObj.beneficioMensualPesos : 0;
@@ -531,7 +531,7 @@ export default function SimuladorPage() {
       totalConBeneficiosCLP: Math.round(totalCLP),
       totalConBeneficiosUF: Number(totalUF.toFixed(2))
     };
-  }, [afiliado.anosCotizados, afiliado.sexo, afiliado.cubiertoSIS, clausulas.incluirPGU, clausulas.incluirBAC, clausulas.incluirBonoMujer, valorUF]);
+  }, [afiliado.anosCotizados, afiliado.sexo, afiliado.cubiertoSIS, valorUF]);
 
   // Desglose actuarial de financiamiento para Pensión de Invalidez (D.L. 3.500)
   const financiamientoInvalidez = useMemo<InvalidezFinanciamientoInfo | undefined>(() => {
@@ -1033,6 +1033,8 @@ export default function SimuladorPage() {
             <AffiliateSidebar
               afiliado={afiliado}
               setAfiliado={setAfiliado}
+              clausulas={clausulas}
+              setClausulas={setClausulas}
               valorUF={valorUF}
               fuenteUF={fuenteUF}
               onRefreshUF={fetchUF}
