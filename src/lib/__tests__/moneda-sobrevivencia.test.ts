@@ -47,7 +47,7 @@ describe('Referencia monetaria única', () => {
   for (const [nombre, calcular] of Object.entries(casos)) {
     it(`${nombre}: la UF solo cambia la representación; no modifica CLP ni CNU`, () => {
       const a = calcular(uf);
-      const otra = { ...uf, valor: uf.valor * 2, fecha: '2026-10-02' };
+      const otra = { ...uf, valor: uf.valor * 2 };
       const b = calcular(otra);
       assert.deepEqual(a.referenciaUF, uf);
       assert.deepEqual(b.referenciaUF, otra);
@@ -145,11 +145,13 @@ describe('CNU y flujo de sobrevivencia', () => {
     assert.equal(a.pensionMensual, b.pensionMensual);
     assert.equal(a.proyeccion[1].beneficiarios[1].esInvalido, true);
   });
-  it('el prorrateo conserva la suma sin truncar porcentajes antes del CNU', () => {
+  it('distingue porcentajes de referencia y participación en el total familiar', () => {
     const grupo = [conyuge, ...Array.from({ length: 4 }, (_, i) => ({ ...hijo, id: String(i), edad: 10 + i }))];
     const porcentajes = motor.calcularPorcentajesBeneficiarios(grupo);
-    assert.ok(Math.abs(porcentajes.reduce((t, b) => t + b.porcentaje, 0) - 1) < 1e-14);
-    assert.equal(porcentajes[0].porcentaje, .5 / 1.1);
+    assert.ok(Math.abs(porcentajes.reduce((t, b) => t + b.participacionFamiliar, 0) - 1) < 1e-14);
+    assert.equal(porcentajes[0].porcentajeLegal, .5);
+    assert.equal(porcentajes[0].porcentaje, .5);
+    assert.ok(Math.abs(porcentajes[0].participacionFamiliar - .5 / 1.1) < 1e-14);
   });
   it('rechaza entradas inválidas y tasas que no tienen sentido financiero', () => {
     for (const opciones of [{ anoCalculo: 2026.5 }, { rentabilidadRealAnual: -1 }, { rentabilidadRealAnual: Infinity }]) {

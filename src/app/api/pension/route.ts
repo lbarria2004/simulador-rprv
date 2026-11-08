@@ -2,6 +2,7 @@ import { validarReferenciaUF, UF_REFERENCIA_EJEMPLO } from '@/lib/moneda';
 import { NextRequest, NextResponse } from 'next/server';
 import {
   calcularRetiroProgramado,
+  etiquetarResultadoActuarial,
   calcularEscenariosRetiroProgramado,
   ESCENARIOS_RENTABILIDAD_RP,
   AVISO_SIMULACION,
@@ -64,7 +65,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({
           success: true,
           aviso: AVISO_SIMULACION,
-          resultados: calcularEscenariosRetiroProgramado(fondos, edad, sexo, tasaInteres, beneficiarios, datos.esInvalido ?? false, datos.anoCalculo, referenciaUF)
+          resultados: Object.fromEntries(Object.entries(calcularEscenariosRetiroProgramado(fondos, edad, sexo, tasaInteres, beneficiarios, datos.esInvalido ?? false, datos.anoCalculo, referenciaUF)).map(([nombre, r]) => [nombre, etiquetarResultadoActuarial(r, beneficiarios)]))
         });
       case 'retiro_programado':
         resultado = calcularRetiroProgramado(fondos, edad, sexo, tasaInteres, beneficiarios, datos.esInvalido ?? false, opcionesRP, referenciaUF);
@@ -206,7 +207,7 @@ export async function POST(request: NextRequest) {
           datos.pensionReferenciaCausante,
           datos.ingresoBaseCausante, tasaInteres, tasaRV, referenciaUF, opcionesRP
         );
-        return NextResponse.json({ success: true, aviso: AVISO_SIMULACION, resultados: opciones });
+        return NextResponse.json({ success: true, aviso: AVISO_SIMULACION, resultados: opciones.map(r => etiquetarResultadoActuarial(r, beneficiarios)) });
 
       case 'sobrevivencia_rp':
         resultado = calcularRetiroProgramadoSobrevivencia(
@@ -281,7 +282,7 @@ export async function POST(request: NextRequest) {
         );
     }
 
-    return NextResponse.json({ success: true, aviso: AVISO_SIMULACION, resultado });
+    return NextResponse.json({ success: true, aviso: AVISO_SIMULACION, resultado: etiquetarResultadoActuarial(resultado, beneficiarios) });
   } catch (error) {
     console.error('Error en cálculo:', error);
     return NextResponse.json(
@@ -321,14 +322,19 @@ export async function GET() {
         convivienteSinHijos: '60%',
         convivienteConHijos: '50%',
         hijo: '15% cada uno',
-        padreMadre: '15% cada uno (si no hay cónyuge ni hijos)'
+        padreMadre: '50% sujeto a art.10 y ausencia de otros beneficiarios',
+        convivienteSoloHijosNoComunes: '15%',
+        hijoInvalidoParcialDesde24: '11%',
+        base: 'Pensión de referencia del causante; participación familiar informada por separado'
       },
       opciones: {
         mesesGarantizados: [60, 120, 180, 240, 300, 360],
         mesesAumento: [12, 24, 36, 48, 60, 84, 108, 120],
         porcentajesAumento: [0.10, 0.20, 0.30, 0.40, 0.50, 0.60, 0.70, 0.80, 0.90, 1.00]
       },
-      fechaActualizacion: 'Enero 2025'
+      fechaRevision: '2026-11-08',
+      estadoTasas: 'Supuestos ilustrativos sin circular primaria de vigencia acreditada',
+      estadoCalculo: 'Estimativo, sin certificación normativa'
     }
   });
 }

@@ -40,3 +40,9 @@ RP de sobrevivencia comparte un motor único, actualiza beneficiarios y distingu
 Consultar [fundamentos previos y fuentes](docs/fase-2-fundamentos.md) e [informe de resultados, migración monetaria y límites pendientes](docs/fase-2-resultados.md). Este informe actualiza los pendientes y ejemplos de la primera etapa; no acredita equivalencia con cálculos oficiales.
 
 Con la app local iniciada, `node scripts/verificar-integracion.mjs` ejecuta regresiones HTTP. `node scripts/generate_proposal.mjs 45000.13 2026-10-01 /tmp/estudio.pdf` genera un ejemplo con referencia explícita. El valor del ejemplo no corresponde a una cotización oficial.
+
+## Fase 3: validación documental y períodos mensuales
+
+Las tablas TM-2020 se cotejaron con los originales SP/CMF: se corrigieron cuatro discrepancias y se retiraron edades RV-M sin respaldo. Los aumentos temporales usan exactamente los meses solicitados con una hipótesis mensual documentada; el CNU vitalicio sigue siendo una aproximación anual. Porcentajes legales, incrementos, ajustes manuales y participación familiar se informan por separado.
+
+Consultar [fundamentos y fuentes](docs/fase-3-fundamentos.md) e [informe de verificaciones y limitaciones](docs/fase-3-resultados.md). No se afirma conformidad normativa. `node scripts/auditar-tm2020.mjs` verifica la transcripción local y `node scripts/auditar-tm2020.mjs d1c7ef3` reproduce las diferencias de esta fase. Las tasas y garantías siguen siendo supuestos sin vigencia primaria acreditada; los escenarios de pantalla se presentan sin atribución a compañías.

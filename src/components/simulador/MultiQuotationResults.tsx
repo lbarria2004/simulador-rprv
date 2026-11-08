@@ -380,6 +380,16 @@ export function MultiQuotationResults({
                     ) : null}
                   </div>
 
+                  {item.resultado.reglasSobrevivencia && item.resultado.reglasSobrevivencia.length > 0 && (
+                    <details className="rounded border border-amber-200 p-2 text-xs">
+                      <summary className="cursor-pointer font-semibold">Porcentajes de referencia y participación familiar</summary>
+                      <p className="mt-1">Reglas sujetas a requisitos y vínculos declarados. La base legal del causante y la base financiable del modelo son distintas.</p>
+                      {item.resultado.reglasSobrevivencia.map((b, indice) => <p key={b.id ?? indice} className="mt-1">
+                        {b.nombre || b.tipo}: regla {(b.porcentajeLegal * 100).toFixed(2)}% + incremento {(b.incrementoLegal * 100).toFixed(2)}%; utilizado {(b.porcentaje * 100).toFixed(2)}%; participación en total {(b.participacionFamiliar * 100).toFixed(2)}%. {b.estadoRegla}.
+                      </p>)}
+                      {(item.resultado.advertencias ?? []).map((aviso, i) => <p className="mt-1 text-amber-900" key={i}>{aviso}</p>)}
+                    </details>
+                  )}
                   {/* 3. Última Línea: Suma Total de la Pensión */}
                   {!hasAumento ? (
                     <div className="pt-2 border-t border-slate-200/80 flex items-center justify-between text-xs">

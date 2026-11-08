@@ -1,3 +1,5 @@
+import { determinarPorcentajes, type PorcentajeBeneficiario } from './reglas-sobrevivencia.ts';
+import { proyectarCapitalTemporalMensual, crearTrayectoriaTemporal, type OpcionesMensuales, type PagoTemporal } from './actuaria-mensual.ts';
 import { clpAUf, ufAClp, validarReferenciaUF, UF_REFERENCIA_EJEMPLO, type ReferenciaUF } from './moneda.ts';
 /**
  * Simulador de Pensiones - Sistema Chileno AFP
@@ -78,6 +80,10 @@ export interface BeneficiarioPension {
   porcentajePension: number;
   esEstudiante?: boolean; // Para hijos estudiantes entre 18 y 24 años
   esInvalido?: boolean;   // Para beneficiarios calificados con invalidez
+  gradoInvalidez?: 'total' | 'parcial';
+  idsHijosComunes?: string[];
+  cargaFamiliarAcreditada?: boolean;
+  requisitosAcreditados?: boolean;
 }
 
 export interface DatosAfiliado {
@@ -132,7 +138,12 @@ export interface ResultadoEscenario {
   pensionReferencia?: number;
   
   proyeccion?: ProyeccionAnual[];
+  proyeccionMensual?: PagoTemporal[];
+  metodologiaTemporal?: 'mensual_fuerza_constante_v1';
+  componentesCNU?: { vitalicioAnual: number; temporalMensual: number; porcentajeAumento: number; factorGarantia: number; divisorTotal: number };
   advertencias?: string[];
+  validacionActuarial?: { estado: 'estimativo'; fechaRevision: string; fuenteTablas: string; cnuVitalicio: string };
+  reglasSobrevivencia?: PorcentajeBeneficiario[];
 }
 
 export interface ProyeccionAnual {
@@ -141,7 +152,9 @@ export interface ProyeccionAnual {
   pensionMensual: number;
   saldoAcumulado: number;
   retiroAcumulado: number;
-  fase?: 'aumento' | 'normal' | 'decreciente' | 'aumentada' | 'vitalicia';
+  mesesAumentados?: number;
+  mesesGarantizados?: number;
+  fase?: 'aumento' | 'normal' | 'decreciente' | 'aumentada' | 'vitalicia' | 'mixta';
 }
 
 export interface OpcionesProyeccionRP {
@@ -240,18 +253,20 @@ export const PORCENTAJES_SOBREVIVENCIA = {
   CONYUGE_SIN_HIJOS: 0.60,        // 60% si no hay hijos con derecho
   CONYUGE_CON_HIJOS: 0.50,        // 50% si hay hijos con derecho a pensión
   CONVIVIENTE_SIN_HIJOS: 0.60,    // 60% si no hay hijos con derecho
-  CONVIVIENTE_CON_HIJOS: 0.50,    // 50% si hay hijos con derecho a pensión
+  CONVIVIENTE_CON_HIJOS: 0.50,
+  CONVIVIENTE_SOLO_HIJOS_NO_COMUNES: 0.15,
+  HIJO_INVALIDO_PARCIAL_DESDE_24: 0.11,    // Art.58 f)
   
   // Hijos
   HIJO_CON_PADRE: 0.15,           // 15% si tiene padre/madre viudo
-  HIJO_HUERFANO: 0.11,            // 11% si es huérfano de padre y madre
+  HIJO_HUERFANO: 0.15,            // Base hijo; incremento último inciso se calcula por separado
   
   // Madre/Padre de hijos de filiación no matrimonial
   MADRE_PADRE_SIN_OTROS_HIJOS: 0.36,  // 36% si no hay otros hijos con derecho
   MADRE_PADRE_CON_OTROS_HIJOS: 0.30,  // 30% si hay otros hijos con derecho
   
   // Padre/Madre (cuando no hay cónyuge, conviviente ni hijos)
-  PADRE_MADRE_SIN_OTROS: 0.15     // 15% cada uno (padre o madre)
+  PADRE_MADRE_SIN_OTROS: 0.50     // Art.58 e), sujeto a art.10
 } as const;
 
 // ==========================================
@@ -334,6 +349,7 @@ export function calcularCNU(
   modalidad: ModalidadPension = 'retiro_programado',
   anoCalculo: number = 2026
 ): number {
+  validarEntradaCNU(edad, sexo, tasaInteres, anoCalculo);
   let cnu = 0;
   const maxEdad = 110;
   
@@ -448,6 +464,7 @@ export function calcularCNUIndividual(
   esHijo: boolean = false,
   esEstudiante: boolean = false
 ): number {
+  validarEntradaCNU(edad, sexo, tasaInteres, anoCalculo);
   let cnu = 0;
   let factorSupervivencia = 1.0;
   const maxEdad = (esHijo && !esInvalido) ? (esEstudiante ? 24 : 18) : 110;
@@ -465,8 +482,8 @@ export function calcularCNUIndividual(
 
 /**
  * Calcula el Capital Necesario Unitario Temporal para un período de meses dado
- * Aproximación anual del costo del aumento temporal; redondea meses a años completos.
- * Fórmula: CNU_temp = Σ_{t=0}^{m-1} [ _t p_x ] × [ 1 / (1+i)^(t+0.5) ] × 12
+ * Suma de pagos mensuales vencidos, supervivencia por fuerza constante y descuento real.
+ * Fórmula, convención 30/360 y límites: docs/fase-3-fundamentos.md.
  */
 export function calcularCNUTemporal(
   edad: number,
@@ -475,20 +492,10 @@ export function calcularCNUTemporal(
   tasaInteres: number,
   esInvalido: boolean = false,
   modalidad: ModalidadPension = 'renta_vitalicia',
-  anoCalculo: number = 2026
+  anoCalculo: number = 2026,
+  opciones: OpcionesMensuales = {}
 ): number {
-  const anos = Math.ceil(meses / 12);
-  let cnuTemporal = 0;
-  let factorSupervivencia = 1.0;
-
-  for (let t = 0; t < anos; t++) {
-    const factorDescuento = 1 / Math.pow(1 + tasaInteres, t + 0.5);
-    cnuTemporal += factorSupervivencia * factorDescuento;
-    const qx = getQx(edad + t, sexo, esInvalido, modalidad, anoCalculo + t);
-    factorSupervivencia *= (1 - qx);
-  }
-
-  return cnuTemporal * 12;
+  return proyectarCapitalTemporalMensual(edad, sexo, meses, tasaInteres, esInvalido, modalidad, anoCalculo, opciones).cnu;
 }
 
 // ==========================================
@@ -571,6 +578,7 @@ export function calcularRetiroProgramado(
   return {
     referenciaUF,
     unidadMonetaria: 'CLP_REALES',
+    reglasSobrevivencia: determinarPorcentajes(beneficiarios ?? []),
     nombre: esInvalido ? 'Retiro Programado (Invalidez MI-2020)' : 'Retiro Programado',
     pensionMensual: Math.round(pensionMensual),
     pensionEnUF: clpAUf(Math.round(pensionMensual), referenciaUF),
@@ -689,14 +697,14 @@ export function calcularRVAumentoTemporal(
   referenciaUF: ReferenciaUF = UF_REFERENCIA_EJEMPLO
 ): ResultadoEscenario {
   referenciaUF = validarReferenciaUF(referenciaUF);
-  const porcentajeNormalizado = porcentajeAumento > 1 ? porcentajeAumento / 100 : porcentajeAumento;
+  const porcentajeNormalizado = normalizarAumento(porcentajeAumento);
   const cnuVitalicio = calcularCNU(edad, sexo, tasaInteres, beneficiarios, esInvalido, 'renta_vitalicia', Number(referenciaUF.fecha.slice(0, 4)));
-  const cnuTemporal = calcularCNUTemporal(edad, sexo, mesesAumento, tasaInteres, esInvalido, 'renta_vitalicia', Number(referenciaUF.fecha.slice(0, 4)));
+  const cnuTemporal = calcularCNUTemporal(edad, sexo, mesesAumento, tasaInteres, esInvalido, 'renta_vitalicia', Number(referenciaUF.fecha.slice(0, 4)), { fechaCalculo: referenciaUF.fecha });
   
   // Equivalencia actuarial:
   // Fondos = PensionBase * CNU_vitalicio + (porcentaje * PensionBase) * CNU_temporal
   const pensionBaseAjustada = fondos / (cnuVitalicio + porcentajeNormalizado * cnuTemporal);
-  const pensionAumentadaFinal = pensionBaseAjustada * (1 + porcentajeNormalizado);
+  const pensionAumentadaFinal = pensionBaseAjustada * (1 + (mesesAumento > 0 ? porcentajeNormalizado : 0));
   const expectativaVida = calcularExpectativaVida(edad, sexo, esInvalido, 'renta_vitalicia', Number(referenciaUF.fecha.slice(0, 4)));
   
   const anosAumento = Math.floor(mesesAumento / 12);
@@ -710,25 +718,9 @@ export function calcularRVAumentoTemporal(
     nombrePeriodo = `${mesesAumento} meses`;
   }
   
-  const proyeccion: ProyeccionAnual[] = [];
-  const anosAumentoInt = Math.ceil(mesesAumento / 12);
-  
-  for (let año = 0; año < 30; año++) {
-    const edadActual = edad + año;
-    const enPeriodoAumento = año < anosAumentoInt;
-    
-    proyeccion.push({
-      año: año + 1,
-      edad: edadActual,
-      pensionMensual: enPeriodoAumento 
-        ? Math.round(pensionAumentadaFinal) 
-        : Math.round(pensionBaseAjustada),
-      saldoAcumulado: 0,
-      retiroAcumulado: 0,
-      fase: enPeriodoAumento ? 'aumento' : 'normal'
-    });
-  }
-  
+  const trayectoria = crearTrayectoriaTemporal(pensionBaseAjustada, pensionAumentadaFinal, mesesAumento, edad, 30);
+  const proyeccion = trayectoria.anual;
+
   return {
     referenciaUF,
     unidadMonetaria: 'CLP_REALES',
@@ -736,7 +728,8 @@ export function calcularRVAumentoTemporal(
     pensionMensual: Math.round(pensionAumentadaFinal),
     pensionEnUF: clpAUf(Math.round(pensionAumentadaFinal), referenciaUF),
     pensionAnual: pensionAumentadaFinal * 12,
-    cnu: cnuVitalicio,
+    cnu: cnuVitalicio + porcentajeNormalizado * cnuTemporal,
+    componentesCNU: { vitalicioAnual: cnuVitalicio, temporalMensual: cnuTemporal, porcentajeAumento: porcentajeNormalizado, factorGarantia: 1, divisorTotal: cnuVitalicio + porcentajeNormalizado * cnuTemporal },
     tasaInteres,
     expectativaVida,
     aumentoTemporal: {
@@ -746,10 +739,12 @@ export function calcularRVAumentoTemporal(
       pensionFinal: Math.round(pensionBaseAjustada)
     },
     proyeccion,
+    proyeccionMensual: trayectoria.mensual,
+    metodologiaTemporal: 'mensual_fuerza_constante_v1',
     advertencias: [
       `Aumento ${(porcentajeNormalizado * 100).toFixed(0)}% durante ${nombrePeriodo}`,
       `Pensión inicial: ${formatearPesos(pensionAumentadaFinal)}`,
-      `Pensión desde año ${anosAumentoInt + 1}: ${formatearPesos(pensionBaseAjustada)}`
+      `Pensión desde mes ${mesesAumento + 1}: ${formatearPesos(pensionBaseAjustada)}`
     ]
   };
 }
@@ -767,38 +762,22 @@ export function calcularRVConAmbasClausulas(
   referenciaUF: ReferenciaUF = UF_REFERENCIA_EJEMPLO
 ): ResultadoEscenario {
   referenciaUF = validarReferenciaUF(referenciaUF);
-  const porcentajeNormalizado = porcentajeAumento > 1 ? porcentajeAumento / 100 : porcentajeAumento;
+  const porcentajeNormalizado = normalizarAumento(porcentajeAumento);
   const cnuVitalicio = calcularCNU(edad, sexo, tasaInteres, beneficiarios, esInvalido, 'renta_vitalicia', Number(referenciaUF.fecha.slice(0, 4)));
   const factorGarantizado = calcularFactorGarantizado(mesesGarantizados);
   const cnuEfectivoGarantizado = cnuVitalicio / (factorGarantizado > 0 ? factorGarantizado : 1);
-  const cnuTemporal = calcularCNUTemporal(edad, sexo, mesesAumento, tasaInteres, esInvalido, 'renta_vitalicia', Number(referenciaUF.fecha.slice(0, 4)));
+  const cnuTemporal = calcularCNUTemporal(edad, sexo, mesesAumento, tasaInteres, esInvalido, 'renta_vitalicia', Number(referenciaUF.fecha.slice(0, 4)), { fechaCalculo: referenciaUF.fecha });
   
   const pensionBaseFinal = fondos / (cnuEfectivoGarantizado + porcentajeNormalizado * cnuTemporal);
-  const pensionAumentadaFinal = pensionBaseFinal * (1 + porcentajeNormalizado);
+  const pensionAumentadaFinal = pensionBaseFinal * (1 + (mesesAumento > 0 ? porcentajeNormalizado : 0));
   const expectativaVida = calcularExpectativaVida(edad, sexo, esInvalido, 'renta_vitalicia', Number(referenciaUF.fecha.slice(0, 4)));
   
   const anosGarantia = Math.floor(mesesGarantizados / 12);
   const anosAumento = Math.floor(mesesAumento / 12);
   
-  const proyeccion: ProyeccionAnual[] = [];
-  const anosAumentoInt = Math.ceil(mesesAumento / 12);
-  
-  for (let año = 0; año < 30; año++) {
-    const edadActual = edad + año;
-    const enPeriodoAumento = año < anosAumentoInt;
-    
-    proyeccion.push({
-      año: año + 1,
-      edad: edadActual,
-      pensionMensual: enPeriodoAumento 
-        ? Math.round(pensionAumentadaFinal)
-        : Math.round(pensionBaseFinal),
-      saldoAcumulado: 0,
-      retiroAcumulado: 0,
-      fase: enPeriodoAumento ? 'aumento' : 'normal'
-    });
-  }
-  
+  const trayectoria = crearTrayectoriaTemporal(pensionBaseFinal, pensionAumentadaFinal, mesesAumento, edad, 30);
+  const proyeccion = trayectoria.anual;
+
   return {
     referenciaUF,
     unidadMonetaria: 'CLP_REALES',
@@ -806,7 +785,8 @@ export function calcularRVConAmbasClausulas(
     pensionMensual: Math.round(pensionAumentadaFinal),
     pensionEnUF: clpAUf(Math.round(pensionAumentadaFinal), referenciaUF),
     pensionAnual: pensionAumentadaFinal * 12,
-    cnu: cnuVitalicio,
+    cnu: cnuEfectivoGarantizado + porcentajeNormalizado * cnuTemporal,
+    componentesCNU: { vitalicioAnual: cnuVitalicio, temporalMensual: cnuTemporal, porcentajeAumento: porcentajeNormalizado, factorGarantia: factorGarantizado, divisorTotal: cnuEfectivoGarantizado + porcentajeNormalizado * cnuTemporal },
     tasaInteres,
     expectativaVida,
     periodoGarantizado: mesesGarantizados,
@@ -817,6 +797,8 @@ export function calcularRVConAmbasClausulas(
       pensionFinal: Math.round(pensionBaseFinal)
     },
     proyeccion,
+    proyeccionMensual: trayectoria.mensual,
+    metodologiaTemporal: 'mensual_fuerza_constante_v1',
     advertencias: [
       `Aumento ${(porcentajeAumento > 1 ? porcentajeAumento : porcentajeAumento * 100).toFixed(0)}% por ${anosAumento} años`,
       `Garantía ${anosGarantia} años`,
@@ -1046,78 +1028,7 @@ export function calcularRVAumentoTemporalInvalidez(
   beneficiarios?: BeneficiarioPension[],
   referenciaUF: ReferenciaUF = UF_REFERENCIA_EJEMPLO
 ): ResultadoEscenario {
-  referenciaUF = validarReferenciaUF(referenciaUF);
-  const porcentajeNormalizado = porcentajeAumento > 1 ? porcentajeAumento / 100 : porcentajeAumento;
-  const rvBase = calcularRVInmediataInvalidez(fondos, edad, sexo, tasaInteres, beneficiarios, referenciaUF);
-  const pensionVitalicia = rvBase.pensionMensual;
-  const pensionAumentada = pensionVitalicia * (1 + porcentajeNormalizado);
-  const incrementoMensual = pensionVitalicia * porcentajeNormalizado;
-  
-  let costoAumento = 0;
-  for (let mes = 1; mes <= mesesAumento; mes++) {
-    const factorDescuento = 1 / Math.pow(1 + tasaInteres, mes / 12);
-    costoAumento += incrementoMensual * factorDescuento;
-  }
-  
-  const factorAjuste = 1 - (costoAumento / (fondos * 0.97));
-  const pensionBaseAjustada = pensionVitalicia * Math.max(factorAjuste, 0.5);
-  const pensionAumentadaFinal = pensionBaseAjustada * (1 + porcentajeNormalizado);
-  
-  const anosAumento = Math.floor(mesesAumento / 12);
-  const mesesRestantes = mesesAumento % 12;
-  let nombrePeriodo = '';
-  if (anosAumento > 0 && mesesRestantes > 0) {
-    nombrePeriodo = `${anosAumento}a ${mesesRestantes}m`;
-  } else if (anosAumento > 0) {
-    nombrePeriodo = `${anosAumento} ${anosAumento === 1 ? 'año' : 'años'}`;
-  } else {
-    nombrePeriodo = `${mesesAumento} meses`;
-  }
-  
-  const proyeccion: ProyeccionAnual[] = [];
-  const anosAumentoInt = Math.ceil(mesesAumento / 12);
-  const maxAnos = Math.min(30, 81 - edad);
-  
-  for (let año = 0; año < maxAnos; año++) {
-    const edadActual = edad + año;
-    const enPeriodoAumento = año < anosAumentoInt;
-    
-    proyeccion.push({
-      año: año + 1,
-      edad: edadActual,
-      pensionMensual: enPeriodoAumento 
-        ? Math.round(pensionAumentadaFinal)
-        : Math.round(pensionBaseAjustada),
-      saldoAcumulado: 0,
-      retiroAcumulado: 0,
-      fase: enPeriodoAumento ? 'aumento' : 'normal'
-    });
-  }
-  
-  return {
-    referenciaUF,
-    unidadMonetaria: 'CLP_REALES',
-    nombre: `RV Invalidez +${porcentajeAumento > 1 ? porcentajeAumento : porcentajeAumento * 100}% x ${nombrePeriodo}`,
-    pensionMensual: Math.round(pensionAumentadaFinal),
-    pensionEnUF: clpAUf(Math.round(pensionAumentadaFinal), referenciaUF),
-    pensionAnual: pensionAumentadaFinal * 12,
-    cnu: rvBase.cnu,
-    tasaInteres,
-    expectativaVida: rvBase.expectativaVida,
-    aumentoTemporal: {
-      meses: mesesAumento,
-      porcentaje: porcentajeAumento,
-      pensionAumentada: Math.round(pensionAumentadaFinal),
-      pensionFinal: Math.round(pensionBaseAjustada)
-    },
-    proyeccion,
-    advertencias: [
-      `Aumento del ${(porcentajeAumento > 1 ? porcentajeAumento : porcentajeAumento * 100).toFixed(0)}% por ${nombrePeriodo}`,
-      `Pensión durante aumento: ${formatearPesos(pensionAumentadaFinal)}`,
-      `Pensión después del período: ${formatearPesos(pensionBaseAjustada)}`,
-      'Usa tabla de mortalidad de inválidos (I-H/I-M-2020)'
-    ]
-  };
+  return calcularRVAumentoTemporal(fondos, edad, sexo, mesesAumento, porcentajeAumento, tasaInteres, beneficiarios, true, referenciaUF);
 }
 
 /**
@@ -1134,183 +1045,18 @@ export function calcularRVConAmbasClausulasInvalidez(
   beneficiarios?: BeneficiarioPension[],
   referenciaUF: ReferenciaUF = UF_REFERENCIA_EJEMPLO
 ): ResultadoEscenario {
-  referenciaUF = validarReferenciaUF(referenciaUF);
-  const porcentajeNormalizado = porcentajeAumento > 1 ? porcentajeAumento / 100 : porcentajeAumento;
-  const rvBase = calcularRVInmediataInvalidez(fondos, edad, sexo, tasaInteres, beneficiarios, referenciaUF);
-  const factorGarantizado = calcularFactorGarantizado(mesesGarantizados);
-  const pensionBase = rvBase.pensionMensual * factorGarantizado;
-  const pensionAumentada = pensionBase * (1 + porcentajeNormalizado);
-  const incrementoMensual = pensionBase * porcentajeNormalizado;
-  
-  let costoAumento = 0;
-  for (let mes = 1; mes <= mesesAumento; mes++) {
-    const factorDescuento = 1 / Math.pow(1 + tasaInteres, mes / 12);
-    costoAumento += incrementoMensual * factorDescuento;
-  }
-  
-  const factorAjusteTotal = Math.max(factorGarantizado - (costoAumento / (fondos * 0.97)), 0.45);
-  const pensionBaseFinal = rvBase.pensionMensual * factorAjusteTotal;
-  const pensionAumentadaFinal = pensionBaseFinal * (1 + porcentajeNormalizado);
-  
-  const anosGarantia = Math.floor(mesesGarantizados / 12);
-  const anosAumento = Math.floor(mesesAumento / 12);
-  
-  const proyeccion: ProyeccionAnual[] = [];
-  const anosAumentoInt = Math.ceil(mesesAumento / 12);
-  const maxAnos = Math.min(30, 81 - edad);
-  
-  for (let año = 0; año < maxAnos; año++) {
-    const edadActual = edad + año;
-    const enPeriodoAumento = año < anosAumentoInt;
-    
-    proyeccion.push({
-      año: año + 1,
-      edad: edadActual,
-      pensionMensual: enPeriodoAumento 
-        ? Math.round(pensionAumentadaFinal)
-        : Math.round(pensionBaseFinal),
-      saldoAcumulado: 0,
-      retiroAcumulado: 0,
-      fase: enPeriodoAumento ? 'aumento' : 'normal'
-    });
-  }
-  
-  return {
-    referenciaUF,
-    unidadMonetaria: 'CLP_REALES',
-    nombre: `RV Invalidez +${(porcentajeNormalizado * 100).toFixed(0)}% x ${anosAumento}a + Garantía ${anosGarantia}a`,
-    pensionMensual: Math.round(pensionAumentadaFinal),
-    pensionEnUF: clpAUf(Math.round(pensionAumentadaFinal), referenciaUF),
-    pensionAnual: pensionAumentadaFinal * 12,
-    cnu: rvBase.cnu,
-    tasaInteres,
-    expectativaVida: rvBase.expectativaVida,
-    periodoGarantizado: mesesGarantizados,
-    aumentoTemporal: {
-      meses: mesesAumento,
-      porcentaje: porcentajeAumento,
-      pensionAumentada: Math.round(pensionAumentadaFinal),
-      pensionFinal: Math.round(pensionBaseFinal)
-    },
-    proyeccion,
-    advertencias: [
-      `Aumento ${(porcentajeAumento > 1 ? porcentajeAumento : porcentajeAumento * 100).toFixed(0)}% por ${anosAumento} años`,
-      `Garantía ${anosGarantia} años`,
-      `Pensión aumento: ${formatearPesos(pensionAumentadaFinal)}`,
-      `Pensión final: ${formatearPesos(pensionBaseFinal)}`,
-      'Usa tabla de mortalidad de inválidos (I-H/I-M-2020)'
-    ]
-  };
+  return calcularRVConAmbasClausulas(fondos, edad, sexo, mesesGarantizados, mesesAumento, porcentajeAumento, tasaInteres, beneficiarios, true, referenciaUF);
 }
 
 // ==========================================
 // CÁLCULO PENSIÓN DE SOBREVIVENCIA
 // ==========================================
 
-/**
- * Calcula los porcentajes de pensión para cada beneficiario
- * según el Art. 58 del DL 3500 con prorrateo cuando excede 100%
- * 
- * PROCEDIMIENTO DE PRORRATEO:
- * 1. Calcular porcentaje teórico de cada beneficiario
- * 2. Sumar todos los porcentajes
- * 3. Si supera 100%, aplicar factor de ajuste = 100 / suma_total
- * 4. Cada beneficiario recibe: porcentaje_original × factor_ajuste
+/** Porcentajes documentados sobre la base del causante y participación familiar separada.
+ * No aplica un tope global del 100%; ver docs/fase-3-fundamentos.md.
  */
-export function calcularPorcentajesBeneficiarios(
-  beneficiarios: BeneficiarioPension[]
-): (BeneficiarioPension & { porcentaje: number; porcentajeOriginal: number; factorProrrateo: number })[] {
-  const resultados: (BeneficiarioPension & { porcentaje: number; porcentajeOriginal: number; factorProrrateo: number })[] = [];
-  
-  // Un hijo tiene derecho si es < 18, o < 24 si es estudiante, o inválido de cualquier edad
-  const tieneHijosConDerecho = beneficiarios.some(
-    b => b.tipo === 'hijo' && (b.edad < 18 || (b.edad < 24 && b.esEstudiante) || b.esInvalido)
-  );
-  const tieneConyugeOConviviente = beneficiarios.some(
-    b => b.tipo === 'conyuge' || b.tipo === 'conviviente'
-  );
-  const tieneMadrePadreNM = beneficiarios.some(
-    b => b.tipo === 'madre_padre_hijos_nm'
-  );
-  const tieneOtrosBeneficiarios = tieneConyugeOConviviente || tieneHijosConDerecho || tieneMadrePadreNM;
-  
-  for (const ben of beneficiarios) {
-    if (ben.tipo === 'hijo' && !ben.esInvalido && ben.edad >= (ben.esEstudiante ? 24 : 18)) continue;
-    if (ben.edad >= 110) continue;
-    let porcentajeOriginal = ben.porcentajePension;
-    
-    // Si el usuario no forzó porcentaje personalizado (> 0), calcular el legal según D.L. 3.500
-    if (!porcentajeOriginal || porcentajeOriginal === 0) {
-      switch (ben.tipo) {
-        case 'conyuge':
-          porcentajeOriginal = tieneHijosConDerecho 
-            ? PORCENTAJES_SOBREVIVENCIA.CONYUGE_CON_HIJOS 
-            : PORCENTAJES_SOBREVIVENCIA.CONYUGE_SIN_HIJOS;
-          break;
-          
-        case 'conviviente':
-          porcentajeOriginal = tieneHijosConDerecho 
-            ? PORCENTAJES_SOBREVIVENCIA.CONVIVIENTE_CON_HIJOS 
-            : PORCENTAJES_SOBREVIVENCIA.CONVIVIENTE_SIN_HIJOS;
-          break;
-          
-        case 'madre_padre_hijos_nm':
-          porcentajeOriginal = tieneHijosConDerecho
-            ? PORCENTAJES_SOBREVIVENCIA.MADRE_PADRE_CON_OTROS_HIJOS
-            : PORCENTAJES_SOBREVIVENCIA.MADRE_PADRE_SIN_OTROS_HIJOS;
-          break;
-
-        case 'hijo': {
-          const tieneDerecho = ben.edad < 18 || (ben.edad < 24 && ben.esEstudiante) || ben.esInvalido;
-          if (!tieneDerecho) {
-            porcentajeOriginal = 0;
-          } else {
-            // Huérfano absoluto: no concurre con cónyuge, conviviente ni madre/padre no matrimonial
-            const esHuerfanoAbsoluto = !tieneConyugeOConviviente && !tieneMadrePadreNM;
-            porcentajeOriginal = esHuerfanoAbsoluto 
-              ? PORCENTAJES_SOBREVIVENCIA.HIJO_HUERFANO 
-              : PORCENTAJES_SOBREVIVENCIA.HIJO_CON_PADRE;
-          }
-          break;
-        }
-          
-        case 'padre':
-        case 'madre':
-          // Sólo tienen derecho si no existen cónyuge, conviviente civil, madre/padre no mat., ni hijos con derecho
-          if (!tieneOtrosBeneficiarios) {
-            porcentajeOriginal = PORCENTAJES_SOBREVIVENCIA.PADRE_MADRE_SIN_OTROS;
-          } else {
-            porcentajeOriginal = 0;
-          }
-          break;
-      }
-    }
-    
-    if (porcentajeOriginal > 0) {
-      resultados.push({
-        ...ben,
-        tipo: ben.tipo,
-        porcentaje: porcentajeOriginal,
-        porcentajeOriginal,
-        edad: ben.edad,
-        sexo: ben.sexo,
-        factorProrrateo: 1.0
-      });
-    }
-  }
-  
-  // APLICAR PRORRATEO LEGAL (Art. 58 DL 3500) SI LA SUMA SUPERA EL 100%
-  const sumaPorcentajes = resultados.reduce((sum, r) => sum + r.porcentajeOriginal, 0);
-  
-  if (sumaPorcentajes > 1.0) {
-    const factorProrrateo = 1.0 / sumaPorcentajes;
-    for (const r of resultados) {
-      r.porcentaje = r.porcentajeOriginal * factorProrrateo;
-      r.factorProrrateo = factorProrrateo;
-    }
-  }
-  
-  return resultados;
+export function calcularPorcentajesBeneficiarios(beneficiarios: BeneficiarioPension[]): PorcentajeBeneficiario[] {
+  return determinarPorcentajes(beneficiarios);
 }
 
 /**
@@ -1402,17 +1148,16 @@ export function calcularPensionSobrevivencia(
     pensionReferencia = fondosCausante / cnuCausante;
   }
   
-  // 2. Calcular porcentajes por beneficiario (YA INCLUYE PRORRATEO si excede 100%)
+  // 2. Porcentajes sobre la base de referencia, sin normalización global
   const porcentajesBeneficiarios = calcularPorcentajesBeneficiarios(beneficiarios);
   
   // 3. Calcular CNU total de sobrevivencia
   const { cnuTotal, detallePorBeneficiario } = calcularCNUSobrevivencia(beneficiarios, tasaInteres, undefined, Number(referenciaUF.fecha.slice(0, 4)));
   
-  // 4. Distribuir pensión por beneficiario usando porcentajes YA AJUSTADOS
+  // 4. Aplicar porcentajes a la base de referencia
   const pensionPorBeneficiario: { tipo: string; porcentaje: number; pensionMensual: number }[] = [];
   
   for (const ben of porcentajesBeneficiarios) {
-    // El porcentaje YA incluye el prorrateo si corresponde
     const pensionBeneficiario = pensionReferencia * ben.porcentaje;
     
     pensionPorBeneficiario.push({
@@ -1425,7 +1170,7 @@ export function calcularPensionSobrevivencia(
   // Expectativa de vida promedio
   const expectativaVidaPromedio = porcentajesBeneficiarios.length > 0
     ? porcentajesBeneficiarios.reduce(
-        (sum, ben) => sum + calcularExpectativaVida(ben.edad, ben.sexo, undefined, undefined, Number(referenciaUF.fecha.slice(0, 4)), 'beneficiario'), 0
+        (sum, ben) => sum + calcularExpectativaVida(ben.edad, ben.sexo, !!ben.esInvalido, undefined, Number(referenciaUF.fecha.slice(0, 4)), 'beneficiario'), 0
       ) / porcentajesBeneficiarios.length
     : 0;
   
@@ -1437,25 +1182,13 @@ export function calcularPensionSobrevivencia(
     madre: 'Madre'
   };
   
-  // Calcular porcentaje total (ya ajustado por prorrateo en calcularPorcentajesBeneficiarios)
   const porcentajeTotal = porcentajesBeneficiarios.reduce((sum, b) => sum + b.porcentaje, 0);
-  const porcentajeOriginalTotal = porcentajesBeneficiarios.reduce((sum, b) => sum + b.porcentajeOriginal, 0);
-  const factorProrrateo = porcentajesBeneficiarios[0]?.factorProrrateo ?? 1.0;
-  
-  // Generar advertencias con información de prorrateo
-  const advertencias: string[] = [
+  const advertencias = [
     `Pensión de referencia: ${formatearPesos(pensionReferencia)}`,
+    `Suma de porcentajes sobre la base: ${(porcentajeTotal * 100).toFixed(1)}%. No es participación en el total familiar.`,
+    ...porcentajesBeneficiarios.flatMap(b => b.advertenciasRegla)
   ];
-  
-  // Si hubo prorrateo, mostrar información
-  if (porcentajeOriginalTotal > 1.0) {
-    advertencias.push(`⚠️ PRORRATEO APLICADO:`);
-    advertencias.push(`   Total original: ${(porcentajeOriginalTotal * 100).toFixed(0)}% > 100%`);
-    advertencias.push(`   Factor de ajuste: ${(factorProrrateo * 100).toFixed(2)}%`);
-  }
-  
-  advertencias.push(`Total porcentajes ajustado: ${(porcentajeTotal * 100).toFixed(1)}%`);
-  
+
   // Agregar detalle por beneficiario
   pensionPorBeneficiario.forEach(b => {
     advertencias.push(
@@ -1549,28 +1282,15 @@ export function calcularRVInmediataSobrevivencia(
   const { cnuTotal } = calcularCNUSobrevivencia(beneficiarios, tasaInteres, 'renta_vitalicia', Number(referenciaUF.fecha.slice(0, 4)));
   const pensionMensual = fondosCausante / cnuTotal;
 
-  // Los porcentajes YA incluyen el prorrateo aplicado en calcularPorcentajesBeneficiarios
-  // No aplicar doble ajuste
-  const porcentajeTotal = porcentajes.reduce((sum, b) => sum + b.porcentaje, 0);
-  const porcentajeOriginalTotal = porcentajes.reduce((sum, b) => sum + b.porcentajeOriginal, 0);
-  const factorProrrateo = porcentajes[0]?.factorProrrateo ?? 1.0;
-
-  // Usar porcentajes ya ajustados (b.porcentaje ya tiene aplicado el prorrateo)
   const pensionPorBen = porcentajes.map(b => ({
-    tipo: b.tipo,
-    porcentaje: b.porcentaje, // Ya ajustado
+    tipo: b.tipo, porcentaje: b.porcentaje,
     pensionMensual: Math.round(pensionMensual * b.porcentaje)
   }));
-
-  // Generar advertencias con info de prorrateo
-  const advertencias: string[] = [];
-  if (porcentajeOriginalTotal > 1.0) {
-    advertencias.push(`⚠️ PRORRATEO APLICADO`);
-    advertencias.push(`Original: ${(porcentajeOriginalTotal * 100).toFixed(0)}% → Ajustado: ${(porcentajeTotal * 100).toFixed(1)}%`);
-    advertencias.push(`Factor: ${(factorProrrateo * 100).toFixed(2)}%`);
-  }
-  advertencias.push('Pensión fija de por vida');
-  advertencias.push('Distribución según Art. 58 DL 3500');
+  const advertencias = [
+    'Pensión financiable estimativa; verificar derechos y acrecimientos futuros.',
+    'Porcentajes del Art.58 sobre la base, sin normalización global al 100%.',
+    ...porcentajes.flatMap(b => b.advertenciasRegla)
+  ];
 
   return presentarTotalSobrevivencia({
     referenciaUF,
@@ -1582,7 +1302,7 @@ export function calcularRVInmediataSobrevivencia(
     pensionAnual: pensionMensual * 12,
     cnu: cnuTotal,
     tasaInteres,
-    expectativaVida: calcularExpectativaVida(porcentajes[0]?.edad || 60, porcentajes[0]?.sexo || 'F', undefined, undefined, Number(referenciaUF.fecha.slice(0, 4)), 'beneficiario'),
+    expectativaVida: calcularExpectativaVida(porcentajes[0]?.edad ?? 60, porcentajes[0]?.sexo ?? 'F', !!porcentajes[0]?.esInvalido, undefined, Number(referenciaUF.fecha.slice(0, 4)), 'beneficiario'),
     pensionPorBeneficiario: pensionPorBen,
     pensionReferencia,
     advertencias
@@ -1643,8 +1363,7 @@ export function calcularRVGarantizadoSobrevivencia(
     periodoGarantizado: mesesGarantizados,
     pensionPorBeneficiario: pensionPorBenAjustado,
     advertencias: [
-      // Mantener advertencias de prorrateo si las hay
-      ...(rvBase.advertencias?.filter(a => a.includes('PRORRATEO') || a.includes('Original:') || a.includes('Factor:')) || []),
+      ...(rvBase.advertencias ?? []),
       `Período garantizado: ${nombreMeses}`,
       `Factor aplicado: ${(factorAjuste * 100).toFixed(1)}%`,
       'Distribución según Art. 58 DL 3500'
@@ -1667,66 +1386,7 @@ export function calcularRVAumentoSobrevivencia(
   tasaInteres: number = TASAS_INTERES.SOBREVIVENCIA,
   referenciaUF: ReferenciaUF = UF_REFERENCIA_EJEMPLO
 ): ResultadoEscenario {
-  referenciaUF = validarReferenciaUF(referenciaUF);
-  const porcentajeNormalizado = porcentajeAumento > 1 ? porcentajeAumento / 100 : porcentajeAumento;
-  const rvBase = calcularRVInmediataSobrevivencia(
-    fondosCausante, edadCausante, sexoCausante, beneficiarios,
-    pensionReferenciaCausante, ingresoBaseCausante, tasaInteres, referenciaUF
-  );
-
-  if ((rvBase.pensionBaseReparto ?? rvBase.pensionMensual) === 0) return rvBase;
-
-  const pensionVitalicia = (rvBase.pensionBaseReparto ?? rvBase.pensionMensual);
-  const pensionAumentada = pensionVitalicia * (1 + porcentajeNormalizado);
-  const incrementoMensual = pensionVitalicia * porcentajeNormalizado;
-
-  let costoAumento = 0;
-  for (let mes = 1; mes <= mesesAumento; mes++) {
-    const factorDescuento = 1 / Math.pow(1 + tasaInteres, mes / 12);
-    costoAumento += incrementoMensual * factorDescuento;
-  }
-
-  const factorAjuste = 1 - (costoAumento / (fondosCausante * 0.97));
-  const pensionBaseAjustada = pensionVitalicia * Math.max(factorAjuste, 0.5);
-  const pensionAumentadaFinal = pensionBaseAjustada * (1 + porcentajeNormalizado);
-
-  const anosAumento = Math.floor(mesesAumento / 12);
-  const mesesRestantes = mesesAumento % 12;
-  let nombrePeriodo = anosAumento > 0 && mesesRestantes > 0 
-    ? `${anosAumento}a ${mesesRestantes}m`
-    : anosAumento > 0 ? `${anosAumento} años` : `${mesesAumento} meses`;
-
-  return presentarTotalSobrevivencia({
-    referenciaUF,
-    unidadMonetaria: 'CLP_REALES',
-    nombre: `RV Sobrevivencia +${porcentajeAumento > 1 ? porcentajeAumento : porcentajeAumento * 100}% x ${nombrePeriodo}`,
-    pensionBaseReparto: pensionAumentadaFinal,
-    pensionMensual: Math.round(pensionAumentadaFinal),
-    pensionEnUF: clpAUf(Math.round(pensionAumentadaFinal), referenciaUF),
-    pensionAnual: pensionAumentadaFinal * 12,
-    cnu: rvBase.cnu,
-    tasaInteres,
-    expectativaVida: rvBase.expectativaVida,
-    aumentoTemporal: {
-      meses: mesesAumento,
-      porcentaje: porcentajeAumento,
-      pensionAumentada: Math.round(pensionAumentadaFinal),
-      pensionFinal: Math.round(pensionBaseAjustada)
-    },
-    pensionPorBeneficiario: rvBase.pensionPorBeneficiario?.map(b => ({
-      ...b,
-      pensionMensual: Math.round(pensionAumentadaFinal * b.porcentaje)
-    })),
-    pensionReferencia: rvBase.pensionReferencia,
-    advertencias: [
-      // Mantener advertencias de prorrateo si las hay
-      ...(rvBase.advertencias?.filter(a => a.includes('PRORRATEO') || a.includes('Original:') || a.includes('Factor:')) || []),
-      `Aumento del ${(porcentajeAumento > 1 ? porcentajeAumento : porcentajeAumento * 100).toFixed(0)}% por ${nombrePeriodo}`,
-      `Pensión durante aumento: ${formatearPesos(pensionAumentadaFinal)}`,
-      `Pensión después: ${formatearPesos(pensionBaseAjustada)}`,
-      'Distribución según Art. 58 DL 3500'
-    ]
-  });
+  return calcularRVAumentoTemporalSobrevivencia(fondosCausante, beneficiarios, mesesAumento, porcentajeAumento, tasaInteres, referenciaUF);
 }
 
 /**
@@ -1745,65 +1405,7 @@ export function calcularRVAmbasSobrevivencia(
   tasaInteres: number = TASAS_INTERES.SOBREVIVENCIA,
   referenciaUF: ReferenciaUF = UF_REFERENCIA_EJEMPLO
 ): ResultadoEscenario {
-  referenciaUF = validarReferenciaUF(referenciaUF);
-  const porcentajeNormalizado = porcentajeAumento > 1 ? porcentajeAumento / 100 : porcentajeAumento;
-  const rvBase = calcularRVInmediataSobrevivencia(
-    fondosCausante, edadCausante, sexoCausante, beneficiarios,
-    pensionReferenciaCausante, ingresoBaseCausante, tasaInteres, referenciaUF
-  );
-
-  if ((rvBase.pensionBaseReparto ?? rvBase.pensionMensual) === 0) return rvBase;
-
-  const factorGarantizado = calcularFactorGarantizado(mesesGarantizados);
-  const pensionBase = (rvBase.pensionBaseReparto ?? rvBase.pensionMensual) * factorGarantizado;
-  const incrementoMensual = pensionBase * porcentajeNormalizado;
-
-  let costoAumento = 0;
-  for (let mes = 1; mes <= mesesAumento; mes++) {
-    const factorDescuento = 1 / Math.pow(1 + tasaInteres, mes / 12);
-    costoAumento += incrementoMensual * factorDescuento;
-  }
-
-  const factorAjusteTotal = Math.max(factorGarantizado - (costoAumento / (fondosCausante * 0.97)), 0.45);
-  const pensionBaseFinal = (rvBase.pensionBaseReparto ?? rvBase.pensionMensual) * factorAjusteTotal;
-  const pensionAumentadaFinal = pensionBaseFinal * (1 + porcentajeNormalizado);
-
-  const anosGarantia = Math.floor(mesesGarantizados / 12);
-  const anosAumento = Math.floor(mesesAumento / 12);
-
-  return presentarTotalSobrevivencia({
-    referenciaUF,
-    unidadMonetaria: 'CLP_REALES',
-    nombre: `RV Sobrevivencia +${(porcentajeNormalizado * 100).toFixed(0)}% x ${anosAumento}a + Garantía ${anosGarantia}a`,
-    pensionBaseReparto: pensionAumentadaFinal,
-    pensionMensual: Math.round(pensionAumentadaFinal),
-    pensionEnUF: clpAUf(Math.round(pensionAumentadaFinal), referenciaUF),
-    pensionAnual: pensionAumentadaFinal * 12,
-    cnu: rvBase.cnu,
-    tasaInteres,
-    expectativaVida: rvBase.expectativaVida,
-    periodoGarantizado: mesesGarantizados,
-    aumentoTemporal: {
-      meses: mesesAumento,
-      porcentaje: porcentajeAumento,
-      pensionAumentada: Math.round(pensionAumentadaFinal),
-      pensionFinal: Math.round(pensionBaseFinal)
-    },
-    pensionPorBeneficiario: rvBase.pensionPorBeneficiario?.map(b => ({
-      ...b,
-      pensionMensual: Math.round(pensionAumentadaFinal * b.porcentaje)
-    })),
-    pensionReferencia: rvBase.pensionReferencia,
-    advertencias: [
-      // Mantener advertencias de prorrateo si las hay
-      ...(rvBase.advertencias?.filter(a => a.includes('PRORRATEO') || a.includes('Original:') || a.includes('Factor:')) || []),
-      `Aumento ${porcentajeAumento}% por ${anosAumento} años`,
-      `Garantía ${anosGarantia} años`,
-      `Pensión aumento: ${formatearPesos(pensionAumentadaFinal)}`,
-      `Pensión final: ${formatearPesos(pensionBaseFinal)}`,
-      'Distribución según Art. 58 DL 3500'
-    ]
-  });
+  return calcularRVAumentoTemporalSobrevivencia(fondosCausante, beneficiarios, mesesAumento, porcentajeAumento, tasaInteres, referenciaUF, mesesGarantizados);
 }
 
 /**
@@ -1861,6 +1463,7 @@ export function calcularRetiroProgramadoSobrevivencia(
   const inicial = proyeccion[0];
   return {
     nombre: 'Retiro Programado Sobrevivencia (total del grupo)',
+    reglasSobrevivencia: determinarPorcentajes(beneficiarios),
     referenciaUF, unidadMonetaria: 'CLP_REALES',
     pensionMensual: inicial.pensionMensual, pensionEnUF: clpAUf(inicial.pensionMensual, referenciaUF),
     pensionAnual: inicial.retiroAnual, pensionBaseReparto: inicial.pensionBaseReparto,
@@ -2433,7 +2036,7 @@ export function calcularFinanciamientoSobrevivencia(
 
 /**
  * Calcula Renta Vitalicia Inmediata de Sobrevivencia con Aumento Temporal (Período Aumentado)
- * Única cláusula adicional permitida legalmente en Sobrevivencia según D.L. 3.500 Art. 61 bis y Compendio de Normas SP
+ * Valorización estimativa de un aumento; su admisibilidad contractual requiere revisión separada.
  * 
  * FÓRMULA DE EQUIVALENCIA ACTUARIAL:
  * Fondos = P_vitalicia × CNU_sob_vitalicio + (porcentajeAumento × P_vitalicia) × CNU_sob_temporal(m)
@@ -2446,12 +2049,13 @@ export function calcularRVAumentoTemporalSobrevivencia(
   mesesAumento: number,
   porcentajeAumento: number,
   tasaInteres: number = TASAS_INTERES.SOBREVIVENCIA,
-  referenciaUF: ReferenciaUF = UF_REFERENCIA_EJEMPLO
+  referenciaUF: ReferenciaUF = UF_REFERENCIA_EJEMPLO,
+  mesesGarantizados: number = 0
 ): ResultadoEscenario {
   referenciaUF = validarReferenciaUF(referenciaUF);
   const valorUF = referenciaUF.valor;
   const porcentajes = calcularPorcentajesBeneficiarios(beneficiarios);
-  const porcentajeNormalizado = porcentajeAumento > 1 ? porcentajeAumento / 100 : porcentajeAumento;
+  const porcentajeNormalizado = normalizarAumento(porcentajeAumento);
 
   if (porcentajes.length === 0) {
     return presentarTotalSobrevivencia({
@@ -2483,15 +2087,16 @@ export function calcularRVAumentoTemporalSobrevivencia(
       mesesAumento,
       tasaInteres,
       esInvalido,
-      'renta_vitalicia', Number(referenciaUF.fecha.slice(0, 4))
+      'renta_vitalicia', Number(referenciaUF.fecha.slice(0, 4)),
+      { rol: 'beneficiario', fechaCalculo: referenciaUF.fecha, edadLimite: ben.tipo === 'hijo' && !ben.esInvalido ? (ben.esEstudiante ? 24 : 18) : 110 }
     );
     cnuTemporalSobrevivencia += cnuTempInd * ben.porcentaje;
   }
 
   // Divisor actuarial ponderado
-  const divisor = cnuVitalicio + porcentajeNormalizado * cnuTemporalSobrevivencia;
+  const divisor = cnuVitalicio / calcularFactorGarantizado(mesesGarantizados) + porcentajeNormalizado * cnuTemporalSobrevivencia;
   const pensionBaseMensual = divisor > 0 ? fondosCausante / divisor : 0;
-  const pensionAumentadaMensual = pensionBaseMensual * (1 + porcentajeNormalizado);
+  const pensionAumentadaMensual = pensionBaseMensual * (1 + (mesesAumento > 0 ? porcentajeNormalizado : 0));
 
   // Desglose por beneficiario para ambas fases (aumentada y posterior)
   const pensionPorBen = porcentajes.map(b => ({
@@ -2510,22 +2115,8 @@ export function calcularRVAumentoTemporalSobrevivencia(
   const pct = Math.round(porcentajeNormalizado * 100);
 
   // Proyección anual
-  const proyeccion: ProyeccionAnual[] = [];
-  const anosAumentoInt = Math.ceil(mesesAumento / 12);
-  for (let ano = 1; ano <= 25; ano++) {
-    const esFaseAumentada = ano <= anosAumentoInt;
-    const pMensual = esFaseAumentada ? pensionAumentadaMensual : pensionBaseMensual;
-    proyeccion.push({
-      año: ano,
-      edad: (porcentajes[0]?.edad || 60) + ano - 1,
-      pensionMensual: Math.round(pMensual),
-      saldoAcumulado: 0,
-      retiroAcumulado: 0,
-      fase: esFaseAumentada ? 'aumentada' : 'vitalicia'
-    });
-  }
-
-  const ufVal = valorUF;
+  const trayectoria = crearTrayectoriaTemporal(pensionBaseMensual, pensionAumentadaMensual, mesesAumento, (porcentajes[0]?.edad ?? 60), 25);
+  const proyeccion = trayectoria.anual;
 
   return presentarTotalSobrevivencia({
     referenciaUF,
@@ -2536,8 +2127,10 @@ export function calcularRVAumentoTemporalSobrevivencia(
     pensionEnUF: clpAUf(Math.round(pensionAumentadaMensual), referenciaUF),
     pensionAnual: Math.round(pensionAumentadaMensual * 12),
     cnu: divisor,
+    componentesCNU: { vitalicioAnual: cnuVitalicio, temporalMensual: cnuTemporalSobrevivencia, porcentajeAumento: porcentajeNormalizado, factorGarantia: calcularFactorGarantizado(mesesGarantizados), divisorTotal: divisor },
     tasaInteres,
-    expectativaVida: calcularExpectativaVida(porcentajes[0]?.edad || 60, porcentajes[0]?.sexo || 'F', undefined, undefined, Number(referenciaUF.fecha.slice(0, 4)), 'beneficiario'),
+    expectativaVida: calcularExpectativaVida(porcentajes[0]?.edad ?? 60, porcentajes[0]?.sexo ?? 'F', !!porcentajes[0]?.esInvalido, undefined, Number(referenciaUF.fecha.slice(0, 4)), 'beneficiario'),
+    periodoGarantizado: mesesGarantizados || undefined,
     aumentoTemporal: {
       meses: mesesAumento,
       porcentaje: porcentajeAumento,
@@ -2546,19 +2139,20 @@ export function calcularRVAumentoTemporalSobrevivencia(
     },
     pensionPorBeneficiario: pensionPorBen,
     proyeccion,
+    proyeccionMensual: trayectoria.mensual,
+    metodologiaTemporal: 'mensual_fuerza_constante_v1',
     advertencias: [
       `Fase Aumentada (+${pct}%): ${Math.round(pensionAumentadaMensual).toLocaleString('es-CL')} / mes durante ${nombrePeriodo} (${mesesAumento} meses)`,
-      `Fase Vitalicia Posterior: ${Math.round(pensionBaseMensual).toLocaleString('es-CL')} / mes fijo en UF de por vida`,
+      `Fase Vitalicia Posterior: ${Math.round(pensionBaseMensual).toLocaleString('es-CL')} / mes; revisar vigencia de derechos`,
       `Distribución a beneficiarios según Art. 58 D.L. 3.500`,
-      `Nota regulatoria Art. 61 bis DL 3500: Cláusula exclusiva de Vejez e Invalidez según normativa CMF/SP`
+      `Art.58 define porcentajes de referencia. La admisibilidad de la cláusula bajo Art.61 bis requiere revisión profesional.`
     ]
   });
 }
 
 /**
  * Calcula la Renta Vitalicia de Sobrevivencia con Período Garantizado de Pago
- * Cláusula adicional permitida para sobrevivencia según la CMF (código CAD220131741) y Compendio SP.
- * Si fallece un beneficiario garantizado, su cuota acrece a los demás o herederos designados.
+ * Factor ilustrativo de garantía. No se verificó aquí la admisibilidad contractual ni acrecimientos.
  */
 export function calcularRVSobrevivenciaGarantizada(
   fondos: number,
@@ -2588,16 +2182,16 @@ export function calcularRVSobrevivenciaGarantizada(
     : (anosGarantizados > 0 ? `${anosGarantizados} ${anosGarantizados === 1 ? 'año' : 'años'}` : `${mesesGarantizados} meses`);
 
   const proyeccion: ProyeccionAnual[] = [];
-  const anosGarantizadosInt = Math.ceil(mesesGarantizados / 12);
   for (let ano = 1; ano <= 25; ano++) {
-    const esFaseGarantizada = ano <= anosGarantizadosInt;
+    const mesesCubiertos = Math.max(0, Math.min(12, mesesGarantizados - (ano - 1) * 12));
     proyeccion.push({
       año: ano,
-      edad: (porcentajes[0]?.edad || 60) + ano - 1,
+      edad: (porcentajes[0]?.edad ?? 60) + ano - 1,
       pensionMensual: Math.round(pensionGarantizadaMensual),
       saldoAcumulado: 0,
       retiroAcumulado: 0,
-      fase: esFaseGarantizada ? 'normal' : 'decreciente'
+      mesesGarantizados: mesesCubiertos,
+      fase: mesesCubiertos > 0 && mesesCubiertos < 12 ? 'mixta' : 'normal'
     });
   }
 
@@ -2613,7 +2207,7 @@ export function calcularRVSobrevivenciaGarantizada(
     pensionAnual: Math.round(pensionGarantizadaMensual * 12),
     cnu: factorAjuste > 0 ? cnuTotal / factorAjuste : cnuTotal,
     tasaInteres,
-    expectativaVida: calcularExpectativaVida(porcentajes[0]?.edad || 60, porcentajes[0]?.sexo || 'F', undefined, undefined, Number(referenciaUF.fecha.slice(0, 4)), 'beneficiario'),
+    expectativaVida: calcularExpectativaVida(porcentajes[0]?.edad ?? 60, porcentajes[0]?.sexo ?? 'F', !!porcentajes[0]?.esInvalido, undefined, Number(referenciaUF.fecha.slice(0, 4)), 'beneficiario'),
     periodoGarantizado: mesesGarantizados,
     pensionPorBeneficiario: pensionPorBen,
     proyeccion,
@@ -2621,7 +2215,7 @@ export function calcularRVSobrevivenciaGarantizada(
       `Período Garantizado de Pago: ${nombrePeriodo} (${mesesGarantizados} meses)`,
       `Si un beneficiario fallece durante la garantía, su cuota acrece a los demás o herederos designados`,
       `Al término de los ${nombrePeriodo}, se mantiene la pensión vitalicia bajo alícuotas del Art. 58 DL 3500`,
-      `Cláusula legalmente autorizada en Sobrevivencia por CMF (CAD220131741) y Compendio SP`
+      `Factor ilustrativo de garantía; fuente porcentajes: Art.58. Admisibilidad de cláusulas sujeta a revisión CMF/SP.`
     ]
   });
 }
@@ -2642,6 +2236,29 @@ function presentarTotalSobrevivencia(base: ResultadoEscenario): ResultadoEscenar
       ...base.aumentoTemporal, pensionAumentada: total,
       pensionFinal: (base.pensionPorBeneficiario ?? []).reduce((t, b) => t + (b.pensionPosterior ?? Math.round(base.aumentoTemporal!.pensionFinal * b.porcentaje)), 0)
     },
-    proyeccion: base.proyeccion?.map((fila, indice) => ({ ...fila, pensionMensual: indice === 0 ? total : Math.round(fila.pensionMensual * suma) }))
+    proyeccion: base.proyeccion?.map(fila => ({ ...fila, pensionMensual: Math.round(fila.pensionMensual * suma) })),
+    proyeccionMensual: base.proyeccionMensual?.map(fila => ({ ...fila, pensionMensual: fila.pensionMensual * suma }))
+  };
+}
+
+function normalizarAumento(porcentaje: number): number {
+  if (!Number.isFinite(porcentaje) || porcentaje < 0) throw new RangeError('Aumento debe ser finito y no negativo');
+  return porcentaje > 1 ? porcentaje / 100 : porcentaje;
+}
+
+function validarEntradaCNU(edad: number, sexo: Sexo, tasa: number, ano: number): void {
+  if (!Number.isInteger(edad) || edad < 0 || edad > 110 || !['M', 'F'].includes(sexo)) throw new RangeError('CNU anual requiere edad entera válida y sexo M/F');
+  if (!Number.isFinite(tasa) || tasa <= -1 || !Number.isInteger(ano) || ano < 2020) throw new RangeError('Tasa o año CNU inválidos');
+}
+
+/** Adjunta procedencia y separa regla documentada de acreditación personal. */
+export function etiquetarResultadoActuarial(resultado: ResultadoEscenario, beneficiarios: BeneficiarioPension[] = []): ResultadoEscenario {
+  const reglas = determinarPorcentajes(beneficiarios);
+  const limites = ['Tasas de descuento y garantías ilustrativas; sin vigencia regulatoria ni conformidad contractual acreditadas.'];
+  if (resultado.nombre.startsWith('RV') && beneficiarios.some(b => b.tipo === 'hijo')) limites.push('La trayectoria de RV mantiene cuotas iniciales; cambios de derecho, invalidez parcial y acrecimientos futuros requieren revisión. El CNU temporal limita el derecho por edad, pero la trayectoria no es una liquidación legal futura.');
+  return { ...resultado, reglasSobrevivencia: reglas,
+    validacionActuarial: { estado: 'estimativo', fechaRevision: '2026-11-08',
+      fuenteTablas: 'https://www.cmfchile.cl/normativa/ncg_495_2023.pdf', cnuVitalicio: 'aproximacion_anual_no_certificada' },
+    advertencias: [...new Set([AVISO_SIMULACION, ...limites, ...(resultado.advertencias ?? []), ...reglas.flatMap(b => b.advertenciasRegla)])]
   };
 }

@@ -24,8 +24,32 @@ const opcionesResponse = await post('sobrevivencia_opciones', { rentabilidadReal
 assert.ok(opcionesResponse.ok);
 const opciones = (await opcionesResponse.json()).resultados;
 assert.equal(opciones[0].rentabilidadRealAnual, .04);
-for (const r of opciones) assert.deepEqual(r.referenciaUF, uf);
-for (const cambios of [{ referenciaUF: { ...uf, valor: 0 } }, { referenciaUF: { ...uf, fecha: '2026-02-30' } }, { unidadMonetaria: 'UF' }, { uf: 38500 }]) {
+for (const r of opciones) {
+  assert.deepEqual(r.referenciaUF, uf);
+  assert.equal(r.validacionActuarial.estado, 'estimativo');
+  assert.equal(r.reglasSobrevivencia[0].estadoRegla, 'requiere_datos');
+}
+const escenarios = (await (await post('escenarios_rp')).json()).resultados;
+for (const r of Object.values(escenarios)) assert.equal(r.validacionActuarial.estado, 'estimativo');
+for (const tipo of ['aumento_temporal', 'invalidez_rv_aumento', 'sobrevivencia_rv_aumento']) {
+  const r = (await (await post(tipo, { mesesAumento: 13, porcentajeAumento: .5 })).json()).resultado;
+  assert.equal(r.metodologiaTemporal, 'mensual_fuerza_constante_v1');
+  assert.equal(r.proyeccionMensual.filter(p => p.fase === 'aumento').length, 13);
+  assert.equal(r.proyeccion[1].mesesAumentados, 1);
+  assert.equal(r.componentesCNU.divisorTotal, r.cnu);
+  assert.equal(r.pensionEnUF, r.pensionMensual / uf.valor);
+}
+const sinAumento = (await (await post('aumento_temporal', { mesesAumento: 0, porcentajeAumento: .5 })).json()).resultado;
+assert.equal(sinAumento.pensionMensual, sinAumento.aumentoTemporal.pensionFinal);
+assert.equal((await post('aumento_temporal', { mesesAumento: 13, porcentajeAumento: -.5 })).status, 400);
+const reglasExplicitas = [{ ...datos.beneficiarios[0], idsHijosComunes: [] }, datos.beneficiarios[1]];
+const reglas = (await (await post('sobrevivencia_rp', { beneficiarios: reglasExplicitas })).json()).resultado.reglasSobrevivencia;
+assert.equal(reglas[0].porcentajeLegal, .6);
+assert.equal(reglas[1].porcentajeLegal, .15);
+const metadata = (await (await fetch(`${base}/api/pension`)).json()).parametros;
+assert.match(metadata.porcentajesSobrevivencia.padreMadre, /50%/);
+assert.match(metadata.estadoTasas, /ilustrativos/);
+for (const cambios of [{ referenciaUF: { ...uf, valor: 0 } }, { referenciaUF: { ...uf, fecha: '2026-02-30' } }, { unidadMonetaria: 'UF' }, { uf: 38500 }, { beneficiarios: [{ ...datos.beneficiarios[0], edad: -1 }] }, { beneficiarios: [{ ...datos.beneficiarios[0], idsHijosComunes: 'h' }] }]) {
   assert.equal((await post('retiro_programado', cambios)).status, 400);
 }
 const resultado = (await (await post('retiro_programado')).json()).resultado;
@@ -37,4 +61,4 @@ assert.ok(documento.ok, await documento.clone().text());
 assert.equal(Buffer.from(await documento.arrayBuffer()).subarray(0, 4).toString(), '%PDF');
 assert.equal((await pdf({ ...reporte, parametros: { ...reporte.parametros, referenciaUF: { ...uf, valor: 40000 } } })).status, 400);
 assert.equal((await pdf({ ...reporte, parametros: { ...reporte.parametros, usarProyeccionUF: true } })).status, 400);
-console.log('Integración HTTP superada: 5 modalidades, opciones de sobrevivencia, UF fechada, flujos, errores 400 y PDF.');
+console.log('Integración HTTP superada: 8 modalidades, escenarios, metadatos actuariales, períodos de 13 meses, vínculos, UF fechada, errores 400 y PDF.');

@@ -57,7 +57,7 @@ const OPCIONES_PARENTESCO: ParentescoOpcion[] = [
     id: 'conviviente',
     tipo: 'conviviente',
     label: 'Conviviente Civil',
-    sublabel: 'Acuerdo Unión Civil (50%-60%)',
+    sublabel: 'Acuerdo Unión Civil (15%, 50% o 60%)',
     icono: <UserCheck className="w-3.5 h-3.5 text-indigo-500" />,
     sexoDefecto: 'F',
     edadDefecto: 60,
@@ -115,7 +115,7 @@ const OPCIONES_PARENTESCO: ParentescoOpcion[] = [
     id: 'padre_madre',
     tipo: 'padre',
     label: 'Padres del Causante',
-    sublabel: 'Causante Asig. Familiar sin otros beneficiarios (15%)',
+    sublabel: 'Carga familiar acreditada, sin otros beneficiarios (50%)',
     icono: <Scale className="w-3.5 h-3.5 text-slate-500" />,
     sexoDefecto: 'M',
     edadDefecto: 85,
@@ -135,6 +135,7 @@ export function BeneficiariesManager({
   const [sexo, setSexo] = useState<Sexo>(defaultOption.sexoDefecto);
   const [esEstudiante, setEsEstudiante] = useState<boolean>(false);
   const [esInvalido, setEsInvalido] = useState<boolean>(false);
+  const [gradoInvalidez, setGradoInvalidez] = useState<'total' | 'parcial' | ''>('');
 
   // Calcular edad en tiempo real basada en la fecha de nacimiento
   const edadCalculada = calcularEdadDesdeFecha(fechaNacimiento);
@@ -168,6 +169,7 @@ export function BeneficiariesManager({
       fechaNacimiento,
       edad: edadCalculada,
       sexo,
+      gradoInvalidez: esInvalido ? (gradoInvalidez || undefined) : undefined,
       porcentajePension: 0, // Se calcula dinámicamente según normativa
       esEstudiante: opcion.id === 'hijo_estudiante' ? true : esEstudiante,
       esInvalido: opcion.id === 'hijo_invalido' ? true : esInvalido
@@ -189,10 +191,9 @@ export function BeneficiariesManager({
     onChange(filtrados);
   };
 
-  // Cálculo de porcentajes legales y prorrateo de la lista actual
+  // Porcentajes de referencia y datos que requieren acreditación
   const porcentajesCalculados = calcularPorcentajesBeneficiarios(beneficiarios);
-  const sumaPorcentajesTeoricos = porcentajesCalculados.reduce((acc, r) => acc + r.porcentajeOriginal, 0);
-  const hayProrrateo = sumaPorcentajesTeoricos > 1.0;
+  const avisosReglas = [...new Set(porcentajesCalculados.flatMap(b => b.advertenciasRegla))];
 
   return (
     <Card className="shadow-sm border-slate-200 overflow-hidden">
@@ -337,6 +338,11 @@ export function BeneficiariesManager({
             </label>
           </div>
 
+          {esInvalido && <label className="block text-xs">Grado de invalidez informado
+            <select value={gradoInvalidez} onChange={e => setGradoInvalidez(e.target.value as 'total' | 'parcial' | '')} className="ml-2 border rounded p-1">
+              <option value="">Sin especificar</option><option value="total">Total</option><option value="parcial">Parcial</option>
+            </select>
+          </label>}
           {/* Botón Incorporar Beneficiario */}
           <Button
             type="button"
@@ -373,9 +379,8 @@ export function BeneficiariesManager({
           ) : (
             <div className="space-y-1.5">
               {beneficiarios.map((ben, idx) => {
-                const info = porcentajesCalculados[idx];
+                const info = porcentajesCalculados.find(r => r === ben || (ben.id ? r.id === ben.id : r.tipo === ben.tipo && r.edad === ben.edad && r.sexo === ben.sexo));
                 const pctMostrar = info ? Math.round(info.porcentaje * 100) : 0;
-                const pctOriginal = info ? Math.round(info.porcentajeOriginal * 100) : 0;
 
                 return (
                   <div
@@ -421,11 +426,7 @@ export function BeneficiariesManager({
                         <span className="text-xs font-bold text-indigo-700 font-mono block">
                           {pctMostrar}%
                         </span>
-                        {hayProrrateo && (
-                          <span className="text-[9px] text-slate-400 block line-through">
-                            teórico {pctOriginal}%
-                          </span>
-                        )}
+
                       </div>
 
                       <Button
@@ -443,18 +444,20 @@ export function BeneficiariesManager({
                 );
               })}
 
-              {/* Banner de Prorrateo si excede 100% */}
-              {hayProrrateo && (
-                <div className="p-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-[11px] flex items-start gap-1.5 mt-2">
-                  <AlertCircle className="w-3.5 h-3.5 text-amber-600 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <span className="font-semibold">Prorrateo Legal Aplicado: </span>
-                    La suma teórica de las pensiones de sobrevivencia era de{' '}
-                    <strong>{Math.round(sumaPorcentajesTeoricos * 100)}%</strong>. Por ley (Art. 58 D.L. 3.500),
-                    se prorratean proporcionalmente para no exceder el 100%.
-                  </div>
-                </div>
-              )}
+              <div className="rounded border border-amber-200 bg-amber-50 p-2 text-xs text-amber-950 space-y-1">
+                <p>Los porcentajes se aplican a la base de referencia del causante. Su suma puede superar 100%; no es una distribución porcentual del total familiar.</p>
+                {avisosReglas.map(aviso => <p key={aviso}>{aviso}</p>)}
+              </div>
+              {beneficiarios.filter(b => ['conyuge', 'conviviente', 'madre_padre_hijos_nm'].includes(b.tipo)).map(adulto => (
+                <fieldset key={adulto.id} className="border rounded p-2 text-xs space-y-1">
+                  <legend>Hijos comunes con {adulto.nombre || adulto.tipo}</legend>
+                  {adulto.idsHijosComunes === undefined && <button type="button" className="underline" onClick={() => onChange(beneficiarios.map(b => b === adulto ? { ...b, idsHijosComunes: [] } : b))}>Definir vínculos (ahora sin verificar)</button>}
+                  {beneficiarios.filter(h => h.tipo === 'hijo' && h.id).map(h => <label key={h.id} className="block">
+                    <input type="checkbox" checked={adulto.idsHijosComunes?.includes(h.id!) ?? false} onChange={e => onChange(beneficiarios.map(b => b === adulto ? { ...b, idsHijosComunes: e.target.checked ? [...(b.idsHijosComunes ?? []), h.id!] : (b.idsHijosComunes ?? []).filter(id => id !== h.id) } : b))} /> {h.nombre || 'Hijo/a'}
+                  </label>)}
+                </fieldset>
+              ))}
+
             </div>
           )}
         </div>

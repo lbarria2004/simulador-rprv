@@ -65,7 +65,7 @@ export function ModalitiesSelector({
   const [aplicarTasaEspecialEnClausula, setAplicarTasaEspecialEnClausula] = useState<boolean>(false);
   const [modoTasaEspecialGlobal, setModoTasaEspecialGlobal] = useState<boolean>(false);
 
-  // En sobrevivencia, las opciones permitidas por normativa CMF/SP son período garantizado o tasa especial
+  // La interfaz limita las cláusulas explorables de sobrevivencia; no certifica su admisibilidad.
   React.useEffect(() => {
     if (tipoPension === 'sobrevivencia' && tipoClausula !== 'garantizada' && tipoClausula !== 'tasa_especial') {
       setTipoClausula('garantizada');
@@ -163,7 +163,7 @@ export function ModalitiesSelector({
     if ((m.tipo === 'retiro_programado' || m.tipo === 'renta_vitalicia_simple') && !m.esPersonalizada) {
       return false;
     }
-    // En sobrevivencia, las cláusulas adicionales permitidas son garantía o modalidades personalizadas con tasa especial
+    // Alcance actual de la interfaz de sobrevivencia.
     if (tipoPension === 'sobrevivencia') {
       return m.tipo === 'rv_garantizada' || m.esPersonalizada;
     }
@@ -203,10 +203,10 @@ export function ModalitiesSelector({
               </div>
               <div>
                 <h4 className="text-xs font-bold text-slate-900 tracking-wide uppercase flex items-center gap-1.5">
-                  Tasas de Interés de Cálculo Actuarial (Vigentes y Ajustables)
+                  Tasas de descuento real para simulación (ajustables)
                 </h4>
                 <p className="text-[11px] text-slate-500">
-                  Tasas anuales utilizadas para calcular el Capital Necesario Unitario (CNU) y las pensiones mensuales. Modifícalas para evaluar sensibilidad de mercado.
+                  Tasas anuales utilizadas para calcular el Capital Necesario Unitario (CNU) y las pensiones mensuales. Son supuestos ilustrativos sin vigencia regulatoria acreditada. Modifícalas para evaluar sensibilidad.
                 </p>
               </div>
             </div>
@@ -322,12 +322,12 @@ export function ModalitiesSelector({
                   </Badge>
                 ) : (
                   <Badge variant="outline" className="text-[10px] bg-indigo-50 text-indigo-800 border-indigo-200 font-mono">
-                    {tipoPension === 'invalidez' ? 'CMF Invalidez: 3.02%' : tipoPension === 'sobrevivencia' ? 'CMF Sobrevivencia: 2.95%' : 'CMF Líder: 2.99%'}
+                    Supuesto ilustrativo
                   </Badge>
                 )}
               </div>
 
-              {/* Selector de Modo: Oficial CMF vs Especial Manual */}
+              {/* Selector de supuesto inicial o ajuste manual */}
               <div className="flex items-center gap-1 p-0.5 bg-slate-100 rounded-lg border border-slate-200 text-[11px]">
                 <button
                   type="button"
@@ -341,7 +341,7 @@ export function ModalitiesSelector({
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  🏛️ Tasa Mercado CMF
+                  Restablecer supuesto
                 </button>
                 <button
                   type="button"
@@ -412,7 +412,7 @@ export function ModalitiesSelector({
               {/* Atajos rápidos TRV */}
               <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
                 <span className="text-[10px] text-slate-400 font-medium">
-                  {modoTasaEspecialGlobal ? 'Sugerencias:' : 'Escenarios CMF:'}
+                  {modoTasaEspecialGlobal ? 'Sugerencias:' : 'Escenarios ilustrativos:'}
                 </span>
                 {(modoTasaEspecialGlobal ? [
                   { label: '3.15%', val: 3.15 },
@@ -421,10 +421,10 @@ export function ModalitiesSelector({
                   { label: '3.60%', val: 3.60 },
                   { label: '3.75%', val: 3.75 }
                 ] : [
-                  { label: '2.82% (Media)', val: 2.82 },
+                  { label: '2.82%', val: 2.82 },
                   { label: '2.87%', val: 2.87 },
                   { label: '2.93%', val: 2.93 },
-                  { label: '2.99% (Líder)', val: 2.99 },
+                  { label: '2.99%', val: 2.99 },
                   { label: '3.11%', val: 3.11 }
                 ]).map(sc => (
                   <button
@@ -560,7 +560,7 @@ export function ModalitiesSelector({
             <div className="p-2.5 rounded-lg bg-purple-50 border border-purple-200 text-xs text-purple-950 flex items-start gap-2">
               <span className="text-sm">⚖️</span>
               <div className="leading-snug">
-                <strong>Normativa Oficial CMF y SP (Compendio de Pensiones):</strong> En pensión de sobrevivencia no procede la contratación de cláusulas de Aumento Temporal. Sí es plenamente legal cotizar <strong>Retiro Programado</strong>, <strong>Renta Vitalicia Simple</strong>, <strong>Período Garantizado</strong> o cotizaciones con <strong>Tasa hipotética de RV</strong>.
+                <strong>Alcance estimativo:</strong> las reglas de porcentajes y las cláusulas contractuales son cuestiones distintas. La admisibilidad de garantías o aumentos en sobrevivencia requiere revisión profesional; los ejemplos de este simulador no son ofertas.
               </div>
             </div>
           )}

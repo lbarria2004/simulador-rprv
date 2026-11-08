@@ -1,3 +1,4 @@
+import type { PorcentajeBeneficiario } from './reglas-sobrevivencia.ts';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { calcularPGU, calcularBAC, calcularCompensacionExpectativaVidaMujer, PGU } from './pension-calculator.ts';
 import { clpAUf, ufAClp, validarReferenciaUF, type ReferenciaUF } from './moneda.ts';
@@ -71,6 +72,9 @@ interface ResultadoData {
   nombre: string;
   pensionMensual: number;
   pensionEnUF: number;
+  pensionBaseReparto?: number;
+  reglasSobrevivencia?: PorcentajeBeneficiario[];
+  metodologiaTemporal?: string;
   pensionAnual: number;
   cnu: number;
   tasaInteres: number;
@@ -393,7 +397,7 @@ export async function generarReportePDF(body: DatosReporte): Promise<Uint8Array>
 
         const rviData = [
           ['Modalidad', 'Tasa (%)', 'Pension (UF)', 'Pension M. Bruto', 'Dscto. 7% Salud', 'Pension Liquida', headerUltimaColumna],
-          ['RVI SIMPLE (Media Mercado)', `${tasaRVPct}%`, `${pensionUF} UF`, `$${formatNumber(pensionBruto)}`, `-$${formatNumber(descuentoSalud)}`, `$${formatNumber(pensionLiquida)}`, `$${formatNumber(totalUltimaCol)}`]
+          ['RVI SIMPLE (Supuesto)', `${tasaRVPct}%`, `${pensionUF} UF`, `$${formatNumber(pensionBruto)}`, `-$${formatNumber(descuentoSalud)}`, `$${formatNumber(pensionLiquida)}`, `$${formatNumber(totalUltimaCol)}`]
         ];
         const colWidths = [105, 45, 60, 75, 68, 72, 87];
         y = drawTable(page, rviData, 50, y, colWidths, { regular: fontRegular, bold: fontBold });
@@ -637,7 +641,6 @@ export async function generarReportePDF(body: DatosReporte): Promise<Uint8Array>
         const baseNum = rvInmediata ? 3 : 2;
         const num = baseNum + rvGarantizados.length + i;
         const meses = rv.aumentoTemporal?.meses || 0;
-        const anosAumento = Math.floor(meses / 12);
 
         drawText(page, `${num}. RV Invalidez con Aumento Temporal`, 50, y, {
           size: 11,
@@ -645,7 +648,7 @@ export async function generarReportePDF(body: DatosReporte): Promise<Uint8Array>
           color: { r: 0.122, g: 0.306, b: 0.475 }
         });
         y -= 15;
-        drawText(page, `Aumento ${rv.aumentoTemporal?.porcentaje || 0}% por ${anosAumento} anos`, 50, y, { size: 9, font: fontRegular });
+        drawText(page, `Aumento ${(rv.aumentoTemporal!.porcentaje > 1 ? rv.aumentoTemporal!.porcentaje : rv.aumentoTemporal!.porcentaje * 100)}% por ${meses} meses`, 50, y, { size: 9, font: fontRegular });
         y -= 20;
 
         const pensionBruto = rv.pensionMensual;
@@ -791,8 +794,27 @@ export async function generarReportePDF(body: DatosReporte): Promise<Uint8Array>
       }
     }
 
+    const reglas = resultados.find(r => r.reglasSobrevivencia?.length)?.reglasSobrevivencia;
+    if (reglas?.length) {
+      if (y < 140 + reglas.length * 22) nuevaPagina();
+      drawText(page, 'Porcentajes de referencia (art.58): sujetos a requisitos y vinculos acreditados.', 50, y, { size: 8, font: fontBold });
+      y -= 14;
+      drawText(page, 'La base de referencia del causante es distinta de la base financiable del modelo.', 50, y, { size: 8, font: fontRegular });
+      y -= 18;
+      for (let inicio = 0; inicio < reglas.length; inicio += 20) {
+        if (inicio) nuevaPagina();
+        const rows = [['Persona', 'Regla base', 'Incremento', 'Utilizado', 'Part. familiar'], ...reglas.slice(inicio, inicio + 20).map(b => [
+          b.tipo, `${(b.porcentajeLegal * 100).toFixed(2)}%`, `${(b.incrementoLegal * 100).toFixed(2)}%`, `${(b.porcentaje * 100).toFixed(2)}%`, `${(b.participacionFamiliar * 100).toFixed(2)}%`
+        ])];
+        y = drawTable(page, rows, 50, y, [135, 85, 85, 85, 110], { regular: fontRegular, bold: fontBold });
+      }
+      drawText(page, 'Los porcentajes manuales y casos sin datos completos no acreditan un derecho legal.', 50, y, { size: 8, font: fontRegular });
+      y -= 15;
+    }
+
     // Notas finales
     y = Math.min(y, 100);
+    if (y < 90) { nuevaPagina(); y = 100; }
     drawText(page, 'NOTA: VALORES ESTIMATIVOS NO CONSTITUYEN UNA OFERTA FORMAL DE PENSION.', 50, y, { size: 7, font: fontRegular });
     y -= 12;
     drawText(page, 'LA PGU SE SOLICITA A LOS 65 ANOS, REQUISITO TENER REGISTRO SOCIAL DE HOGARES.', 50, y, { size: 7, font: fontRegular });
@@ -810,7 +832,12 @@ export async function generarReportePDF(body: DatosReporte): Promise<Uint8Array>
     }
 
     for (const pagina of pdfDoc.getPages()) {
+      drawText(pagina, 'TM-2020 cotejada con SP/CMF. CNU anual y complemento mensual estimativos; sin certificacion.', 50, 29, { size: 6, font: fontRegular });
       drawText(pagina, 'Orientacion independiente. Sin conexion con SCOMP. No es oferta de AFP o aseguradora.', 50, 18, { size: 7, font: fontRegular });
+    }
+
+    if (tipoPension === 'sobrevivencia') {
+      for (const pagina of pdfDoc.getPages()) drawText(pagina, 'RV: cuotas iniciales ilustrativas; revisar cambios de derecho y acrecimientos futuros.', 50, 40, { size: 7, font: fontRegular });
     }
 
     // Guardar PDF

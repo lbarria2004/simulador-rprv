@@ -7,6 +7,12 @@ interface CacheTasas {
 }
 
 let cacheTasas: CacheTasas | null = null;
+const PROCEDENCIA_TASAS = {
+  estadoValidacion: 'sin_validacion_actuarial_ni_vigencia_regulatoria',
+  fechaDatosVerificada: null,
+  fuenteEstadistica: 'https://www.cmfchile.cl/institucional/estadisticas/svtas_param.php?p=tas_int_med_rvp',
+  aviso: 'Estadísticas o supuestos locales. No son ofertas, tasas técnicas regulatorias ni acreditan vigencia. actualizadoAl es fecha de consulta o etiqueta local sin verificar.'
+};
 const CACHE_DURATION_MS = 24 * 60 * 60 * 1000; // 24 horas
 
 export async function GET() {
@@ -16,6 +22,7 @@ export async function GET() {
   if (cacheTasas && now - cacheTasas.timestamp < CACHE_DURATION_MS) {
     return NextResponse.json({
       success: true,
+      ...PROCEDENCIA_TASAS,
       fuente: 'cache',
       tasas: cacheTasas.data
     });
@@ -109,6 +116,7 @@ export async function GET() {
 
     return NextResponse.json({
       success: true,
+      ...PROCEDENCIA_TASAS,
       fuente: 'cmf_live',
       tasas: resultado
     });
@@ -116,6 +124,7 @@ export async function GET() {
     console.warn('Fallo consulta en vivo a CMF, usando respaldo local:', error);
     return NextResponse.json({
       success: true,
+      ...PROCEDENCIA_TASAS,
       fuente: 'fallback_local',
       tasas: {
         actualizadoAl: TASAS_RENTA_VITALICIA.fecha_actualizacion,

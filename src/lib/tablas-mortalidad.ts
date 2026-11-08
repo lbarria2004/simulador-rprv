@@ -1,8 +1,8 @@
 /**
  * ADAPTADOR DE LA TRANSCRIPCIÓN LOCAL TM-2020 (SP / CMF)
  * Fuente: Superintendencia de Pensiones (SP) y Comisión para el Mercado Financiero (CMF)
- * Referencia: SP NCG 306, 24-02-2023; ver docs/fase-2-fundamentos.md.
- * La transcripción numérica local sigue pendiente de cotejo con el original.
+ * Referencia: SP NCG 306, 24-02-2023; ver docs/fase-3-fundamentos.md.
+ * Transcripción cotejada el 2026-11-08; no certifica fórmulas, tasas ni acreditaciones.
  * 
  * Este módulo unifica las tablas oficiales de mortalidad con factores dinámicos
  * de mejoramiento generacional AA(x, t) de 2021 a 2036*, calibradas para el año 2026.
@@ -38,7 +38,7 @@ export {
   type DatosMortalidadEdad
 };
 
-// Mapas planos Record<number, number> proyectados al año de cálculo vigente (2026)
+// Mapas planos Record<number, number> proyectados al año de ejemplo (2026)
 // Para retrocompatibilidad exacta con el resto del sistema
 export const TABLA_CB_H_2020: Record<number, number> = TABLA_CB_H_2026;
 export const TABLA_B_M_2020: Record<number, number> = TABLA_B_M_2026;
@@ -57,7 +57,9 @@ export const TASAS_INTERES_TECNICAS = {
   FACTOR_AJUSTE_FEMENINO: 0.0015,
 } as const;
 
+/** Datos heredados sin circular primaria acreditada. No son ofertas ni tasas vigentes verificadas. */
 export const TASAS_RENTA_VITALICIA = {
+  estado_validacion: 'sin_respaldo_primario_de_vigencia',
   fecha_actualizacion: '2026-09-01',
   media_mercado: {
     vejez: 0.0282,
@@ -129,7 +131,8 @@ export function getQx(
 }
 
 /**
- * Calcula sobrevivientes lx a una edad dada (raíz de cohorte 100.000)
+ * Supervivientes condicionales, raíz 100.000: edad 20 en RV-M; cero en las demás.
+ * Producto generacional local, no lx oficial; docs/fase-3-fundamentos.md.
  */
 export function calcularLx(
   edadObjetivo: number,
@@ -140,7 +143,9 @@ export function calcularLx(
   rol: 'titular' | 'beneficiario' = 'titular'
 ): number {
   let lx = 100000;
-  const edadMinima = esInvalido ? 18 : 0;
+  const edadMinima = !esInvalido && sexo === 'F' && rol === 'titular' ? 20 : 0;
+  if (!Number.isInteger(edadObjetivo) || edadObjetivo < edadMinima || edadObjetivo > 110) throw new RangeError('Edad fuera del dominio de lx');
+  getQx(edadMinima, sexo, esInvalido, modalidad, anoInicio, rol);
   
   for (let edad = edadMinima; edad < edadObjetivo; edad++) {
     const ano = anoInicio + (edad - edadMinima);

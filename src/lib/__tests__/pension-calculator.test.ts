@@ -9,6 +9,7 @@ import assert from 'node:assert/strict';
 
 import {
   calcularCNU,
+  calcularCNUIndividual,
   calcularCNUTemporal,
   calcularRetiroProgramado,
   calcularRVInmediata,
@@ -237,7 +238,7 @@ describe('Motor Actuarial de Pensiones - Sistema Chileno', () => {
       assert.equal(res[0].factorProrrateo, 1.0); // Suma = 65% <= 100%
     });
 
-    it('Aplica prorrateo legal cuando la suma de porcentajes supera el 100%', () => {
+    it('conserva porcentajes legales que suman 110% y normaliza solo participación', () => {
       // Cónyuge (50%) + 4 Hijos (15% cada uno = 60%) => Suma teórica = 110%
       const ben: BeneficiarioPension[] = [
         { tipo: 'conyuge', edad: 55, sexo: 'F', porcentajePension: 0 },
@@ -250,9 +251,10 @@ describe('Motor Actuarial de Pensiones - Sistema Chileno', () => {
       assert.equal(res.length, 5);
       const sumaFinal = res.reduce((acc, r) => acc + r.porcentaje, 0);
       // La suma ajustada debe ser exactamente 1.0 (o margen menor a 0.001 por redondeo de 4 decimales)
-      assert.ok(Math.abs(sumaFinal - 1.0) < 0.005, `Suma prorrateada (${sumaFinal}) no converge a 1.0`);
-      assert.ok(res[0].factorProrrateo < 1.0);
-      assert.ok(res[0].porcentaje < 0.50);
+      assert.ok(Math.abs(sumaFinal - 1.1) < 1e-14);
+      assert.equal(res[0].factorProrrateo, 1);
+      assert.equal(res[0].porcentajeLegal, .50);
+      assert.ok(Math.abs(res.reduce((s, b) => s + b.participacionFamiliar, 0) - 1) < 1e-14);
     });
 
     it('Hijo mayor de 18 que no es estudiante ni inválido no tiene derecho (0%) y cónyuge mantiene 60%', () => {
@@ -398,7 +400,7 @@ describe('Motor Actuarial de Pensiones - Sistema Chileno', () => {
         tipo: 'hijo',
         edad: 8,
         sexo: 'M',
-        porcentajePension: 0
+        porcentajePension: .15
       }];
 
       const { cnuTotal } = calcularCNUSobrevivencia(hijo8Anos, 0.0358, 'retiro_programado');
@@ -406,7 +408,9 @@ describe('Motor Actuarial de Pensiones - Sistema Chileno', () => {
       // Un flujo de 10 años (8 a 18) con tasa 3.58% y factor 0.15 da un CNU moderado (< 15)
       // Si fuera hasta los 110 años daría mucho más alto
       assert.ok(cnuTotal > 0, 'CNU debe ser positivo');
-      assert.ok(cnuTotal < 15, `CNU de hijo de 8 años (${cnuTotal}) no debería superar 15 por ser temporal hasta los 18`);
+      assert.equal(cnuTotal, .15 * calcularCNUIndividual(8, 'M', .0358, 'retiro_programado', 2026, false, true, false));
+      assert.ok(cnuTotal < 18);
+      assert.equal(calcularCNUIndividual(18, 'M', .0358, 'retiro_programado', 2026, false, true, false), 0);
     });
 
     it('Capital Necesario de Sobrevivencia es proporcional al grupo familiar y la pensión de referencia', () => {
@@ -465,7 +469,7 @@ describe('Motor Actuarial de Pensiones - Sistema Chileno', () => {
       assert.equal(fin.aporteAdicionalSISCLP, fin.capitalNecesarioCLP - 15_000_000);
     });
 
-    it('Renta Vitalicia con Período Aumentado de Sobrevivencia aplica equivalencia actuarial y respeta DL 3500 Art 61 bis', () => {
+    it('Renta Vitalicia con Período Aumentado de Sobrevivencia aplica equivalencia estimativa mensual sin certificar admisibilidad contractual', () => {
       const beneficiarios: BeneficiarioPension[] = [
         { tipo: 'conyuge', edad: 58, sexo: 'F', porcentajePension: 0 },
         { tipo: 'hijo', edad: 14, sexo: 'M', porcentajePension: 0 }
@@ -494,10 +498,10 @@ describe('Motor Actuarial de Pensiones - Sistema Chileno', () => {
       assert.ok(rvAumento.advertencias);
 
       // Proyecciones: años 1 a 3 fase aumentada, año 4 en adelante vitalicia
-      assert.equal(rvAumento.proyeccion[0].fase, 'aumentada');
-      assert.equal(rvAumento.proyeccion[1].fase, 'aumentada');
-      assert.equal(rvAumento.proyeccion[2].fase, 'aumentada');
-      assert.equal(rvAumento.proyeccion[3].fase, 'vitalicia');
+      assert.equal(rvAumento.proyeccion[0].fase, 'aumento');
+      assert.equal(rvAumento.proyeccion[1].fase, 'aumento');
+      assert.equal(rvAumento.proyeccion[2].fase, 'aumento');
+      assert.equal(rvAumento.proyeccion[3].fase, 'normal');
 
       const pInicial = rvAumento.proyeccion[0].pensionMensual;
       const pPosterior = rvAumento.proyeccion[3].pensionMensual;
@@ -519,7 +523,7 @@ describe('Motor Actuarial de Pensiones - Sistema Chileno', () => {
 
       // Advertencias legales
       const advTexto = rvAumento.advertencias.join(' ');
-      assert.ok(advTexto.includes('Art. 61 bis'), 'Debe citar la restricción del Art. 61 bis DL 3500');
+      assert.ok(advTexto.includes('revisión profesional'), 'Debe advertir que no acredita admisibilidad contractual');
       assert.ok(advTexto.includes('Art. 58'), 'Debe citar la distribución legal del Art. 58');
     });
 
@@ -545,7 +549,7 @@ describe('Motor Actuarial de Pensiones - Sistema Chileno', () => {
       assert.ok(pPosterior100 < pPosterior50, 'Con +100% la pensión posterior debe ser menor que con +50%');
     });
 
-    it('Renta Vitalicia con Período Garantizado en Sobrevivencia es legalmente válida bajo CMF CAD220131741 y ajusta pensión según plazo', () => {
+    it('Renta Vitalicia con Período Garantizado en Sobrevivencia es ilustrativa y ajusta pensión según plazo', () => {
       const beneficiarios: BeneficiarioPension[] = [
         { tipo: 'conyuge', edad: 55, sexo: 'F', porcentajePension: 0 },
         { tipo: 'hijo', edad: 12, sexo: 'M', porcentajePension: 0 }

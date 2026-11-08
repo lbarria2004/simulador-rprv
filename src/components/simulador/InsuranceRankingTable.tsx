@@ -42,7 +42,7 @@ export function InsuranceRankingTable({ items, referenciaUF, tipoPension = 'veje
                 Estimaciones con tasas de referencia de RV
               </CardTitle>
               <CardDescription className="text-xs text-slate-500">
-                Datos locales de referencia; no son ofertas ni tasas personalizadas de las compañías
+                Tasas locales sin vigencia acreditada. Escenarios anónimos, sin ofertas ni clasificación de aseguradoras.
               </CardDescription>
             </div>
           </div>
@@ -52,7 +52,7 @@ export function InsuranceRankingTable({ items, referenciaUF, tipoPension = 'veje
             rel="noopener noreferrer"
             className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1 font-medium"
           >
-            <span>Ver fuente CMF</span>
+            <span>Consultar estadísticas CMF</span>
             <ExternalLink className="w-3 h-3" />
           </a>
         </div>
@@ -64,9 +64,9 @@ export function InsuranceRankingTable({ items, referenciaUF, tipoPension = 'veje
             <TableHeader className="bg-slate-50">
               <TableRow className="text-xs">
                 <TableHead className="w-12 text-center">#</TableHead>
-                <TableHead>Compañía Aseguradora</TableHead>
-                <TableHead className="text-center">Clasificación Riesgo CMF</TableHead>
-                <TableHead className="text-right">Tasa CMF {tipoPension === 'invalidez' ? 'Invalidez' : tipoPension === 'sobrevivencia' ? 'Sobrevivencia' : 'Vejez'}</TableHead>
+                <TableHead>Escenario</TableHead>
+                <TableHead className="text-center">Estado</TableHead>
+                <TableHead className="text-right">Supuesto {tipoPension === 'invalidez' ? 'Invalidez' : tipoPension === 'sobrevivencia' ? 'Sobrevivencia' : 'Vejez'}</TableHead>
                 <TableHead className="text-right font-bold text-slate-900">Pensión Mensual (UF)</TableHead>
                 <TableHead className="text-right font-bold text-slate-900">Pensión Mensual (Pesos)</TableHead>
               </TableRow>

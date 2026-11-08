@@ -1,0 +1,113 @@
+{
+  "referencia": "d1c7ef3",
+  "fuente": {
+    "cmf": "https://www.cmfchile.cl/normativa/ncg_495_2023.pdf",
+    "sp": "https://www.spensiones.cl/portal/compendio/596/fo-article-15659.pdf",
+    "consulta": "2026-11-08",
+    "norma": "NCG SP 306 / CMF 495, 2023-02-24",
+    "sha256PDFSP": "aea2a6389234abdbe32c93f048cfd82f9215527c42a7e0228698098fddb6caf8",
+    "extraccion": "Texto de PDF CMF cotejado con imágenes del PDF SP; qx terminal 110=1 confirmado visualmente, sin sufijos de número de página",
+    "paginasCMF": {
+      "qx": [
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "mejorasM": [
+        10,
+        11,
+        12
+      ],
+      "mejorasF": [
+        13,
+        14,
+        15
+      ],
+      "formula": 16
+    }
+  },
+  "resultados": {
+    "CB-H-2020": {
+      "qxComparados": 111,
+      "factoresComparados": 1776,
+      "edadesSinRespaldo": [],
+      "diferencias": [
+        {
+          "campo": "aa",
+          "edad": 103,
+          "ano": 2032,
+          "local": 0.01323,
+          "oficial": 0.001323
+        }
+      ]
+    },
+    "MI-H-2020": {
+      "qxComparados": 111,
+      "factoresComparados": 1776,
+      "edadesSinRespaldo": [],
+      "diferencias": []
+    },
+    "RV-M-2020": {
+      "qxComparados": 91,
+      "factoresComparados": 1776,
+      "edadesSinRespaldo": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19
+      ],
+      "diferencias": []
+    },
+    "B-M-2020": {
+      "qxComparados": 111,
+      "factoresComparados": 1776,
+      "edadesSinRespaldo": [],
+      "diferencias": [
+        {
+          "campo": "aa",
+          "edad": 103,
+          "ano": 2027,
+          "local": 0.01519,
+          "oficial": 0.001519
+        }
+      ]
+    },
+    "MI-M-2020": {
+      "qxComparados": 111,
+      "factoresComparados": 1776,
+      "edadesSinRespaldo": [],
+      "diferencias": [
+        {
+          "campo": "qx2020",
+          "edad": 3,
+          "local": 0.00016066,
+          "oficial": 0.00160661
+        },
+        {
+          "campo": "qx2020",
+          "edad": 96,
+          "local": 0.18859873,
+          "oficial": 0.194004
+        }
+      ]
+    }
+  }
+}

@@ -22,6 +22,7 @@ import {
 } from '@/components/simulador/types';
 import {
   calcularRetiroProgramado,
+  etiquetarResultadoActuarial,
   calcularRetiroProgramadoSobrevivencia,
   calcularRVInmediataSobrevivencia,
   AVISO_SIMULACION,
@@ -62,18 +63,7 @@ import {
   Accessibility
 } from 'lucide-react';
 
-const CLASIFICACIONES_RIESGO: Record<string, string> = {
-  '4LIFE': 'AAA',
-  'AUGUSTAR': 'AA+',
-  'BICE': 'AA+',
-  'CN_LIFE': 'AA+',
-  'CONFUTURO': 'AA+',
-  'CONSORCIO_NACIONAL': 'AA+',
-  'EUROAMERICA': 'AA',
-  'METLIFE': 'AAA',
-  'PENTA': 'AA+',
-  'RENTA_NACIONAL': 'A'
-};
+
 
 export default function SimuladorPage() {
   // Estado del valor oficial de la UF (obtenido del SII)
@@ -114,7 +104,7 @@ export default function SimuladorPage() {
         fechaNacimiento: '1964-06-10',
         edad: 62,
         sexo: 'F',
-        porcentajePension: 0.60
+        porcentajePension: 0
       }
     ],
     conAsesor: true
@@ -162,8 +152,8 @@ export default function SimuladorPage() {
   const [tasaRP, setTasaRP] = useState<number>(3.67);
   const [tasaRV, setTasaRV] = useState<number>(2.99);
 
-  // Función para obtener la tasa oficial recomendada según régimen previsional
-  const getTasaRVOficial = useCallback((tipo: 'vejez' | 'invalidez' | 'sobrevivencia', grado?: 'total' | 'parcial') => {
+  // Tasas heredadas ilustrativas; no son tasas vigentes comprobadas.
+  const getTasaRVEjemplo = useCallback((tipo: 'vejez' | 'invalidez' | 'sobrevivencia', grado?: 'total' | 'parcial') => {
     if (tipo === 'invalidez') {
       const val = grado === 'parcial'
         ? (TASAS_RENTA_VITALICIA?.companias?.['CONFUTURO']?.invalidez_parcial || 0.0272)
@@ -180,8 +170,8 @@ export default function SimuladorPage() {
 
   const handleRestablecerTasas = useCallback(() => {
     setTasaRP(3.67);
-    setTasaRV(getTasaRVOficial(afiliado.tipoPension, afiliado.gradoInvalidez));
-  }, [afiliado.tipoPension, afiliado.gradoInvalidez, getTasaRVOficial]);
+    setTasaRV(getTasaRVEjemplo(afiliado.tipoPension, afiliado.gradoInvalidez));
+  }, [afiliado.tipoPension, afiliado.gradoInvalidez, getTasaRVEjemplo]);
 
   // Estado de las Cláusulas y Escenarios para explorador complementario
   const [clausulas, setClausulas] = useState<CláusulasState>({
@@ -240,7 +230,7 @@ export default function SimuladorPage() {
             fechaNacimiento: '1964-06-10',
             edad: 62,
             sexo: 'F',
-            porcentajePension: 0.60
+            porcentajePension: 0
           }
         ],
         conAsesor: true
@@ -276,7 +266,7 @@ export default function SimuladorPage() {
             fechaNacimiento: '1956-08-20',
             edad: 70,
             sexo: 'M',
-            porcentajePension: 0.60
+            porcentajePension: 0
           }
         ],
         conAsesor: true
@@ -338,7 +328,7 @@ export default function SimuladorPage() {
           undefined, undefined, tasaRPActuarial, referenciaUF,
           { rentabilidadRealAnual: ESCENARIOS_RENTABILIDAD_RP[escenarioRP].rentabilidadRealAnual });
       } else {
-        // Modalidades de Renta Vitalicia en Sobrevivencia (Normativa Oficial CMF y SP)
+        // Modalidades explorables de sobrevivencia, sujetas a revisión profesional.
         if (mod.tipo === 'renta_vitalicia_simple') {
           resultado = calcularRVInmediataSobrevivencia(fondosRV, edad, sexo, beneficiarios,
             undefined, undefined, tasaRVEfectiva, referenciaUF);
@@ -357,10 +347,10 @@ export default function SimuladorPage() {
             ];
           }
         } else {
-          // Aumento Temporal o Combinada en Sobrevivencia (No permitidas por normativa CMF/SP)
+          // La interfaz mantiene fuera de alcance estas cláusulas mientras se revisa su admisibilidad.
           resultado = {
             referenciaUF, unidadMonetaria: 'CLP_REALES',
-            nombre: `${mod.nombre} (No autorizada en Sobrevivencia)`,
+            nombre: `${mod.nombre} (Pendiente de revisión)`,
             pensionMensual: 0,
             pensionEnUF: 0,
             pensionAnual: 0,
@@ -368,9 +358,8 @@ export default function SimuladorPage() {
             tasaInteres: tasaRVEfectiva,
             expectativaVida: 0,
             advertencias: [
-              'Cláusula de Aumento Temporal no permitida en Sobrevivencia según normativa CMF/SP.',
-              'El Aumento Temporal es exclusivo de pensiones de Vejez e Invalidez.',
-              'En Sobrevivencia solo procede Retiro Programado, RV Simple o RV con Período Garantizado.'
+              'Esta cláusula no se habilita en pantalla mientras se revisa su fundamento contractual.',
+              'La disponibilidad matemática del motor no acredita admisibilidad normativa.'
             ]
           };
         }
@@ -441,6 +430,8 @@ export default function SimuladorPage() {
       }
     }
 
+    resultado = etiquetarResultadoActuarial(resultado, beneficiarios);
+
     const pguObj = (tipoPension !== 'sobrevivencia' && clausulas.incluirPGU)
       ? calcularPGU(resultado.pensionMensual, edad) 
       : null;
@@ -484,7 +475,7 @@ export default function SimuladorPage() {
           tipo: 'conyuge',
           edad: afiliado.edadConyuge,
           sexo: afiliado.sexoConyuge,
-          porcentajePension: 0.60
+          porcentajePension: 0
         }] : []);
 
     const ingresoBase = afiliado.ingresoBaseCLP || 1200000;
@@ -529,7 +520,7 @@ export default function SimuladorPage() {
           tipo: 'conyuge',
           edad: afiliado.edadConyuge,
           sexo: afiliado.sexoConyuge,
-          porcentajePension: 0.60
+          porcentajePension: 0
         }] : []);
 
     const ingresoBase = afiliado.ingresoBaseCLP || 1200000;
@@ -565,7 +556,7 @@ export default function SimuladorPage() {
             tipo: 'conyuge',
             edad: afiliado.edadConyuge,
             sexo: afiliado.sexoConyuge,
-            porcentajePension: 0.60
+            porcentajePension: 0
           }] : []);
 
       const esInvalido = afiliado.tipoPension === 'invalidez' || !!afiliado.esInvalido;
@@ -631,7 +622,7 @@ export default function SimuladorPage() {
           tipo: 'conyuge',
           edad: afiliado.edadConyuge,
           sexo: afiliado.sexoConyuge,
-          porcentajePension: 0.60
+          porcentajePension: 0
         }] : []);
 
     const esInvalido = afiliado.tipoPension === 'invalidez' || !!afiliado.esInvalido;
@@ -646,7 +637,7 @@ export default function SimuladorPage() {
     const fondosRV = afiliado.conAsesor ? fondosEfectivos * (1 - 0.015) : fondosEfectivos;
 
     const ranking: CompaniasRankingItem[] = [];
-    for (const [key, item] of Object.entries(TASAS_RENTA_VITALICIA?.companias || {})) {
+    for (const item of Object.values(TASAS_RENTA_VITALICIA?.companias || {})) {
       let tasaAplicable: number = item.vejez;
       if (esInvalido) {
         tasaAplicable = (afiliado.gradoInvalidez === 'parcial' ? item.invalidez_parcial : item.invalidez_total) || item.vejez;
@@ -676,8 +667,8 @@ export default function SimuladorPage() {
       }
 
       ranking.push({
-        nombre: key.replace('_', ' '),
-        rating: CLASIFICACIONES_RIESGO[key] || 'AA+',
+        nombre: `Escenario ilustrativo ${ranking.length + 1}`,
+        rating: 'Sin validar',
         tasaVejez: tasaAplicable,
         pensionUF,
         pensionCLP
@@ -696,7 +687,7 @@ export default function SimuladorPage() {
             tipo: 'conyuge',
             edad: afiliado.edadConyuge,
             sexo: afiliado.sexoConyuge,
-            porcentajePension: 0.60
+            porcentajePension: 0
           }] : []);
 
       const res = await fetch('/api/reporte', {
@@ -815,7 +806,7 @@ export default function SimuladorPage() {
                     tipoPension: 'vejez',
                     esInvalido: false
                   }));
-                  setTasaRV(getTasaRVOficial('vejez'));
+                  setTasaRV(getTasaRVEjemplo('vejez'));
                   setModalidades(prev => {
                     const hasGarantizada = prev.some(m => m.tipo === 'rv_garantizada');
                     if (!hasGarantizada) {
@@ -853,7 +844,7 @@ export default function SimuladorPage() {
                 type="button"
                 onClick={() => {
                   setAfiliado(prev => {
-                    setTasaRV(getTasaRVOficial('invalidez', prev.gradoInvalidez || 'total'));
+                    setTasaRV(getTasaRVEjemplo('invalidez', prev.gradoInvalidez || 'total'));
                     return {
                       ...prev,
                       tipoPension: 'invalidez',
@@ -908,7 +899,7 @@ export default function SimuladorPage() {
                     ingresoBaseCLP: prev.ingresoBaseCLP || 1200000,
                     ingresoBaseUF: prev.ingresoBaseUF || (clpAUf(1200000, referenciaUF))
                   }));
-                  setTasaRV(getTasaRVOficial('sobrevivencia'));
+                  setTasaRV(getTasaRVEjemplo('sobrevivencia'));
                   setModalidades(prev => {
                     const filtered = prev.filter(m => m.tipo !== 'rv_aumento_temporal' && m.tipo !== 'rv_combinada');
                     const hasGarantizada = filtered.some(m => m.tipo === 'rv_garantizada');

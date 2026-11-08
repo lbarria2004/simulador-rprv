@@ -1,3 +1,5 @@
+import { determinarPorcentajes } from '../reglas-sobrevivencia.ts';
+import { calcularRVAumentoTemporalInvalidez } from '../pension-calculator.ts';
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { PDFDocument, PDFArray, PDFRawStream, decodePDFRawStream } from 'pdf-lib';
@@ -73,4 +75,28 @@ describe('Regresión del documento PDF', () => {
     assert.ok(paginas.length > 1);
     for (const texto of paginas) assert.ok(texto.includes('Sin conexion con SCOMP. No es oferta de AFP o aseguradora.'));
   });
+  it('distingue en el PDF regla legal, incremento, porcentaje aplicado y participación familiar', async () => {
+    const body = entrada();
+    body.resultados[0].reglasSobrevivencia = determinarPorcentajes([
+      { tipo: 'conyuge', id: 'c', edad: 62, sexo: 'F', porcentajePension: .7, idsHijosComunes: ['h'] },
+      { tipo: 'hijo', id: 'h', edad: 12, sexo: 'M', porcentajePension: 0 }
+    ]);
+    const texto = (await textosPDF(await generarReportePDF(body))).join('\n');
+    for (const valor of ['Regla base', 'Incremento', 'Utilizado', 'Part. familiar', '50.00%', '70.00%', '82.35%', '15.00%']) assert.ok(texto.includes(valor), valor);
+    assert.ok(texto.includes('base de referencia del causante es distinta'));
+    assert.ok(texto.includes('no acreditan un derecho legal'));
+    assert.ok(texto.includes('sin certificacion'));
+  });
+  it('invalidez temporal conserva 13 meses, aumento de 50% y conversión UF en ambas fases', async () => {
+    const body = entrada();
+    body.afiliado.tipoPension = 'invalidez';
+    const resultado = calcularRVAumentoTemporalInvalidez(80000000, 65, 'M', 13, .5, .03, [], uf);
+    body.resultados = [resultado];
+    const texto = (await textosPDF(await generarReportePDF(body))).join('\n');
+    assert.ok(texto.includes('Aumento 50% por 13 meses'));
+    assert.ok(texto.includes('Desde mes 14'));
+    assert.ok(texto.includes(`${(resultado.pensionMensual / uf.valor).toFixed(2)} UF`));
+    assert.ok(texto.includes(`${(resultado.aumentoTemporal!.pensionFinal / uf.valor).toFixed(2)} UF`));
+  });
+
 });

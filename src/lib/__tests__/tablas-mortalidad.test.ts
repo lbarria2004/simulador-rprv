@@ -16,7 +16,7 @@ describe('Integridad interna de las tablas almacenadas (no certificación de la 
     it(`${nombre}: cobertura de edades, probabilidades y factores generacionales coherentes`, () => {
       const edades = Object.keys(tabla).map(Number);
       const minima = Math.min(...edades);
-      assert.equal(minima, 0);
+      assert.equal(minima, nombre === 'RV-M' ? 20 : 0);
       for (let edad = minima; edad < 110; edad++) {
         const d: DatosMortalidadEdad = tabla[edad];
         assert.ok(d, `Falta edad ${edad}`);

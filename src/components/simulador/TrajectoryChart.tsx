@@ -53,15 +53,16 @@ export function TrajectoryChart({
 
     const aumentoCLP = resultadoRVClausulas?.aumentoTemporal?.pensionAumentada ?? resultadoRVClausulas?.pensionMensual ?? rvSimpleCLP;
     const finalCLP = resultadoRVClausulas?.aumentoTemporal?.pensionFinal ?? resultadoRVClausulas?.pensionMensual ?? rvSimpleCLP;
-    const mesesAumento = resultadoRVClausulas?.aumentoTemporal?.meses || 36;
-    const anosAumento = Math.ceil(mesesAumento / 12);
+    const mesesAumento = resultadoRVClausulas?.aumentoTemporal?.meses ?? 0;
 
     for (let año = 1; año <= 25; año++) {
       const edadActual = edadInicial + año - 1;
       const puntoRP = proyeccionRP?.[año - 1];
       const rpCLP = puntoRP?.pensionMensual ?? null;
 
-      const rvAumentoActualCLP = año <= anosAumento ? aumentoCLP : finalCLP;
+      const mesesAumentados = Math.max(0, Math.min(12, mesesAumento - (año - 1) * 12));
+      const promedio = (mesesAumentados * aumentoCLP + (12 - mesesAumentados) * finalCLP) / 12;
+      const rvAumentoActualCLP = resultadoRVClausulas?.proyeccion?.[año - 1]?.pensionMensual ?? promedio;
 
       data.push({
         año,
