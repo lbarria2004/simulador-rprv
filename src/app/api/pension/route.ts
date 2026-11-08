@@ -1,3 +1,4 @@
+import { validarReferenciaUF, UF_REFERENCIA_EJEMPLO } from '@/lib/moneda';
 import { NextRequest, NextResponse } from 'next/server';
 import {
   calcularRetiroProgramado,
@@ -28,7 +29,6 @@ import {
   MesesAumento,
   TASAS_INTERES,
   EDAD_JUBILACION,
-  UF_ACTUAL,
   ResultadoEscenario,
   BeneficiarioPension
 } from '@/lib/pension-calculator';
@@ -37,15 +37,23 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { tipo, datos } = body;
+    if (!datos || typeof datos !== 'object') throw new RangeError('Se requieren datos del cálculo');
+    if (datos.unidadMonetaria && datos.unidadMonetaria !== 'CLP_REALES') throw new RangeError('Los importes deben expresarse en CLP_REALES');
+    if ('valorUF' in datos || 'uf' in datos) throw new RangeError('Use referenciaUF con valor, fecha y fuente');
+    const referenciaUF = validarReferenciaUF('referenciaUF' in datos ? datos.referenciaUF : UF_REFERENCIA_EJEMPLO);
 
     const sexo = datos.sexo as Sexo;
     const edad = datos.edad as number;
     const fondos = datos.fondos as number;
     const beneficiarios = datos.beneficiarios as BeneficiarioPension[] | undefined;
+    if (!Number.isFinite(fondos) || fondos < 0) throw new RangeError('Fondos deben ser CLP finitos y no negativos');
+    if (!Number.isInteger(edad) || edad < 0 || edad > 110 || !['M', 'F'].includes(sexo)) throw new RangeError('Edad o sexo inválidos');
+    if (beneficiarios !== undefined && !Array.isArray(beneficiarios)) throw new RangeError('Beneficiarios debe ser una lista');
     
     // Permitir tasas personalizadas o usar las por defecto
     const tasaInteres = datos.tasaTecnicaCNU ?? datos.tasaRP ?? datos.tasaInteres ?? TASAS_INTERES.RETIRO_PROGRAMADO;
-    const tasaRV = datos.tasaRV ?? datos.tasaInteres ?? TASAS_INTERES.RENTA_VITALICIA_VEJEZ;
+    const tasaRV = datos.tasaRV ?? datos.tasaInteres ?? (String(tipo).startsWith('sobrevivencia') ? TASAS_INTERES.SOBREVIVENCIA : TASAS_INTERES.RENTA_VITALICIA_VEJEZ);
+    if (![tasaInteres, tasaRV].every(tasa => Number.isFinite(tasa) && tasa > -1)) throw new RangeError('Tasa de descuento inválida');
     const opcionesRP = { rentabilidadRealAnual: datos.rentabilidadRealAnual, anoCalculo: datos.anoCalculo };
 
     let resultado: ResultadoEscenario;
@@ -56,14 +64,14 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({
           success: true,
           aviso: AVISO_SIMULACION,
-          resultados: calcularEscenariosRetiroProgramado(fondos, edad, sexo, tasaInteres, beneficiarios, datos.esInvalido ?? false, datos.anoCalculo)
+          resultados: calcularEscenariosRetiroProgramado(fondos, edad, sexo, tasaInteres, beneficiarios, datos.esInvalido ?? false, datos.anoCalculo, referenciaUF)
         });
       case 'retiro_programado':
-        resultado = calcularRetiroProgramado(fondos, edad, sexo, tasaInteres, beneficiarios, datos.esInvalido ?? false, opcionesRP);
+        resultado = calcularRetiroProgramado(fondos, edad, sexo, tasaInteres, beneficiarios, datos.esInvalido ?? false, opcionesRP, referenciaUF);
         break;
 
       case 'inmediata':
-        resultado = calcularRVInmediata(fondos, edad, sexo, tasaRV, beneficiarios);
+        resultado = calcularRVInmediata(fondos, edad, sexo, tasaRV, beneficiarios, undefined, referenciaUF);
         break;
 
       case 'periodo_garantizado':
@@ -73,7 +81,7 @@ export async function POST(request: NextRequest) {
           sexo,
           datos.mesesGarantizados as MesesGarantizados,
           tasaRV,
-          beneficiarios
+          beneficiarios, undefined, referenciaUF
         );
         break;
 
@@ -85,7 +93,7 @@ export async function POST(request: NextRequest) {
           datos.mesesAumento as MesesAumento,
           datos.porcentajeAumento as number,
           tasaRV,
-          beneficiarios
+          beneficiarios, undefined, referenciaUF
         );
         break;
 
@@ -98,7 +106,7 @@ export async function POST(request: NextRequest) {
           datos.mesesAumento as MesesAumento,
           datos.porcentajeAumento as number,
           tasaRV,
-          beneficiarios
+          beneficiarios, undefined, referenciaUF
         );
         break;
 
@@ -112,7 +120,7 @@ export async function POST(request: NextRequest) {
           datos.ingresoBase || 800000, // Default si no se proporciona
           datos.tasaInteres ?? TASAS_INTERES.RENTA_VITALICIA_INVALIDEZ,
           beneficiarios,
-          datos.cubiertoSIS ?? true
+          datos.cubiertoSIS ?? true, referenciaUF
         );
         break;
 
@@ -123,7 +131,7 @@ export async function POST(request: NextRequest) {
           sexo,
           tasaInteres,
           beneficiarios,
-          opcionesRP
+          opcionesRP, referenciaUF
         );
         break;
 
@@ -134,7 +142,7 @@ export async function POST(request: NextRequest) {
           edad,
           sexo,
           datos.tasaInteres ?? TASAS_INTERES.RENTA_VITALICIA_INVALIDEZ,
-          beneficiarios
+          beneficiarios, referenciaUF
         );
         break;
 
@@ -145,7 +153,7 @@ export async function POST(request: NextRequest) {
           sexo,
           datos.mesesGarantizados as MesesGarantizados,
           datos.tasaInteres ?? TASAS_INTERES.RENTA_VITALICIA_INVALIDEZ,
-          beneficiarios
+          beneficiarios, referenciaUF
         );
         break;
 
@@ -157,7 +165,7 @@ export async function POST(request: NextRequest) {
           datos.mesesAumento as MesesAumento,
           datos.porcentajeAumento as number,
           datos.tasaInteres ?? TASAS_INTERES.RENTA_VITALICIA_INVALIDEZ,
-          beneficiarios
+          beneficiarios, referenciaUF
         );
         break;
 
@@ -170,7 +178,7 @@ export async function POST(request: NextRequest) {
           datos.mesesAumento as MesesAumento,
           datos.porcentajeAumento as number,
           datos.tasaInteres ?? TASAS_INTERES.RENTA_VITALICIA_INVALIDEZ,
-          beneficiarios
+          beneficiarios, referenciaUF
         );
         break;
 
@@ -184,7 +192,7 @@ export async function POST(request: NextRequest) {
           datos.pensionReferenciaCausante,
           datos.ingresoBaseCausante,
           datos.tasaInteres ?? TASAS_INTERES.SOBREVIVENCIA,
-          datos.cubiertoSIS ?? true
+          datos.cubiertoSIS ?? true, referenciaUF
         );
         break;
 
@@ -196,7 +204,7 @@ export async function POST(request: NextRequest) {
           sexo,
           beneficiarios || [],
           datos.pensionReferenciaCausante,
-          datos.ingresoBaseCausante
+          datos.ingresoBaseCausante, tasaInteres, tasaRV, referenciaUF, opcionesRP
         );
         return NextResponse.json({ success: true, aviso: AVISO_SIMULACION, resultados: opciones });
 
@@ -208,7 +216,7 @@ export async function POST(request: NextRequest) {
           beneficiarios || [],
           datos.pensionReferenciaCausante,
           datos.ingresoBaseCausante,
-          datos.tasaInteres ?? TASAS_INTERES.RETIRO_PROGRAMADO
+          tasaInteres, referenciaUF, opcionesRP
         );
         break;
 
@@ -220,7 +228,7 @@ export async function POST(request: NextRequest) {
           beneficiarios || [],
           datos.pensionReferenciaCausante,
           datos.ingresoBaseCausante,
-          datos.tasaInteres ?? TASAS_INTERES.SOBREVIVENCIA
+          tasaRV, referenciaUF
         );
         break;
 
@@ -233,7 +241,7 @@ export async function POST(request: NextRequest) {
           datos.mesesGarantizados as MesesGarantizados,
           datos.pensionReferenciaCausante,
           datos.ingresoBaseCausante,
-          datos.tasaInteres ?? TASAS_INTERES.SOBREVIVENCIA
+          tasaRV, referenciaUF
         );
         break;
 
@@ -247,7 +255,7 @@ export async function POST(request: NextRequest) {
           datos.porcentajeAumento as number,
           datos.pensionReferenciaCausante,
           datos.ingresoBaseCausante,
-          datos.tasaInteres ?? TASAS_INTERES.SOBREVIVENCIA
+          tasaRV, referenciaUF
         );
         break;
 
@@ -262,7 +270,7 @@ export async function POST(request: NextRequest) {
           datos.porcentajeAumento as number,
           datos.pensionReferenciaCausante,
           datos.ingresoBaseCausante,
-          datos.tasaInteres ?? TASAS_INTERES.SOBREVIVENCIA
+          tasaRV, referenciaUF
         );
         break;
 
@@ -296,7 +304,7 @@ export async function GET() {
         sobrevivencia: (TASAS_INTERES.SOBREVIVENCIA * 100).toFixed(2) + '%'
       },
       edadesJubilacion: EDAD_JUBILACION,
-      ufReferencia: UF_ACTUAL,
+      ufReferencia: UF_REFERENCIA_EJEMPLO,
       tiposPension: {
         vejez: ['retiro_programado', 'inmediata', 'periodo_garantizado', 'aumento_temporal', 'ambas'],
         invalidez: ['invalidez', 'invalidez_rp'],

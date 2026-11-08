@@ -1,5 +1,7 @@
 'use client';
 
+import { clpAUf, type ReferenciaUF } from '@/lib/moneda';
+
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -25,6 +27,7 @@ interface SummaryCardsProps {
   pgu: ResultadoPGU;
   bac: ResultadoBAC;
   edadAfiliado: number;
+  referenciaUF: ReferenciaUF;
 }
 
 const COMISIONES_AFP: Record<AFP, { label: string; pct: number }> = {
@@ -45,14 +48,15 @@ export function SummaryCards({
   onSelectAFP,
   pgu,
   bac,
-  edadAfiliado
+  edadAfiliado,
+  referenciaUF
 }: SummaryCardsProps) {
   // Ajuste por comisión de AFP en Retiro Programado
   const comisionInfo = COMISIONES_AFP[afpSeleccionada] || { label: 'PlanVital', pct: 0.0 };
   const factorComision = 1 - (comisionInfo.pct / 100);
 
   const rpNetoCLP = resultadoRP ? Math.round(resultadoRP.pensionMensual * factorComision) : 0;
-  const rpNetoUF = resultadoRP ? Math.round((resultadoRP.pensionEnUF * factorComision) * 100) / 100 : 0;
+  const rpNetoUF = resultadoRP ? Math.round((clpAUf(rpNetoCLP, referenciaUF)) * 100) / 100 : 0;
 
   const pguMonto = pgu.aplica ? pgu.montoMensual : 0;
   const bacMonto = bac.aplica ? bac.beneficioMensualPesos : 0;
@@ -207,7 +211,7 @@ export function SummaryCards({
             <div className="p-3 bg-indigo-50/60 rounded-lg border border-indigo-100 space-y-1">
               <div className="flex items-baseline justify-between">
                 <span className="text-2xl font-black text-indigo-950 font-mono tracking-tight">
-                  {resultadoRVSimple ? resultadoRVSimple.pensionEnUF.toFixed(2) : '0.00'}{' '}
+                  {resultadoRVSimple ? clpAUf(resultadoRVSimple.pensionMensual, referenciaUF).toFixed(2) : '0.00'}{' '}
                   <span className="text-xs font-semibold text-indigo-800">UF/mes</span>
                 </span>
                 <span className="text-xs font-bold text-indigo-800">
@@ -268,7 +272,7 @@ export function SummaryCards({
                 <div className="flex items-baseline justify-between mt-0.5">
                   <span className="text-xl font-black text-emerald-950 font-mono">
                     {resultadoRVClausulas?.aumentoTemporal
-                      ? (resultadoRVClausulas.aumentoTemporal.pensionAumentada / (resultadoRVSimple ? resultadoRVSimple.pensionMensual / resultadoRVSimple.pensionEnUF : 40876)).toFixed(2)
+                      ? (clpAUf(resultadoRVClausulas.aumentoTemporal.pensionAumentada, referenciaUF)).toFixed(2)
                       : '0.00'}{' '}
                     <span className="text-xs font-semibold text-emerald-800">UF</span>
                   </span>

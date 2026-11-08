@@ -1,7 +1,8 @@
 /**
- * TABLAS DE MORTALIDAD OFICIALES DEL SISTEMA DE PENSIONES CHILENO (TM-2020)
+ * TRANSCRIPCIÓN LOCAL DE TABLAS TM-2020: CIFRAS PENDIENTES DE COTEJO
  * Fuente: Superintendencia de Pensiones y Comisión para el Mercado Financiero (CMF)
- * Norma de Carácter General Conjunta SP N° 2.164 y CMF N° 2.272
+ * Referencia verificada: SP NCG 306, 24-02-2023. Cifras locales pendientes de cotejo.
+ * Ver docs/fase-2-fundamentos.md: fuentes y alcance del modelo.
  * 
  * Contiene los valores base de mortalidad q(x, 2020), la matriz completa de factores
  * de mejoramiento anuales AA(x, t) de 2021 a 2036*, y las probabilidades proyectadas
@@ -610,7 +611,7 @@ export const TABLA_MI_M_2026: Record<number, number> = Object.fromEntries(
 );
 
 /**
- * Función oficial de proyección de mortalidad generacional dinámica
+ * Proyección generacional local; ver fuentes y limitaciones en docs/fase-2-fundamentos.md
  * q(x, t) = q(x, 2020) × Π_{s=2021}^{min(t, 2036)} (1 - AA_{x, s}) × (1 - AA_{x, 2036})^(max(0, t - 2036))
  */
 export function getQxGeneracional(
@@ -618,7 +619,8 @@ export function getQxGeneracional(
   sexo: 'M' | 'F',
   anoCalendario: number = 2026,
   esInvalido: boolean = false,
-  modalidad: 'retiro_programado' | 'renta_vitalicia' = 'retiro_programado'
+  modalidad: 'retiro_programado' | 'renta_vitalicia' = 'retiro_programado',
+  rol: 'titular' | 'beneficiario' = 'titular'
 ): number {
   const edadCapped = Math.min(Math.max(0, Math.round(edad)), 110);
   if (edadCapped >= 110) return 1.0;
@@ -626,7 +628,7 @@ export function getQxGeneracional(
   let table: Record<number, DatosMortalidadEdad>;
   if (esInvalido) {
     table = sexo === 'M' ? TABLA_MI_H_2020 : TABLA_MI_M_2020;
-  } else if (sexo === 'F' && modalidad === 'renta_vitalicia') {
+  } else if (sexo === 'F' && rol === 'titular') {
     table = TABLA_RV_M_2020;
   } else if (sexo === 'F') {
     table = TABLA_B_M_2020;

@@ -29,16 +29,16 @@ describe('Integridad interna de las tablas almacenadas (no certificación de la 
           assert.ok(Math.abs(factor - d.cumFactors[i]) < 1e-7);
         }
         for (const ano of [2020, 2026, 2036, 2050, 2100]) {
-          const qx = getQxGeneracional(edad, sexo, ano, invalido, modalidad);
+          const qx = getQxGeneracional(edad, sexo, ano, invalido, modalidad, nombre === 'B-M' ? 'beneficiario' : 'titular');
           assert.ok(Number.isFinite(qx) && qx >= 0 && qx <= 1);
         }
-        const qx2026 = getQxGeneracional(edad, sexo, 2026, invalido, modalidad);
+        const qx2026 = getQxGeneracional(edad, sexo, 2026, invalido, modalidad, nombre === 'B-M' ? 'beneficiario' : 'titular');
         assert.ok(Math.abs(qx2026 - d.qx2026) < 1e-7);
-        const qx2036 = getQxGeneracional(edad, sexo, 2036, invalido, modalidad);
-        const qx2037 = getQxGeneracional(edad, sexo, 2037, invalido, modalidad);
+        const qx2036 = getQxGeneracional(edad, sexo, 2036, invalido, modalidad, nombre === 'B-M' ? 'beneficiario' : 'titular');
+        const qx2037 = getQxGeneracional(edad, sexo, 2037, invalido, modalidad, nombre === 'B-M' ? 'beneficiario' : 'titular');
         assert.ok(Math.abs(qx2037 - qx2036 * (1 - d.aa2036)) < 1e-12);
       }
-      assert.equal(getQxGeneracional(110, sexo, 2050, invalido, modalidad), 1);
+      assert.equal(getQxGeneracional(110, sexo, 2050, invalido, modalidad, nombre === 'B-M' ? 'beneficiario' : 'titular'), 1);
     });
   }
 });

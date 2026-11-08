@@ -1,7 +1,8 @@
 /**
- * TABLAS DE MORTALIDAD OFICIALES TM-2020 (SP / CMF)
+ * ADAPTADOR DE LA TRANSCRIPCIÓN LOCAL TM-2020 (SP / CMF)
  * Fuente: Superintendencia de Pensiones (SP) y Comisión para el Mercado Financiero (CMF)
- * Normativa: NCG Conjunta SP N° 2.164 y CMF N° 2.272 (D.L. 3.500, Compendio Libro III)
+ * Referencia: SP NCG 306, 24-02-2023; ver docs/fase-2-fundamentos.md.
+ * La transcripción numérica local sigue pendiente de cotejo con el original.
  * 
  * Este módulo unifica las tablas oficiales de mortalidad con factores dinámicos
  * de mejoramiento generacional AA(x, t) de 2021 a 2036*, calibradas para el año 2026.
@@ -108,7 +109,8 @@ export function getTasaMortalidad(
     sexo,
     anoCalendario,
     tipoPension === 'invalidez',
-    modalidad
+    modalidad,
+    tipoPension === 'sobrevivencia' ? 'beneficiario' : 'titular'
   );
 }
 
@@ -120,9 +122,10 @@ export function getQx(
   sexo: 'M' | 'F',
   esInvalido: boolean = false,
   modalidad: 'retiro_programado' | 'renta_vitalicia' = 'retiro_programado',
-  anoCalendario: number = 2026
+  anoCalendario: number = 2026,
+  rol: 'titular' | 'beneficiario' = 'titular'
 ): number {
-  return getQxGeneracional(edad, sexo, anoCalendario, esInvalido, modalidad);
+  return getQxGeneracional(edad, sexo, anoCalendario, esInvalido, modalidad, rol);
 }
 
 /**
@@ -133,27 +136,29 @@ export function calcularLx(
   sexo: 'M' | 'F',
   esInvalido: boolean = false,
   modalidad: 'retiro_programado' | 'renta_vitalicia' = 'retiro_programado',
-  anoInicio: number = 2026
+  anoInicio: number = 2026,
+  rol: 'titular' | 'beneficiario' = 'titular'
 ): number {
   let lx = 100000;
   const edadMinima = esInvalido ? 18 : 0;
   
   for (let edad = edadMinima; edad < edadObjetivo; edad++) {
     const ano = anoInicio + (edad - edadMinima);
-    lx = lx * (1 - getQx(edad, sexo, esInvalido, modalidad, ano));
+    lx = lx * (1 - getQx(edad, sexo, esInvalido, modalidad, ano, rol));
   }
   return lx;
 }
 
 /**
- * Calcula la expectativa de vida abreviada mediante el modelo generacional oficial
+ * Calcula la expectativa de vida abreviada mediante el modelo generacional local
  */
 export function calcularExpectativaVida(
   edad: number,
   sexo: 'M' | 'F',
   esInvalido: boolean = false,
   modalidad: 'retiro_programado' | 'renta_vitalicia' = 'retiro_programado',
-  anoInicio: number = 2026
+  anoInicio: number = 2026,
+  rol: 'titular' | 'beneficiario' = 'titular'
 ): number {
   let expectativa = 0;
   let probSupervivencia = 1;
@@ -161,7 +166,7 @@ export function calcularExpectativaVida(
   
   for (let t = 1; t <= (maxEdad - edad); t++) {
     const ano = anoInicio + t - 1;
-    probSupervivencia *= (1 - getQx(edad + t - 1, sexo, esInvalido, modalidad, ano));
+    probSupervivencia *= (1 - getQx(edad + t - 1, sexo, esInvalido, modalidad, ano, rol));
     expectativa += probSupervivencia;
   }
   

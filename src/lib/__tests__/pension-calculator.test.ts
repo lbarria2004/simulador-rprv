@@ -1,3 +1,4 @@
+import { UF_REFERENCIA_EJEMPLO } from '../moneda.ts';
 /**
  * Pruebas unitarias para el motor actuarial de pensiones
  * Utiliza el test runner nativo de Node.js (Node 24)
@@ -92,7 +93,7 @@ describe('Motor Actuarial de Pensiones - Sistema Chileno', () => {
 
   describe('Modalidades de Pensión de Vejez', () => {
     it('Retiro Programado calcula pensión y proyecciones válidas', () => {
-      const resRP = calcularRetiroProgramado(FONDOS_TEST, 65, 'M', TASAS_INTERES.RETIRO_PROGRAMADO);
+      const resRP = calcularRetiroProgramado(FONDOS_TEST, 65, 'M', TASAS_INTERES.RETIRO_PROGRAMADO, undefined, undefined, undefined, UF_REFERENCIA_EJEMPLO);
 
       assert.ok(resRP.pensionMensual > 0, 'Pensión mensual debe ser mayor que 0');
       assert.ok(resRP.pensionEnUF > 0, 'Pensión en UF debe ser mayor que 0');
@@ -100,7 +101,7 @@ describe('Motor Actuarial de Pensiones - Sistema Chileno', () => {
     });
 
     it('Renta Vitalicia Inmediata NO aplica descuento arbitrario de 3%', () => {
-      const resRV = calcularRVInmediata(FONDOS_TEST, 65, 'M', TASAS_INTERES.RENTA_VITALICIA_VEJEZ);
+      const resRV = calcularRVInmediata(FONDOS_TEST, 65, 'M', TASAS_INTERES.RENTA_VITALICIA_VEJEZ, undefined, undefined, UF_REFERENCIA_EJEMPLO);
       const cnu = calcularCNU(65, 'M', TASAS_INTERES.RENTA_VITALICIA_VEJEZ);
       const pensionExactaSinCortes = FONDOS_TEST / cnu;
 
@@ -108,8 +109,8 @@ describe('Motor Actuarial de Pensiones - Sistema Chileno', () => {
     });
 
     it('RV con Periodo Garantizado reduce la pensión mensual respecto a RV Inmediata simple', () => {
-      const resSimple = calcularRVInmediata(FONDOS_TEST, 65, 'M');
-      const resGarantizada = calcularRVPeriodoGarantizado(FONDOS_TEST, 65, 'M', 120);
+      const resSimple = calcularRVInmediata(FONDOS_TEST, 65, 'M', undefined, undefined, undefined, UF_REFERENCIA_EJEMPLO);
+      const resGarantizada = calcularRVPeriodoGarantizado(FONDOS_TEST, 65, 'M', 120, undefined, undefined, undefined, UF_REFERENCIA_EJEMPLO);
 
       assert.ok(resGarantizada.pensionMensual < resSimple.pensionMensual, 'Garantía debe reducir pensión base');
       assert.equal(resGarantizada.periodoGarantizado, 120);
@@ -118,7 +119,7 @@ describe('Motor Actuarial de Pensiones - Sistema Chileno', () => {
     it('RV con Aumento Temporal respeta equivalencia actuarial', () => {
       const mesesAumento = 36; // 3 años
       const porcentajeAumento = 0.30; // 30% más durante el aumento
-      const resAumento = calcularRVAumentoTemporal(FONDOS_TEST, 65, 'M', mesesAumento, porcentajeAumento);
+      const resAumento = calcularRVAumentoTemporal(FONDOS_TEST, 65, 'M', mesesAumento, porcentajeAumento, undefined, undefined, undefined, UF_REFERENCIA_EJEMPLO);
 
       assert.ok(resAumento.aumentoTemporal, 'Debe incluir desglose de aumento temporal');
       const { pensionAumentada, pensionFinal } = resAumento.aumentoTemporal;
@@ -128,13 +129,13 @@ describe('Motor Actuarial de Pensiones - Sistema Chileno', () => {
       assert.ok(diferencia <= 1, `Diferencia de redondeo excesiva: ${diferencia}`);
 
       // La pensión base ajustada final debe ser menor que la RV simple para compensar el sobrepago
-      const resSimple = calcularRVInmediata(FONDOS_TEST, 65, 'M');
+      const resSimple = calcularRVInmediata(FONDOS_TEST, 65, 'M', undefined, undefined, undefined, UF_REFERENCIA_EJEMPLO);
       assert.ok(pensionFinal < resSimple.pensionMensual, 'Pensión final debe compensar el período aumentado');
       assert.ok(pensionAumentada > resSimple.pensionMensual, 'Pensión aumentada debe superar la RV simple');
     });
 
     it('RV con Ambas Cláusulas (Garantizada + Aumento) calcula coherentemente', () => {
-      const resAmbas = calcularRVConAmbasClausulas(FONDOS_TEST, 65, 'M', 120, 24, 0.50);
+      const resAmbas = calcularRVConAmbasClausulas(FONDOS_TEST, 65, 'M', 120, 24, 0.50, undefined, undefined, undefined, UF_REFERENCIA_EJEMPLO);
 
       assert.equal(resAmbas.periodoGarantizado, 120);
       assert.ok(resAmbas.aumentoTemporal);
@@ -150,8 +151,8 @@ describe('Motor Actuarial de Pensiones - Sistema Chileno', () => {
     });
 
     it('BAC calcula 0,1 UF por año con tope de 2,5 UF', () => {
-      const bac10Anos = calcularBAC(10);
-      const bac35Anos = calcularBAC(35);
+      const bac10Anos = calcularBAC(10, undefined, UF_REFERENCIA_EJEMPLO);
+      const bac35Anos = calcularBAC(35, undefined, UF_REFERENCIA_EJEMPLO);
 
       assert.equal(bac10Anos.beneficioUF, 1.0);
       // Con 35 años sobrepasa el tope de 2.5 UF
@@ -159,18 +160,18 @@ describe('Motor Actuarial de Pensiones - Sistema Chileno', () => {
     });
 
     it('Compensación por Expectativa de Vida aplica a mujeres y garantiza 0,25 UF/mes', () => {
-      const bonoMujer = calcularCompensacionExpectativaVidaMujer('F', 65, 40_000, 'vejez');
+      const bonoMujer = calcularCompensacionExpectativaVidaMujer('F', 65, { ...UF_REFERENCIA_EJEMPLO, valor: 40_000 }, 'vejez');
       assert.equal(bonoMujer.aplica, true);
       assert.equal(bonoMujer.beneficioUF, 0.25);
       assert.equal(bonoMujer.beneficioMensualPesos, 10_000);
 
       // No aplica a hombres
-      const bonoHombre = calcularCompensacionExpectativaVidaMujer('M', 65, 40_000, 'vejez');
+      const bonoHombre = calcularCompensacionExpectativaVidaMujer('M', 65, { ...UF_REFERENCIA_EJEMPLO, valor: 40_000 }, 'vejez');
       assert.equal(bonoHombre.aplica, false);
       assert.equal(bonoHombre.beneficioMensualPesos, 0);
 
       // No aplica en sobrevivencia al causante
-      const bonoSobrevivencia = calcularCompensacionExpectativaVidaMujer('F', 65, 40_000, 'sobrevivencia');
+      const bonoSobrevivencia = calcularCompensacionExpectativaVidaMujer('F', 65, { ...UF_REFERENCIA_EJEMPLO, valor: 40_000 }, 'sobrevivencia');
       assert.equal(bonoSobrevivencia.aplica, false);
     });
   });
@@ -183,7 +184,7 @@ describe('Motor Actuarial de Pensiones - Sistema Chileno', () => {
       const beneficiarios = [{ tipo: 'conyuge' as const, edad: 62, sexo: 'F' as const, porcentajePension: 0.60 }];
 
       // Retiro Programado
-      const resRP = calcularRetiroProgramado(saldoPesos, 65, 'M', 0.0358, beneficiarios);
+      const resRP = calcularRetiroProgramado(saldoPesos, 65, 'M', 0.0358, beneficiarios, undefined, undefined, UF_REFERENCIA_EJEMPLO);
       const pensionRPUF = resRP.pensionMensual / uf;
 
       // PlanVital SCOMP: 4,97 UF
@@ -191,7 +192,7 @@ describe('Motor Actuarial de Pensiones - Sistema Chileno', () => {
 
       // RV Simple con tasa observada de aseguradoras líderes (~3.15%)
       const saldoNetoRV = (saldoUF - 15.53) * uf; // Menos comisión asesor 1.5%
-      const resRV = calcularRVInmediata(saldoNetoRV, 65, 'M', 0.0315, beneficiarios);
+      const resRV = calcularRVInmediata(saldoNetoRV, 65, 'M', 0.0315, beneficiarios, undefined, UF_REFERENCIA_EJEMPLO);
       const pensionRVUF = resRV.pensionMensual / uf;
 
       // Confuturo SCOMP: 4,68 UF / 4 Life: 4,67 UF
@@ -205,7 +206,7 @@ describe('Motor Actuarial de Pensiones - Sistema Chileno', () => {
 
       // RV Simple con tasa observada de aseguradoras líderes (~3.08% en SCOMP 4 Life / Confuturo)
       const saldoNetoRV = (saldoUF - 32.66) * uf; // Menos comisión asesor 1.5%
-      const resRV = calcularRVInmediata(saldoNetoRV, 64, 'F', 0.0308, beneficiarios);
+      const resRV = calcularRVInmediata(saldoNetoRV, 64, 'F', 0.0308, beneficiarios, undefined, UF_REFERENCIA_EJEMPLO);
       const pensionRVUF = resRV.pensionMensual / uf;
 
       // SCOMP 4 Life: 9,59 UF / Confuturo: 9,55 UF / Penta: 9,50 UF
@@ -297,8 +298,8 @@ describe('Motor Actuarial de Pensiones - Sistema Chileno', () => {
     });
 
     it('Retiro Programado con titular inválido genera mayor pensión mensual inicial debido al menor CNU', () => {
-      const rpVejez = calcularRetiroProgramado(FONDOS_TEST, 65, 'M', 0.0358, [], false);
-      const rpInvalidez = calcularRetiroProgramado(FONDOS_TEST, 65, 'M', 0.0358, [], true);
+      const rpVejez = calcularRetiroProgramado(FONDOS_TEST, 65, 'M', 0.0358, [], false, undefined, UF_REFERENCIA_EJEMPLO);
+      const rpInvalidez = calcularRetiroProgramado(FONDOS_TEST, 65, 'M', 0.0358, [], true, undefined, UF_REFERENCIA_EJEMPLO);
 
       assert.ok(
         rpInvalidez.pensionMensual > rpVejez.pensionMensual,
@@ -307,8 +308,8 @@ describe('Motor Actuarial de Pensiones - Sistema Chileno', () => {
     });
 
     it('Renta Vitalicia con titular inválido genera mayor pensión mensual para la misma tasa de mercado', () => {
-      const rvVejez = calcularRVInmediata(FONDOS_TEST, 65, 'M', 0.0305, [], false);
-      const rvInvalidez = calcularRVInmediata(FONDOS_TEST, 65, 'M', 0.0305, [], true);
+      const rvVejez = calcularRVInmediata(FONDOS_TEST, 65, 'M', 0.0305, [], false, UF_REFERENCIA_EJEMPLO);
+      const rvInvalidez = calcularRVInmediata(FONDOS_TEST, 65, 'M', 0.0305, [], true, UF_REFERENCIA_EJEMPLO);
 
       assert.ok(
         rvInvalidez.pensionMensual > rvVejez.pensionMensual,
@@ -374,7 +375,7 @@ describe('Motor Actuarial de Pensiones - Sistema Chileno', () => {
         'M',
         0.0358,
         [],
-        40876.41
+        UF_REFERENCIA_EJEMPLO
       );
 
       assert.equal(des.pensionReferenciaCLP, 840_000); // 70% de 1.2M
@@ -443,7 +444,7 @@ describe('Motor Actuarial de Pensiones - Sistema Chileno', () => {
         true,       // cubierto SIS
         beneficiarios,
         0.0358,
-        40876.41
+        UF_REFERENCIA_EJEMPLO
       );
 
       assert.equal(fin.pensionReferenciaCausanteCLP, 700_000); // 70% de 1M
@@ -482,7 +483,7 @@ describe('Motor Actuarial de Pensiones - Sistema Chileno', () => {
         mesesAumento,
         pctAumento,
         tasa,
-        valorUF
+        { ...UF_REFERENCIA_EJEMPLO, valor: valorUF }
       );
 
       // Verificación de montos
@@ -530,8 +531,8 @@ describe('Motor Actuarial de Pensiones - Sistema Chileno', () => {
       const tasa = 0.0305;
       const valorUF = 40_000;
 
-      const rv50 = calcularRVAumentoTemporalSobrevivencia(fondos, beneficiarios, 36, 0.50, tasa, valorUF);
-      const rv100 = calcularRVAumentoTemporalSobrevivencia(fondos, beneficiarios, 36, 1.00, tasa, valorUF);
+      const rv50 = calcularRVAumentoTemporalSobrevivencia(fondos, beneficiarios, 36, 0.50, tasa, { ...UF_REFERENCIA_EJEMPLO, valor: valorUF });
+      const rv100 = calcularRVAumentoTemporalSobrevivencia(fondos, beneficiarios, 36, 1.00, tasa, { ...UF_REFERENCIA_EJEMPLO, valor: valorUF });
 
       // +100% entrega mayor pensión inicial en los primeros 3 años
       assert.ok(rv100.pensionMensual > rv50.pensionMensual, 'Con +100% la pensión inicial es mayor que con +50%');
@@ -554,8 +555,8 @@ describe('Motor Actuarial de Pensiones - Sistema Chileno', () => {
       const tasa = 0.0301;
       const valorUF = 40_000;
 
-      const rv10 = calcularRVSobrevivenciaGarantizada(fondos, beneficiarios, 120, tasa, valorUF);
-      const rv20 = calcularRVSobrevivenciaGarantizada(fondos, beneficiarios, 240, tasa, valorUF);
+      const rv10 = calcularRVSobrevivenciaGarantizada(fondos, beneficiarios, 120, tasa, { ...UF_REFERENCIA_EJEMPLO, valor: valorUF });
+      const rv20 = calcularRVSobrevivenciaGarantizada(fondos, beneficiarios, 240, tasa, { ...UF_REFERENCIA_EJEMPLO, valor: valorUF });
 
       assert.ok(rv10.pensionMensual > 0, 'Pensión debe ser positiva');
       assert.ok(rv20.pensionMensual > 0, 'Pensión debe ser positiva');

@@ -1,5 +1,7 @@
 'use client';
 
+import { clpAUf, ufAClp, type ReferenciaUF } from '@/lib/moneda';
+
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -18,7 +20,7 @@ interface AffiliateSidebarProps {
   setAfiliado: React.Dispatch<React.SetStateAction<AfiliadoState>>;
   clausulas: CláusulasState;
   setClausulas: React.Dispatch<React.SetStateAction<CláusulasState>>;
-  valorUF: number;
+  referenciaUF: ReferenciaUF;
   fuenteUF: string;
   onRefreshUF: () => void;
   isLoadingUF: boolean;
@@ -34,7 +36,7 @@ export function AffiliateSidebar({
   setAfiliado,
   clausulas,
   setClausulas,
-  valorUF,
+  referenciaUF,
   fuenteUF,
   onRefreshUF,
   isLoadingUF,
@@ -44,10 +46,11 @@ export function AffiliateSidebar({
   tasaRP = 3.67,
   tasaRV = 2.99
 }: AffiliateSidebarProps) {
+  const valorUF = referenciaUF.valor;
   // Manejar cambio de fondos en Pesos y sincronizar UF
   const handlePesosChange = (valStr: string) => {
     const rawVal = parseFloat(valStr.replace(/\D/g, '')) || 0;
-    const ufVal = valorUF > 0 ? Math.round((rawVal / valorUF) * 100) / 100 : 0;
+    const ufVal = valorUF > 0 ? clpAUf(rawVal, referenciaUF) : 0;
     setAfiliado(prev => ({
       ...prev,
       fondosCLP: rawVal,
@@ -58,7 +61,7 @@ export function AffiliateSidebar({
   // Manejar cambio de fondos en UF y sincronizar Pesos
   const handleUFChange = (valStr: string) => {
     const ufVal = parseFloat(valStr.replace(',', '.')) || 0;
-    const pesosVal = Math.round(ufVal * valorUF);
+    const pesosVal = ufAClp(ufVal, referenciaUF);
     setAfiliado(prev => ({
       ...prev,
       fondosUF: ufVal,
@@ -69,7 +72,7 @@ export function AffiliateSidebar({
   // Manejar cambio de Ingreso Base en Pesos
   const handleIngresoBaseCLPChange = (valStr: string) => {
     const rawVal = parseFloat(valStr.replace(/\D/g, '')) || 0;
-    const ufVal = valorUF > 0 ? Math.round((rawVal / valorUF) * 100) / 100 : 0;
+    const ufVal = valorUF > 0 ? clpAUf(rawVal, referenciaUF) : 0;
     setAfiliado(prev => ({
       ...prev,
       ingresoBaseCLP: rawVal,
@@ -80,7 +83,7 @@ export function AffiliateSidebar({
   // Manejar cambio de Ingreso Base en UF
   const handleIngresoBaseUFChange = (valStr: string) => {
     const ufVal = parseFloat(valStr.replace(',', '.')) || 0;
-    const pesosVal = Math.round(ufVal * valorUF);
+    const pesosVal = ufAClp(ufVal, referenciaUF);
     setAfiliado(prev => ({
       ...prev,
       ingresoBaseUF: ufVal,
@@ -237,7 +240,7 @@ export function AffiliateSidebar({
                 <span>Bono por Expectativa de Vida (Mujer)</span>
               </div>
               <p className="text-[11px] text-rose-800 leading-tight">
-                Se incorpora automáticamente la compensación legal de <strong>+0,25 UF/mes</strong> (~${Math.round(0.25 * valorUF).toLocaleString('es-CL')}) para mitigar la brecha de género por mayor sobrevida en tablas de mortalidad.
+                Se incorpora automáticamente la compensación legal de <strong>+0,25 UF/mes</strong> (~${Math.round(ufAClp(0.25, referenciaUF)).toLocaleString('es-CL')}) para mitigar la brecha de género por mayor sobrevida en tablas de mortalidad.
               </p>
             </div>
           )}
@@ -654,7 +657,7 @@ export function AffiliateSidebar({
             {/* Grilla 2: BAC */}
             {(() => {
               const bacUF = Math.min((afiliado.anosCotizados || 0) * 0.1, 2.5);
-              const bacCLP = Math.round(bacUF * valorUF);
+              const bacCLP = Math.round(ufAClp(bacUF, referenciaUF));
               return (
                 <button
                   type="button"
@@ -692,7 +695,7 @@ export function AffiliateSidebar({
             {/* Grilla 3: BEV */}
             {(() => {
               const bevActivo = clausulas.incluirBonoMujer ?? true;
-              const bevCLP = Math.round(0.25 * valorUF);
+              const bevCLP = Math.round(ufAClp(0.25, referenciaUF));
               const aplicaMujer = afiliado.sexo === 'F' && afiliado.tipoPension !== 'sobrevivencia';
               return (
                 <button

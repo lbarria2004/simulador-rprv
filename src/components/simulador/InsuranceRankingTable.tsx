@@ -1,5 +1,7 @@
 'use client';
 
+import { clpAUf, ufAClp, type ReferenciaUF } from '@/lib/moneda';
+
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -9,11 +11,12 @@ import { CompaniasRankingItem } from './types';
 
 interface InsuranceRankingTableProps {
   items: CompaniasRankingItem[];
-  valorUF: number;
+  referenciaUF: ReferenciaUF;
   tipoPension?: 'vejez' | 'invalidez' | 'sobrevivencia';
 }
 
-export function InsuranceRankingTable({ items, valorUF, tipoPension = 'vejez' }: InsuranceRankingTableProps) {
+export function InsuranceRankingTable({ items, referenciaUF, tipoPension = 'vejez' }: InsuranceRankingTableProps) {
+  const valorUF = referenciaUF.valor;
   // Ordenar por mayor pensión
   const sortedItems = React.useMemo(() => {
     return [...items].sort((a, b) => b.pensionUF - a.pensionUF);

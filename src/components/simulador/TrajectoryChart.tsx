@@ -1,5 +1,7 @@
 'use client';
 
+import { clpAUf, ufAClp, type ReferenciaUF } from '@/lib/moneda';
+
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -22,7 +24,7 @@ interface TrajectoryChartProps {
   proyeccionRP: ProyeccionAnual[] | undefined;
   resultadoRVSimple: ResultadoEscenario | null;
   resultadoRVClausulas: ResultadoEscenario | null;
-  valorUF: number;
+  referenciaUF: ReferenciaUF;
 }
 
 export function TrajectoryChart({
@@ -30,8 +32,9 @@ export function TrajectoryChart({
   proyeccionRP,
   resultadoRVSimple,
   resultadoRVClausulas,
-  valorUF
+  referenciaUF
 }: TrajectoryChartProps) {
+  const valorUF = referenciaUF.valor;
   // Construir serie de tiempo de 25 años
   const chartData = React.useMemo(() => {
     const data: Array<{
@@ -46,10 +49,10 @@ export function TrajectoryChart({
     }> = [];
 
     const rvSimpleCLP = resultadoRVSimple?.pensionMensual || 0;
-    const rvSimpleUF = resultadoRVSimple?.pensionEnUF || 0;
+    const rvSimpleUF = clpAUf(rvSimpleCLP, referenciaUF);
 
-    const aumentoCLP = resultadoRVClausulas?.aumentoTemporal?.pensionAumentada || rvSimpleCLP;
-    const finalCLP = resultadoRVClausulas?.aumentoTemporal?.pensionFinal || rvSimpleCLP;
+    const aumentoCLP = resultadoRVClausulas?.aumentoTemporal?.pensionAumentada ?? resultadoRVClausulas?.pensionMensual ?? rvSimpleCLP;
+    const finalCLP = resultadoRVClausulas?.aumentoTemporal?.pensionFinal ?? resultadoRVClausulas?.pensionMensual ?? rvSimpleCLP;
     const mesesAumento = resultadoRVClausulas?.aumentoTemporal?.meses || 36;
     const anosAumento = Math.ceil(mesesAumento / 12);
 
@@ -66,14 +69,14 @@ export function TrajectoryChart({
         retiroProgramado: rpCLP,
         rentaVitalicia: rvSimpleCLP,
         rvConAumento: rvAumentoActualCLP,
-        retiroProgramadoUF: rpCLP === null ? null : valorUF > 0 ? Math.round((rpCLP / valorUF) * 100) / 100 : 0,
+        retiroProgramadoUF: rpCLP === null ? null : valorUF > 0 ? clpAUf(rpCLP, referenciaUF) : 0,
         rentaVitaliciaUF: rvSimpleUF,
-        rvConAumentoUF: valorUF > 0 ? Math.round((rvAumentoActualCLP / valorUF) * 100) / 100 : 0
+        rvConAumentoUF: valorUF > 0 ? Math.round((clpAUf(rvAumentoActualCLP, referenciaUF)) * 100) / 100 : 0
       });
     }
 
     return data;
-  }, [edadInicial, proyeccionRP, resultadoRVSimple, resultadoRVClausulas, valorUF]);
+  }, [edadInicial, proyeccionRP, resultadoRVSimple, resultadoRVClausulas, valorUF, referenciaUF]);
 
   return (
     <Card className="border-slate-200 shadow-sm">
@@ -145,7 +148,7 @@ export function TrajectoryChart({
                           Edad: {label} años (Año {dataPoint.año})
                         </div>
                         <div className="text-emerald-300 flex justify-between gap-4">
-                          <span>RV Aumentada:</span>
+                          <span>RV con cláusulas:</span>
                           <span className="font-mono font-bold">
                             {dataPoint.rvConAumentoUF} UF (${dataPoint.rvConAumento.toLocaleString('es-CL')})
                           </span>
@@ -175,7 +178,7 @@ export function TrajectoryChart({
                 iconType="circle"
                 wrapperStyle={{ fontSize: '11px', paddingTop: '0px' }}
                 formatter={(value) => {
-                  if (value === 'rvConAumento') return 'RV con Aumento Temporal (Verde)';
+                  if (value === 'rvConAumento') return 'RV con Cláusulas (Verde)';
                   if (value === 'rentaVitalicia') return 'Renta Vitalicia Fija (Azul)';
                   if (value === 'retiroProgramado') return 'Retiro Programado Simulado (Naranja)';
                   return value;

@@ -1,5 +1,7 @@
 'use client';
 
+import { clpAUf, ufAClp, type ReferenciaUF } from '@/lib/moneda';
+
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -20,7 +22,7 @@ import { CotizacionItemResultado, InvalidezFinanciamientoInfo, SobrevivenciaFina
 
 interface MultiQuotationResultsProps {
   items: CotizacionItemResultado[];
-  valorUF: number;
+  referenciaUF: ReferenciaUF;
   onDescargarPDF: () => void;
   isGeneratingPDF?: boolean;
   tipoPension?: 'vejez' | 'invalidez' | 'sobrevivencia';
@@ -43,7 +45,7 @@ function formatUF(val: number): string {
 
 export function MultiQuotationResults({
   items,
-  valorUF,
+  referenciaUF,
   onDescargarPDF,
   isGeneratingPDF = false,
   tipoPension = 'vejez',
@@ -53,6 +55,7 @@ export function MultiQuotationResults({
   tasaRV = 2.99,
   sexo = 'M'
 }: MultiQuotationResultsProps) {
+  const valorUF = referenciaUF.valor;
   if (items.length === 0) {
     return (
       <Card className="border-dashed border-slate-300 p-8 text-center bg-slate-50/50">
@@ -203,7 +206,7 @@ export function MultiQuotationResults({
           const hasAumento = !!aumento && (aumento.meses > 0);
           const totalBeneficiosCLP = item.pguMensual + item.bacMensual + (item.bonoMujerMensual || 0);
           const totalDefinitivoCLP = hasAumento ? (aumento.pensionFinal + totalBeneficiosCLP) : item.totalConBeneficiosCLP;
-          const totalDefinitivoUF = valorUF > 0 ? (totalDefinitivoCLP / valorUF) : 0;
+          const totalDefinitivoUF = valorUF > 0 ? (clpAUf(totalDefinitivoCLP, referenciaUF)) : 0;
 
           return (
             <Card
@@ -270,7 +273,7 @@ export function MultiQuotationResults({
                           {formatCLP(item.resultado.pensionMensual)}
                         </span>
                         <span className="text-xs sm:text-sm font-black text-blue-700 font-mono">
-                          ({formatUF(item.resultado.pensionEnUF)})
+                          ({formatUF(clpAUf(item.resultado.pensionMensual, referenciaUF))})
                         </span>
                       </div>
                     </div>
@@ -290,7 +293,7 @@ export function MultiQuotationResults({
                             {formatCLP(aumento.pensionAumentada)}
                           </span>
                           <span className="text-xs sm:text-sm font-black text-rose-700 font-mono">
-                            ({formatUF(aumento.pensionAumentada / valorUF)})
+                            ({formatUF(clpAUf(aumento.pensionAumentada, referenciaUF))})
                           </span>
                         </div>
                       </div>
@@ -307,7 +310,7 @@ export function MultiQuotationResults({
                             {formatCLP(aumento.pensionFinal)}
                           </span>
                           <span className="text-xs sm:text-sm font-bold text-blue-700 font-mono">
-                            ({formatUF(aumento.pensionFinal / valorUF)})
+                            ({formatUF(clpAUf(aumento.pensionFinal, referenciaUF))})
                           </span>
                         </div>
                       </div>
@@ -332,7 +335,7 @@ export function MultiQuotationResults({
                             +{formatCLP(item.pguMensual)}
                           </span>
                           <span className="text-[10px] text-emerald-600 font-mono font-medium">
-                            ({formatUF(item.pguMensual / valorUF)})
+                            ({formatUF(clpAUf(item.pguMensual, referenciaUF))})
                           </span>
                         </div>
                       ) : (
@@ -352,7 +355,7 @@ export function MultiQuotationResults({
                             +{formatCLP(item.bacMensual)}
                           </span>
                           <span className="text-[10px] text-indigo-600 font-mono font-medium">
-                            ({formatUF(item.bacMensual / valorUF)})
+                            ({formatUF(clpAUf(item.bacMensual, referenciaUF))})
                           </span>
                         </div>
                       </div>
@@ -551,13 +554,13 @@ export function MultiQuotationResults({
                     <td className="py-2.5 px-3 text-right font-mono font-medium text-blue-900">
                       {itemHasAumento ? (
                         <div className="flex flex-col items-end">
-                          <span className="font-bold text-rose-700">{formatUF(item.resultado.pensionEnUF)}</span>
+                          <span className="font-bold text-rose-700">{formatUF(clpAUf(item.resultado.pensionMensual, referenciaUF))}</span>
                           <span className="text-[10px] text-blue-800 font-semibold">
-                            → {formatUF(itemAumento.pensionFinal / valorUF)} def.
+                            → {formatUF(clpAUf(itemAumento.pensionFinal, referenciaUF))} def.
                           </span>
                         </div>
                       ) : (
-                        formatUF(item.resultado.pensionEnUF)
+                        formatUF(clpAUf(item.resultado.pensionMensual, referenciaUF))
                       )}
                     </td>
                     <td className="py-2.5 px-3 text-right font-bold text-slate-900">

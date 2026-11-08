@@ -1,6 +1,8 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { clpAUf, ufAClp, validarReferenciaUF, UF_REFERENCIA_EJEMPLO, type ReferenciaUF } from '@/lib/moneda';
+
+import React, { useState, useMemo, useCallback } from 'react';
 import { AffiliateSidebar } from '@/components/simulador/AffiliateSidebar';
 import { ModalitiesSelector } from '@/components/simulador/ModalitiesSelector';
 import { MultiQuotationResults } from '@/components/simulador/MultiQuotationResults';
@@ -20,6 +22,8 @@ import {
 } from '@/components/simulador/types';
 import {
   calcularRetiroProgramado,
+  calcularRetiroProgramadoSobrevivencia,
+  calcularRVInmediataSobrevivencia,
   AVISO_SIMULACION,
   ESCENARIOS_RENTABILIDAD_RP,
   type EscenarioRentabilidadRP,
@@ -73,11 +77,14 @@ const CLASIFICACIONES_RIESGO: Record<string, string> = {
 
 export default function SimuladorPage() {
   // Estado del valor oficial de la UF (obtenido del SII)
-  const [valorUF, setValorUF] = useState<number>(40876.41);
-  const [fuenteUF, setFuenteUF] = useState<string>('sii.cl');
+  const [referenciaUF, setReferenciaUF] = useState<ReferenciaUF>({ ...UF_REFERENCIA_EJEMPLO });
+  const valorUF = referenciaUF.valor;
+  const fuenteUF = referenciaUF.fuente;
+  const [errorUF, setErrorUF] = useState('');
+
   const [isLoadingUF, setIsLoadingUF] = useState<boolean>(false);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState<boolean>(false);
-  const [isCotizando, setIsCotizando] = useState<boolean>(false);
+  const isCotizando = false;
 
   // Estado del Afiliado (por defecto: Caso real Juan Zamora SCOMP)
   const [afiliado, setAfiliado] = useState<AfiliadoState>({
@@ -87,14 +94,14 @@ export default function SimuladorPage() {
     edad: 65,
     sexo: 'M',
     fondosUF: 1035.47,
-    fondosCLP: Math.round(1035.47 * 40876.41),
+    fondosCLP: ufAClp(1035.47, UF_REFERENCIA_EJEMPLO),
     anosCotizados: 25,
     tipoPension: 'vejez',
     esInvalido: false,
     gradoInvalidez: 'total',
     cubiertoSIS: true,
     ingresoBaseCLP: 1200000,
-    ingresoBaseUF: Math.round((1200000 / 40876.41) * 100) / 100,
+    ingresoBaseUF: clpAUf(1200000, UF_REFERENCIA_EJEMPLO),
     tieneConyuge: true,
     fechaNacimientoConyuge: '1964-06-10',
     edadConyuge: 62,
@@ -112,6 +119,14 @@ export default function SimuladorPage() {
     ],
     conAsesor: true
   });
+
+  const actualizarReferenciaUF = useCallback((referencia: ReferenciaUF) => {
+    const uf = validarReferenciaUF(referencia);
+    setReferenciaUF(uf);
+    setAfiliado(prev => ({ ...prev, fondosUF: clpAUf(prev.fondosCLP, uf),
+      ingresoBaseUF: clpAUf(prev.ingresoBaseCLP ?? 0, uf) }));
+    setErrorUF('');
+  }, []);
 
   // Modalidades configuradas para cotizar en lote
   const [modalidades, setModalidades] = useState<ModalidadConfig[]>([
@@ -140,7 +155,7 @@ export default function SimuladorPage() {
   ]);
 
   // Resultados de la cotización generada
-  const [cotizacionResultados, setCotizacionResultados] = useState<CotizacionItemResultado[]>([]);
+
 
   // Tasas de Interés de Cálculo Actuarial (en porcentaje %, ej. 3.67 para 3.67%)
   const [escenarioRP, setEscenarioRP] = useState<EscenarioRentabilidadRP>('base');
@@ -186,26 +201,17 @@ export default function SimuladorPage() {
       const res = await fetch('/api/uf');
       if (res.ok) {
         const data = await res.json();
-        if (data.valor && data.valor > 0) {
-          setValorUF(data.valor);
-          setFuenteUF(data.fuente || 'sii.cl');
-          // Sincronizar pesos con la nueva UF
-          setAfiliado(prev => ({
-            ...prev,
-            fondosCLP: Math.round(prev.fondosUF * data.valor)
-          }));
-        }
+        if (!data.success) throw new Error(data.error || 'No se pudo obtener UF');
+        actualizarReferenciaUF({ valor: data.valor, fecha: data.fecha, fuente: data.fuente });
+      } else {
+        throw new Error('No se obtuvo una referencia UF fechada; se conserva la seleccionada');
       }
     } catch (err) {
-      console.warn('Error al obtener UF:', err);
+      setErrorUF(err instanceof Error ? err.message : 'No se pudo obtener UF');
     } finally {
       setIsLoadingUF(false);
     }
-  }, []);
-
-  useEffect(() => {
-    fetchUF();
-  }, [fetchUF]);
+  }, [actualizarReferenciaUF]);
 
   // Manejar presets de casos reales SCOMP
   const handleApplyPreset = (presetKey: 'zamora' | 'spuler' | 'soltero') => {
@@ -217,7 +223,7 @@ export default function SimuladorPage() {
         edad: 65,
         sexo: 'M',
         fondosUF: 1035.47,
-        fondosCLP: Math.round(1035.47 * valorUF),
+        fondosCLP: ufAClp(1035.47, referenciaUF),
         anosCotizados: 25,
         tipoPension: 'vejez',
         esInvalido: false,
@@ -253,7 +259,7 @@ export default function SimuladorPage() {
         edad: 64,
         sexo: 'F',
         fondosUF: 2177.40,
-        fondosCLP: Math.round(2177.40 * valorUF),
+        fondosCLP: ufAClp(2177.40, referenciaUF),
         anosCotizados: 30,
         tipoPension: 'vejez',
         esInvalido: false,
@@ -289,7 +295,7 @@ export default function SimuladorPage() {
         edad: 65,
         sexo: 'M',
         fondosUF: 1500.00,
-        fondosCLP: Math.round(1500.00 * valorUF),
+        fondosCLP: ufAClp(1500.00, referenciaUF),
         anosCotizados: 20,
         tipoPension: 'vejez',
         esInvalido: false,
@@ -328,94 +334,21 @@ export default function SimuladorPage() {
     if (tipoPension === 'sobrevivencia') {
       const porcentajes = calcularPorcentajesBeneficiarios(beneficiarios);
       if (mod.tipo === 'retiro_programado') {
-        const { cnuTotal: cnuRP } = calcularCNUSobrevivencia(beneficiarios, tasaRPActuarial, 'retiro_programado');
-        const pensionRP = cnuRP > 0 ? fondosRP / cnuRP : 0;
-        const pensionPorBen = porcentajes.map(b => ({
-          tipo: b.tipo,
-          porcentaje: b.porcentaje,
-          pensionMensual: Math.round(pensionRP * b.porcentaje)
-        }));
-
-        const proyeccionRP: ProyeccionAnual[] = [];
-        let saldoTemp = fondosRP;
-        for (let y = 0; y <= 25; y++) {
-          const pAnual = (saldoTemp / (cnuRP > 0 ? cnuRP : 1)) * 12;
-          proyeccionRP.push({
-            año: y + 1,
-            edad: edad + y,
-            pensionMensual: Math.round(pAnual / 12),
-            saldoAcumulado: Math.round(saldoTemp),
-            retiroAcumulado: 0,
-            fase: 'decreciente'
-          });
-          saldoTemp = Math.max(0, (saldoTemp - pAnual) * (1 + tasaRPActuarial));
-          if (saldoTemp <= 0) break;
-        }
-
-        resultado = {
-          nombre: 'Retiro Programado Sobrevivencia',
-          pensionMensual: Math.round(pensionRP),
-          pensionEnUF: valorUF > 0 ? Number((pensionRP / valorUF).toFixed(2)) : 0,
-          pensionAnual: Math.round(pensionRP * 12),
-          cnu: cnuRP,
-          tasaInteres: tasaRPActuarial,
-          expectativaVida: calcularExpectativaVida(porcentajes[0]?.edad || 60, porcentajes[0]?.sexo || 'F'),
-          pensionPorBeneficiario: pensionPorBen,
-          proyeccion: proyeccionRP,
-          advertencias: [
-            'Pensión de Sobrevivencia Legal (D.L. 3.500 Art. 58)',
-            `Tasa de Retiro Programado aplicada: ${(tasaRPActuarial * 100).toFixed(2)}% anual`,
-            'Recálculo anual por saldo decreciente en AFP'
-          ]
-        };
+        resultado = calcularRetiroProgramadoSobrevivencia(fondosRP, edad, sexo, beneficiarios,
+          undefined, undefined, tasaRPActuarial, referenciaUF,
+          { rentabilidadRealAnual: ESCENARIOS_RENTABILIDAD_RP[escenarioRP].rentabilidadRealAnual });
       } else {
         // Modalidades de Renta Vitalicia en Sobrevivencia (Normativa Oficial CMF y SP)
         if (mod.tipo === 'renta_vitalicia_simple') {
-          const { cnuTotal: cnuRVBase } = calcularCNUSobrevivencia(beneficiarios, tasaRVEfectiva, 'renta_vitalicia');
-          const pensionRV = cnuRVBase > 0 ? fondosRV / cnuRVBase : 0;
-          const pensionPorBen = porcentajes.map(b => ({
-            tipo: b.tipo,
-            porcentaje: b.porcentaje,
-            pensionMensual: Math.round(pensionRV * b.porcentaje)
-          }));
-
-          const proyeccionRV: ProyeccionAnual[] = [];
-          for (let y = 0; y <= 25; y++) {
-            proyeccionRV.push({
-              año: y + 1,
-              edad: edad + y,
-              pensionMensual: Math.round(pensionRV),
-              saldoAcumulado: 0,
-              retiroAcumulado: 0,
-              fase: 'vitalicia'
-            });
-          }
-
-          resultado = {
-            nombre: mod.nombre || 'Renta Vitalicia Sobrevivencia Simple',
-            pensionMensual: Math.round(pensionRV),
-            pensionEnUF: valorUF > 0 ? Number((pensionRV / valorUF).toFixed(2)) : 0,
-            pensionAnual: Math.round(pensionRV * 12),
-            cnu: cnuRVBase,
-            tasaInteres: tasaRVEfectiva,
-            expectativaVida: calcularExpectativaVida(porcentajes[0]?.edad || 60, porcentajes[0]?.sexo || 'F'),
-            pensionPorBeneficiario: pensionPorBen,
-            proyeccion: proyeccionRV,
-            advertencias: [
-              'Renta Vitalicia Sobrevivencia Fija en UF de por vida',
-              mod.esTasaEspecial || (mod.tasaEspecialRV !== undefined && mod.tasaEspecialRV > 0)
-                ? `⚡ Tasa Especial Ajustada: ${(tasaRVEfectiva * 100).toFixed(2)}% anual`
-                : `Tasa Renta Vitalicia aplicada: ${(tasaRVEfectiva * 100).toFixed(2)}% anual`,
-              'Distribución a beneficiarios legales según Art. 58 D.L. 3.500'
-            ]
-          };
+          resultado = calcularRVInmediataSobrevivencia(fondosRV, edad, sexo, beneficiarios,
+            undefined, undefined, tasaRVEfectiva, referenciaUF);
         } else if (mod.tipo === 'rv_garantizada') {
           resultado = calcularRVSobrevivenciaGarantizada(
             fondosRV,
             beneficiarios,
             mod.mesesGarantizados || 180,
             tasaRVEfectiva,
-            valorUF
+            referenciaUF
           );
           if (mod.esTasaEspecial || (mod.tasaEspecialRV !== undefined && mod.tasaEspecialRV > 0)) {
             resultado.advertencias = [
@@ -426,6 +359,7 @@ export default function SimuladorPage() {
         } else {
           // Aumento Temporal o Combinada en Sobrevivencia (No permitidas por normativa CMF/SP)
           resultado = {
+            referenciaUF, unidadMonetaria: 'CLP_REALES',
             nombre: `${mod.nombre} (No autorizada en Sobrevivencia)`,
             pensionMensual: 0,
             pensionEnUF: 0,
@@ -444,9 +378,9 @@ export default function SimuladorPage() {
     } else if (mod.tipo === 'retiro_programado') {
       resultado = calcularRetiroProgramado(fondosRP, edad, sexo, tasaRPActuarial, beneficiarios, esInvalido, {
         rentabilidadRealAnual: ESCENARIOS_RENTABILIDAD_RP[escenarioRP].rentabilidadRealAnual
-      });
+      }, referenciaUF);
     } else if (mod.tipo === 'renta_vitalicia_simple') {
-      resultado = calcularRVInmediata(fondosRV, edad, sexo, tasaRVEfectiva, beneficiarios, esInvalido);
+      resultado = calcularRVInmediata(fondosRV, edad, sexo, tasaRVEfectiva, beneficiarios, esInvalido, referenciaUF);
       if (mod.esTasaEspecial || (mod.tasaEspecialRV !== undefined && mod.tasaEspecialRV > 0)) {
         resultado.advertencias = [
           ...(resultado.advertencias || []),
@@ -461,7 +395,7 @@ export default function SimuladorPage() {
         mod.mesesGarantizados || 180,
         tasaRVEfectiva,
         beneficiarios,
-        esInvalido
+        esInvalido, referenciaUF
       );
       if (mod.esTasaEspecial || (mod.tasaEspecialRV !== undefined && mod.tasaEspecialRV > 0)) {
         resultado.advertencias = [
@@ -478,7 +412,7 @@ export default function SimuladorPage() {
         mod.porcentajeAumento || 1.0,
         tasaRVEfectiva,
         beneficiarios,
-        esInvalido
+        esInvalido, referenciaUF
       );
       if (mod.esTasaEspecial || (mod.tasaEspecialRV !== undefined && mod.tasaEspecialRV > 0)) {
         resultado.advertencias = [
@@ -497,7 +431,7 @@ export default function SimuladorPage() {
         mod.porcentajeAumento || 1.0,
         tasaRVEfectiva,
         beneficiarios,
-        esInvalido
+        esInvalido, referenciaUF
       );
       if (mod.esTasaEspecial || (mod.tasaEspecialRV !== undefined && mod.tasaEspecialRV > 0)) {
         resultado.advertencias = [
@@ -507,26 +441,26 @@ export default function SimuladorPage() {
       }
     }
 
-    const pguObj = (tipoPension !== 'sobrevivencia')
+    const pguObj = (tipoPension !== 'sobrevivencia' && clausulas.incluirPGU)
       ? calcularPGU(resultado.pensionMensual, edad) 
       : null;
     const pguMensual = (pguObj && pguObj.aplica) ? (pguObj.montoMensual || 0) : 0;
 
-    const bacObj = (tipoPension !== 'sobrevivencia')
-      ? calcularBAC(afiliado.anosCotizados, 0, valorUF) 
+    const bacObj = (tipoPension !== 'sobrevivencia' && clausulas.incluirBAC)
+      ? calcularBAC(afiliado.anosCotizados, 0, referenciaUF)
       : null;
     const bacMensual = (bacObj && bacObj.aplica) ? (bacObj.beneficioMensualPesos || 0) : 0;
 
     // Compensación por Diferencias de Expectativa de Vida para Mujeres (Seguro Social Previsional)
-    const bonoMujerObj = (afiliado.sexo === 'F' && tipoPension !== 'sobrevivencia')
-      ? calcularCompensacionExpectativaVidaMujer(afiliado.sexo, edad, valorUF, tipoPension, afiliado.cubiertoSIS)
+    const bonoMujerObj = (clausulas.incluirBonoMujer && afiliado.sexo === 'F' && tipoPension !== 'sobrevivencia')
+      ? calcularCompensacionExpectativaVidaMujer(afiliado.sexo, edad, referenciaUF, tipoPension, afiliado.cubiertoSIS)
       : null;
     const bonoMujerMensual = (bonoMujerObj && bonoMujerObj.aplica) ? bonoMujerObj.beneficioMensualPesos : 0;
     const bonoMujerUF = (bonoMujerObj && bonoMujerObj.aplica) ? bonoMujerObj.beneficioUF : 0;
 
     const baseCLP = Number(resultado.pensionMensual) || 0;
     const totalCLP = baseCLP + pguMensual + bacMensual + bonoMujerMensual;
-    const totalUF = valorUF > 0 ? totalCLP / valorUF : 0;
+    const totalUF = clpAUf(totalCLP, referenciaUF);
 
     return {
       config: mod,
@@ -538,7 +472,7 @@ export default function SimuladorPage() {
       totalConBeneficiosCLP: Math.round(totalCLP),
       totalConBeneficiosUF: Number(totalUF.toFixed(2))
     };
-  }, [afiliado.anosCotizados, afiliado.sexo, afiliado.cubiertoSIS, valorUF, escenarioRP]);
+  }, [afiliado.anosCotizados, afiliado.sexo, afiliado.cubiertoSIS, valorUF, escenarioRP, referenciaUF, clausulas.incluirPGU, clausulas.incluirBAC, clausulas.incluirBonoMujer]);
 
   // Desglose actuarial de financiamiento para Pensión de Invalidez (D.L. 3.500)
   const financiamientoInvalidez = useMemo<InvalidezFinanciamientoInfo | undefined>(() => {
@@ -566,7 +500,7 @@ export default function SimuladorPage() {
       afiliado.sexo,
       (tasaRP || 3.67) / 100,
       beneficiarios,
-      valorUF
+      referenciaUF
     );
   }, [
     afiliado.tipoPension,
@@ -580,6 +514,7 @@ export default function SimuladorPage() {
     afiliado.tieneConyuge,
     afiliado.edadConyuge,
     afiliado.sexoConyuge,
+    referenciaUF,
     valorUF,
     tasaRP
   ]);
@@ -606,7 +541,7 @@ export default function SimuladorPage() {
       cubiertoSIS,
       beneficiarios,
       (tasaRP || 3.67) / 100,
-      valorUF
+      referenciaUF
     );
   }, [
     afiliado.tipoPension,
@@ -617,14 +552,13 @@ export default function SimuladorPage() {
     afiliado.tieneConyuge,
     afiliado.edadConyuge,
     afiliado.sexoConyuge,
+    referenciaUF,
     valorUF,
     tasaRP
   ]);
 
   // Manejar cálculo de todas las modalidades activas en lote
-  const handleGenerarCotizacion = useCallback(() => {
-    setIsCotizando(true);
-    try {
+  const calcularResultados = useCallback(() => {
       const beneficiarios: BeneficiarioPension[] = (afiliado.beneficiarios && afiliado.beneficiarios.length > 0)
         ? afiliado.beneficiarios
         : (afiliado.tieneConyuge ? [{
@@ -668,16 +602,12 @@ export default function SimuladorPage() {
         )
       );
 
-      setCotizacionResultados(resultados);
-    } finally {
-      setIsCotizando(false);
-    }
+      return resultados;
   }, [afiliado, modalidades, calcularModalidad, financiamientoInvalidez, financiamientoSobrevivencia, tasaRP, tasaRV]);
 
-  // Generar cotización inicial al cargar o cambiar parámetros clave
-  useEffect(() => {
-    handleGenerarCotizacion();
-  }, [handleGenerarCotizacion]);
+  // Datos derivados en la misma renderización: nunca combinar resultados viejos y UF nueva.
+  const cotizacionResultados = useMemo(() => calcularResultados(), [calcularResultados]);
+  const handleGenerarCotizacion = useCallback(() => { calcularResultados(); }, [calcularResultados]);
 
   // Manejadores de modalidades
   const handleToggleModalidad = (id: string) => {
@@ -729,9 +659,9 @@ export default function SimuladorPage() {
       let pensionCLP = 0;
 
       if (esSobrevivencia) {
-        const { cnuTotal } = calcularCNUSobrevivencia(beneficiarios, tasaAplicable, 'renta_vitalicia');
-        pensionCLP = cnuTotal > 0 ? Math.round(fondosRV / cnuTotal) : 0;
-        pensionUF = valorUF > 0 ? Number((pensionCLP / valorUF).toFixed(2)) : 0;
+        const rv = calcularRVInmediataSobrevivencia(fondosRV, afiliado.edad, afiliado.sexo, beneficiarios, undefined, undefined, tasaAplicable, referenciaUF);
+        pensionCLP = rv.pensionMensual;
+        pensionUF = rv.pensionEnUF;
       } else {
         const rvComp = calcularRVInmediata(
           fondosRV,
@@ -739,7 +669,7 @@ export default function SimuladorPage() {
           afiliado.sexo,
           tasaAplicable,
           beneficiarios,
-          esInvalido
+          esInvalido, referenciaUF
         );
         pensionUF = rvComp.pensionEnUF;
         pensionCLP = rvComp.pensionMensual;
@@ -754,7 +684,7 @@ export default function SimuladorPage() {
       });
     }
     return ranking;
-  }, [afiliado, financiamientoInvalidez, financiamientoSobrevivencia, valorUF]);
+  }, [afiliado, financiamientoInvalidez, financiamientoSobrevivencia, valorUF, referenciaUF]);
 
   // Descarga del Informe PDF Orientativo con todas las modalidades cotizadas
   const handleGenerarPDF = async () => {
@@ -782,12 +712,13 @@ export default function SimuladorPage() {
             anosCotizados: afiliado.anosCotizados,
             tipoPension: afiliado.tipoPension,
             esInvalido: afiliado.esInvalido,
-            gradoInvalidez: afiliado.gradoInvalidez
+            gradoInvalidez: afiliado.gradoInvalidez,
+            cubiertoSIS: afiliado.cubiertoSIS
           },
           parametros: {
-            uf: valorUF,
+            referenciaUF,
             tasaRP: (tasaRP || 3.67) / 100,
-            rentabilidadRealAnualRP: afiliado.tipoPension === 'sobrevivencia' ? undefined : ESCENARIOS_RENTABILIDAD_RP[escenarioRP].rentabilidadRealAnual,
+            rentabilidadRealAnualRP: ESCENARIOS_RENTABILIDAD_RP[escenarioRP].rentabilidadRealAnual,
             tasaRV: (tasaRV || 2.99) / 100,
             incluirPGU: clausulas.incluirPGU,
             incluirBAC: clausulas.incluirBAC,
@@ -859,7 +790,7 @@ export default function SimuladorPage() {
           <div className="flex items-center gap-2">
             <Badge variant="outline" className="text-xs bg-emerald-50 text-emerald-800 border-emerald-200 gap-1.5 py-1 px-2.5 font-medium">
               <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
-              <span>UF Hoy: ${valorUF.toLocaleString('es-CL', { minimumFractionDigits: 2 })}</span>
+              <span>UF de referencia: ${valorUF.toLocaleString('es-CL', { minimumFractionDigits: 2 })} ({referenciaUF.fecha})</span>
             </Badge>
 
             <Badge variant="outline" className="text-xs bg-blue-50 text-blue-800 border-blue-200 gap-1.5 py-1 px-2.5 font-medium hidden sm:flex">
@@ -930,7 +861,7 @@ export default function SimuladorPage() {
                       gradoInvalidez: prev.gradoInvalidez || 'total',
                       cubiertoSIS: prev.cubiertoSIS ?? true,
                       ingresoBaseCLP: prev.ingresoBaseCLP || 1200000,
-                      ingresoBaseUF: prev.ingresoBaseUF || (valorUF > 0 ? Math.round((1200000 / valorUF) * 100) / 100 : 29.35)
+                      ingresoBaseUF: prev.ingresoBaseUF || (clpAUf(1200000, referenciaUF))
                     };
                   });
                   setModalidades(prev => {
@@ -975,7 +906,7 @@ export default function SimuladorPage() {
                     esInvalido: false,
                     cubiertoSIS: prev.cubiertoSIS ?? true,
                     ingresoBaseCLP: prev.ingresoBaseCLP || 1200000,
-                    ingresoBaseUF: prev.ingresoBaseUF || (valorUF > 0 ? Math.round((1200000 / valorUF) * 100) / 100 : 29.35)
+                    ingresoBaseUF: prev.ingresoBaseUF || (clpAUf(1200000, referenciaUF))
                   }));
                   setTasaRV(getTasaRVOficial('sobrevivencia'));
                   setModalidades(prev => {
@@ -1037,6 +968,18 @@ export default function SimuladorPage() {
         <p role="note" className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
           {AVISO_SIMULACION}
         </p>
+        <div className="mb-4 rounded-lg border bg-white p-3 flex flex-wrap gap-4 items-end">
+          <label className="text-sm">UF en CLP
+            <input aria-label="UF en CLP" type="number" min="0.01" step="0.01" defaultValue={valorUF} key={`valor-${valorUF}`}
+              onBlur={event => { try { actualizarReferenciaUF({ ...referenciaUF, valor: Number(event.target.value), fuente: 'Configuración manual' }); } catch (error) { setErrorUF(String(error)); } }} className="block border rounded p-1" />
+          </label>
+          <label className="text-sm">Fecha de referencia UF
+            <input aria-label="Fecha de referencia UF" type="date" value={referenciaUF.fecha}
+              onChange={event => { try { actualizarReferenciaUF({ ...referenciaUF, fecha: event.target.value, fuente: 'Configuración manual' }); } catch (error) { setErrorUF(String(error)); } }} className="block border rounded p-1" />
+          </label>
+          <p className="text-xs text-slate-600">{fuenteUF}. Los fondos en CLP se conservan al cambiar la referencia.</p>
+          {errorUF && <p role="alert" className="text-sm text-red-700">{errorUF}</p>}
+        </div>
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
           {/* Barra Lateral Izquierda (4 columnas en LG) */}
           <div className="lg:col-span-4">
@@ -1045,7 +988,7 @@ export default function SimuladorPage() {
               setAfiliado={setAfiliado}
               clausulas={clausulas}
               setClausulas={setClausulas}
-              valorUF={valorUF}
+              referenciaUF={referenciaUF}
               fuenteUF={fuenteUF}
               onRefreshUF={fetchUF}
               isLoadingUF={isLoadingUF}
@@ -1058,7 +1001,7 @@ export default function SimuladorPage() {
 
           {/* Panel Principal (8 columnas en LG) */}
           <div className="lg:col-span-8 space-y-5">
-            {afiliado.tipoPension !== 'sobrevivencia' && (
+            {(
               <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-2">
                 <label htmlFor="escenario-rp" className="block text-sm font-semibold">Rentabilidad real hipotética del fondo AFP</label>
                 <select id="escenario-rp" value={escenarioRP}
@@ -1092,7 +1035,7 @@ export default function SimuladorPage() {
             {/* 2. Resultados Consolidados de la Multi-Cotización */}
             <MultiQuotationResults
               items={cotizacionResultados}
-              valorUF={valorUF}
+              referenciaUF={referenciaUF}
               onDescargarPDF={handleGenerarPDF}
               isGeneratingPDF={isGeneratingPDF}
               tipoPension={afiliado.tipoPension}
@@ -1125,11 +1068,11 @@ export default function SimuladorPage() {
               <TabsContent value="grafico" className="pt-3">
                 {primerRP && primerRVSimple && (
                   <TrajectoryChart
-                    edadInicial={afiliado.edad}
+                    edadInicial={afiliado.tipoPension === 'sobrevivencia' ? (primerRP?.proyeccion?.[0]?.edad ?? afiliado.edad) : afiliado.edad}
                     proyeccionRP={primerRP.proyeccion}
                     resultadoRVSimple={primerRVSimple}
                     resultadoRVClausulas={primerRVClausula || primerRVSimple}
-                    valorUF={valorUF}
+                    referenciaUF={referenciaUF}
                   />
                 )}
               </TabsContent>
@@ -1137,7 +1080,7 @@ export default function SimuladorPage() {
               <TabsContent value="ranking" className="pt-3">
                 <InsuranceRankingTable
                   items={rankingCompanias}
-                  valorUF={valorUF}
+                  referenciaUF={referenciaUF}
                   tipoPension={afiliado.tipoPension}
                 />
               </TabsContent>
@@ -1148,7 +1091,7 @@ export default function SimuladorPage() {
                   setClausulas={setClausulas}
                   anosCotizados={afiliado.anosCotizados}
                   setAnosCotizados={(anos: number) => setAfiliado(prev => ({ ...prev, anosCotizados: anos }))}
-                  bacUF={calcularBAC(afiliado.anosCotizados, 0, valorUF).beneficioUF}
+                  bacUF={calcularBAC(afiliado.anosCotizados, 0, referenciaUF).beneficioUF}
                   tasaRP={tasaRP}
                   setTasaRP={setTasaRP}
                   tasaRV={tasaRV}
