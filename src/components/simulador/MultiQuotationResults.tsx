@@ -60,9 +60,9 @@ export function MultiQuotationResults({
           <div className="w-12 h-12 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center mx-auto">
             <Coins className="w-6 h-6" />
           </div>
-          <h3 className="font-semibold text-slate-800 text-base">Aún no se ha generado una cotización</h3>
+          <h3 className="font-semibold text-slate-800 text-base">Aún no se ha generado una simulación</h3>
           <p className="text-xs text-slate-500">
-            Selecciona las modalidades base que deseas cotizar o agrega combinaciones personalizadas y presiona <strong>&quot;Generar Cotización&quot;</strong>.
+            Selecciona las modalidades base que deseas simular o agrega combinaciones personalizadas y presiona <strong>&quot;Generar Simulación&quot;</strong>.
           </p>
         </div>
       </Card>
@@ -81,18 +81,18 @@ export function MultiQuotationResults({
             <Sparkles className="w-5 h-5 text-amber-300" />
             <h2 className="text-base font-semibold">
               {tipoPension === 'invalidez' 
-                ? 'Cotización de Pensión de Invalidez' 
+                ? 'Simulación de Pensión de Invalidez'
                 : tipoPension === 'sobrevivencia' 
-                  ? 'Cotización de Pensión de Sobrevivencia' 
-                  : 'Resumen Comparativo de Cotización'} ({items.length} Modalidades)
+                  ? 'Simulación de Pensión de Sobrevivencia'
+                  : 'Resumen Comparativo de Simulación'} ({items.length} Modalidades)
             </h2>
           </div>
           <p className="text-xs text-blue-200 mt-0.5">
             {tipoPension === 'invalidez' 
               ? `Cálculo con Tablas Generacionales MI-2020 • UF $${valorUF.toLocaleString('es-CL', { minimumFractionDigits: 2 })} • TRP: ${tasaRP.toFixed(2)}% | TRV: ${tasaRV.toFixed(2)}%`
               : tipoPension === 'sobrevivencia'
-                ? `Cálculo actuarial oficial según D.L. 3.500 Art. 58 y Tablas B-2020 • UF $${valorUF.toLocaleString('es-CL', { minimumFractionDigits: 2 })} • TRP: ${tasaRP.toFixed(2)}% | TRV: ${tasaRV.toFixed(2)}%`
-                : `Cálculo actuarial oficial con tablas generacionales TM-2020 • UF $${valorUF.toLocaleString('es-CL', { minimumFractionDigits: 2 })} • TRP: ${tasaRP.toFixed(2)}% | TRV: ${tasaRV.toFixed(2)}%`
+                ? `Estimación actuarial orientativa según D.L. 3.500 Art. 58 y Tablas B-2020 • UF $${valorUF.toLocaleString('es-CL', { minimumFractionDigits: 2 })} • TRP: ${tasaRP.toFixed(2)}% | TRV: ${tasaRV.toFixed(2)}%`
+                : `Estimación actuarial orientativa con tablas generacionales TM-2020 • UF $${valorUF.toLocaleString('es-CL', { minimumFractionDigits: 2 })} • TRP: ${tasaRP.toFixed(2)}% | TRV: ${tasaRV.toFixed(2)}%`
             }
           </p>
         </div>
@@ -105,7 +105,7 @@ export function MultiQuotationResults({
           className="bg-white text-blue-950 hover:bg-blue-50 font-semibold text-xs h-9 px-4 shadow-sm flex items-center gap-1.5"
         >
           <Download className={`w-3.5 h-3.5 ${isGeneratingPDF ? 'animate-spin' : ''}`} />
-          <span>{isGeneratingPDF ? 'Generando PDF...' : 'Descargar Estudio Oficial (PDF)'}</span>
+          <span>{isGeneratingPDF ? 'Generando PDF...' : 'Descargar Estudio Orientativo (PDF)'}</span>
         </Button>
       </div>
 
@@ -186,7 +186,7 @@ export function MultiQuotationResults({
           </div>
 
           <div className="bg-white p-2.5 rounded-lg border border-purple-200 shrink-0 text-right space-y-0.5 min-w-[190px]">
-            <div className="text-[10px] text-slate-500 font-medium">Saldo Total SCOMP</div>
+            <div className="text-[10px] text-slate-500 font-medium">Saldo para simulación</div>
             <div className="text-sm font-extrabold text-indigo-950">{formatCLP(sobrevivenciaInfo.saldoTotalFinanciamientoCLP)}</div>
             <div className="text-[10px] font-semibold text-emerald-700">{formatUF(sobrevivenciaInfo.saldoTotalFinanciamientoUF)}</div>
           </div>
@@ -461,7 +461,7 @@ export function MultiQuotationResults({
                 {/* Atributos clave */}
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div className="space-y-0.5">
-                    <span className="text-[10px] text-slate-400 block">Tasa Actuarial</span>
+                    <span className="text-[10px] text-slate-400 block">Tasa técnica CNU</span>
                     <span className={`font-semibold font-mono ${item.config.esTasaEspecial ? 'text-amber-700' : 'text-slate-900'}`}>
                       {(item.resultado.tasaInteres * 100).toFixed(2)}% anual {item.config.esTasaEspecial ? '(⚡ Especial)' : ''}
                     </span>
@@ -507,7 +507,7 @@ export function MultiQuotationResults({
       <Card className="shadow-sm border-slate-200">
         <CardHeader className="py-3 px-4 bg-slate-50/70 border-b border-slate-200">
           <CardTitle className="text-xs font-semibold text-slate-800 uppercase tracking-wider">
-            Matriz Comparativa de Ofertas Cotizadas
+            Comparación de Estimaciones
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0 overflow-x-auto">

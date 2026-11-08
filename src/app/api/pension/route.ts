@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
   calcularRetiroProgramado,
+  calcularEscenariosRetiroProgramado,
+  ESCENARIOS_RENTABILIDAD_RP,
+  AVISO_SIMULACION,
   calcularRVInmediata,
   calcularRVPeriodoGarantizado,
   calcularRVAumentoTemporal,
@@ -41,15 +44,22 @@ export async function POST(request: NextRequest) {
     const beneficiarios = datos.beneficiarios as BeneficiarioPension[] | undefined;
     
     // Permitir tasas personalizadas o usar las por defecto
-    const tasaInteres = datos.tasaRP ?? datos.tasaInteres ?? TASAS_INTERES.RETIRO_PROGRAMADO;
+    const tasaInteres = datos.tasaTecnicaCNU ?? datos.tasaRP ?? datos.tasaInteres ?? TASAS_INTERES.RETIRO_PROGRAMADO;
     const tasaRV = datos.tasaRV ?? datos.tasaInteres ?? TASAS_INTERES.RENTA_VITALICIA_VEJEZ;
+    const opcionesRP = { rentabilidadRealAnual: datos.rentabilidadRealAnual, anoCalculo: datos.anoCalculo };
 
     let resultado: ResultadoEscenario;
 
     switch (tipo) {
       // ========== VEJEZ ==========
+      case 'escenarios_rp':
+        return NextResponse.json({
+          success: true,
+          aviso: AVISO_SIMULACION,
+          resultados: calcularEscenariosRetiroProgramado(fondos, edad, sexo, tasaInteres, beneficiarios, datos.esInvalido ?? false, datos.anoCalculo)
+        });
       case 'retiro_programado':
-        resultado = calcularRetiroProgramado(fondos, edad, sexo, tasaInteres, beneficiarios);
+        resultado = calcularRetiroProgramado(fondos, edad, sexo, tasaInteres, beneficiarios, datos.esInvalido ?? false, opcionesRP);
         break;
 
       case 'inmediata':
@@ -112,7 +122,8 @@ export async function POST(request: NextRequest) {
           edad,
           sexo,
           tasaInteres,
-          beneficiarios
+          beneficiarios,
+          opcionesRP
         );
         break;
 
@@ -187,7 +198,7 @@ export async function POST(request: NextRequest) {
           datos.pensionReferenciaCausante,
           datos.ingresoBaseCausante
         );
-        return NextResponse.json({ success: true, resultados: opciones });
+        return NextResponse.json({ success: true, aviso: AVISO_SIMULACION, resultados: opciones });
 
       case 'sobrevivencia_rp':
         resultado = calcularRetiroProgramadoSobrevivencia(
@@ -262,12 +273,12 @@ export async function POST(request: NextRequest) {
         );
     }
 
-    return NextResponse.json({ success: true, resultado });
+    return NextResponse.json({ success: true, aviso: AVISO_SIMULACION, resultado });
   } catch (error) {
     console.error('Error en cálculo:', error);
     return NextResponse.json(
       { success: false, error: 'Error al procesar el cálculo: ' + (error instanceof Error ? error.message : 'Error desconocido') },
-      { status: 500 }
+      { status: error instanceof RangeError ? 400 : 500 }
     );
   }
 }
@@ -275,7 +286,9 @@ export async function POST(request: NextRequest) {
 export async function GET() {
   return NextResponse.json({
     success: true,
+    aviso: AVISO_SIMULACION,
     parametros: {
+      escenariosRentabilidadRP: ESCENARIOS_RENTABILIDAD_RP,
       tasasInteres: {
         retiroProgramado: (TASAS_INTERES.RETIRO_PROGRAMADO * 100).toFixed(2) + '%',
         rentaVitaliciaVejez: (TASAS_INTERES.RENTA_VITALICIA_VEJEZ * 100).toFixed(2) + '%',

@@ -199,7 +199,7 @@ export function SummaryCards({
             </div>
 
             <div className="text-xs text-slate-500 pt-1 flex items-center justify-between">
-              <span>Oferta Líder CMF:</span>
+              <span>Estimación de referencia:</span>
               <span className="font-semibold text-slate-700">Confuturo / 4Life (2,92%)</span>
             </div>
 
@@ -252,7 +252,7 @@ export function SummaryCards({
                 </div>
               </div>
               <Badge className="bg-emerald-600 text-white text-[10px] py-0">
-                Elegida SCOMP
+                Ejemplo ilustrativo
               </Badge>
             </div>
 

@@ -180,10 +180,10 @@ export function ModalitiesSelector({
             </div>
             <div>
               <CardTitle className="text-base font-semibold text-white">
-                Cotizador Multimodalidad SCOMP
+                Simulador de Modalidades
               </CardTitle>
               <CardDescription className="text-xs text-slate-300">
-                Selecciona las modalidades base, agrega cláusulas a la medida y cotiza todos los escenarios en lote.
+                Selecciona las modalidades base, agrega cláusulas a la medida y simula todos los escenarios en lote.
               </CardDescription>
             </div>
           </div>
@@ -218,24 +218,24 @@ export function ModalitiesSelector({
                 size="sm"
                 onClick={onRestablecerTasas}
                 className="text-[11px] h-7 px-2.5 bg-white text-slate-700 hover:text-blue-700 border-slate-300 gap-1.5 self-start sm:self-auto shrink-0 shadow-2xs"
-                title="Restablecer a las tasas oficiales de referencia vigentes"
+                title="Restablecer los supuestos de tasas de referencia"
               >
                 <RotateCcw className="w-3 h-3" />
-                <span>Restablecer Oficiales</span>
+                <span>Restablecer Referencias</span>
               </Button>
             )}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-            {/* Tasa Retiro Programado (TRP) */}
+            {/* Tasa técnica CNU de RP */}
             <div className="p-3 bg-white rounded-xl border border-slate-200/90 shadow-2xs space-y-2.5">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
                   <Landmark className="w-3.5 h-3.5 text-blue-600" />
-                  <span className="text-xs font-bold text-slate-800">Tasa Retiro Programado (TRP)</span>
+                  <span className="text-xs font-bold text-slate-800">Tasa técnica CNU de RP</span>
                 </div>
                 <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-800 border-blue-200 font-mono">
-                  SP Oficial: 3.67%
+                  Referencia CNU: 3.67%
                 </Badge>
               </div>
 
@@ -283,7 +283,7 @@ export function ModalitiesSelector({
                 {[
                   { label: '3.40%', val: 3.40 },
                   { label: '3.50%', val: 3.50 },
-                  { label: '3.67% (Oficial)', val: 3.67 },
+                  { label: '3.67% (Referencia)', val: 3.67 },
                   { label: '3.80%', val: 3.80 },
                   { label: '4.00%', val: 4.00 }
                 ].map(sc => (
@@ -545,12 +545,12 @@ export function ModalitiesSelector({
           </div>
         </div>
 
-        {/* 2. Constructor de Cláusulas Adicionales y Ofertas Especiales */}
+        {/* 2. Constructor de Cláusulas Adicionales y Escenarios Manuales */}
         <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/60 space-y-3.5">
           <div className="flex items-center justify-between">
             <Label className="text-xs font-semibold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
               <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-              <span>2. Diseñar e Incorporar Cláusula Adicional u Oferta Especial</span>
+              <span>2. Diseñar e Incorporar Cláusula Adicional u Escenario Manual</span>
             </Label>
             <span className="text-[11px] text-slate-500">Cotiza múltiples escenarios o tasas especiales en lote</span>
           </div>
@@ -560,7 +560,7 @@ export function ModalitiesSelector({
             <div className="p-2.5 rounded-lg bg-purple-50 border border-purple-200 text-xs text-purple-950 flex items-start gap-2">
               <span className="text-sm">⚖️</span>
               <div className="leading-snug">
-                <strong>Normativa Oficial CMF y SP (Compendio de Pensiones):</strong> En pensión de sobrevivencia no procede la contratación de cláusulas de Aumento Temporal. Sí es plenamente legal cotizar <strong>Retiro Programado</strong>, <strong>Renta Vitalicia Simple</strong>, <strong>Período Garantizado</strong> o cotizaciones con <strong>Tasa Especial de Aseguradora</strong>.
+                <strong>Normativa Oficial CMF y SP (Compendio de Pensiones):</strong> En pensión de sobrevivencia no procede la contratación de cláusulas de Aumento Temporal. Sí es plenamente legal cotizar <strong>Retiro Programado</strong>, <strong>Renta Vitalicia Simple</strong>, <strong>Período Garantizado</strong> o cotizaciones con <strong>Tasa hipotética de RV</strong>.
               </div>
             </div>
           )}
@@ -680,12 +680,12 @@ export function ModalitiesSelector({
 
                 {/* Nombre personalizado / Aseguradora */}
                 <div className="sm:col-span-3 space-y-1 pt-1">
-                  <Label className="text-xs text-slate-600">Nombre / Identificador de la Oferta Especial (Opcional)</Label>
+                  <Label className="text-xs text-slate-600">Nombre / Identificador de la Escenario Manual (Opcional)</Label>
                   <Input
                     type="text"
                     value={nombreOfertaEspecial}
                     onChange={e => setNombreOfertaEspecial(e.target.value)}
-                    placeholder="Ej. Oferta Especial Consorcio, Tasa Negociada Bice, etc."
+                    placeholder="Ej. Escenario Manual Consorcio, Tasa hipotética, etc."
                     className="h-9 text-xs bg-white"
                   />
                 </div>
@@ -898,7 +898,7 @@ export function ModalitiesSelector({
           </div>
         )}
 
-        {/* 4. Botón de Acción Principal: Generar Cotización en Lote */}
+        {/* 4. Botón de Acción Principal: Generar Simulación en Lote */}
         <div className="pt-2 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="text-xs text-slate-600 flex items-center gap-1.5">
             <span className="inline-block w-2 h-2 rounded-full bg-emerald-500"></span>
@@ -915,7 +915,7 @@ export function ModalitiesSelector({
             className="w-full sm:w-auto h-10 px-6 font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2"
           >
             <Calculator className={`w-4 h-4 ${isCotizando ? 'animate-spin' : ''}`} />
-            <span>Generar Cotización ({modalidadesActivas.length})</span>
+            <span>Generar Simulación ({modalidadesActivas.length})</span>
           </Button>
         </div>
       </CardContent>

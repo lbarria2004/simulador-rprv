@@ -14,9 +14,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Simulador Previsional RPRV - Asesoría SCOMP Chile",
-  description: "Simulador actuarial de Retiro Programado y Renta Vitalicia conforme a normativa de la CMF y Superintendencia de Pensiones de Chile",
-  keywords: ["SCOMP", "Jubilación", "Pensión", "Retiro Programado", "Renta Vitalicia", "AFP", "Chile"],
+  title: "Simulador Previsional RPRV - Orientación Independiente Chile",
+  description: "Simulador actuarial de Retiro Programado y Renta Vitalicia para orientación independiente en Chile. Estimaciones sin conexión con SCOMP; no constituyen ofertas oficiales",
+  keywords: ["Jubilación", "Pensión", "Retiro Programado", "Renta Vitalicia", "AFP", "Chile"],
   authors: [{ name: "Luis Barria" }],
   openGraph: {
     title: "Simulador Previsional RPRV",
@@ -31,7 +31,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="es" suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}
       >

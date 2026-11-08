@@ -16,6 +16,7 @@ interface AfiliadoData {
 interface ParametrosData {
   uf: number;
   tasaRP: number;
+  rentabilidadRealAnualRP?: number;
   tasaRV: number;
   incluirPGU?: boolean;
   incluirBAC?: boolean;
@@ -230,6 +231,15 @@ export async function POST(request: NextRequest) {
     });
     y -= 25;
 
+    drawText(page, 'SIMULACION INDEPENDIENTE - SIN CONEXION CON SCOMP', 50, y, { size: 8, font: fontBold });
+    y -= 15;
+    drawText(page, 'No constituye oferta oficial de AFP o aseguradora ni garantiza pension o rentabilidad.', 50, y, { size: 8, font: fontRegular });
+    y -= 15;
+    if (parametros.rentabilidadRealAnualRP !== undefined) {
+      drawText(page, `RP: retorno real hipotetico ${(parametros.rentabilidadRealAnualRP * 100).toFixed(2)}% anual; descuento CNU ${(parametros.tasaRP * 100).toFixed(2)}%.`, 50, y, { size: 8, font: fontRegular });
+      y -= 15;
+    }
+
     // Nombre afiliado/causante
     const nombreAfiliado = (afiliado.nombre || 'AFILIADO').toUpperCase();
     const etiquetaNombre = tipoPension === 'sobrevivencia' ? 'CAUSANTE' : 'SR.';
@@ -350,7 +360,7 @@ export async function POST(request: NextRequest) {
         });
         y -= 15;
         const tasaRVPct = (rvInmediata.tasaInteres * 100).toFixed(2);
-        drawText(page, `Calculo RVI: Tasa de Venta: Media Mercado (Vejez: ${tasaRVPct}%)`, 50, y, { size: 9, font: fontRegular });
+        drawText(page, `Estimacion RVI: Tasa hipotetica de descuento (Vejez: ${tasaRVPct}%)`, 50, y, { size: 9, font: fontRegular });
         y -= 20;
 
         const pensionBruto = rvInmediata.pensionMensual;
@@ -793,6 +803,10 @@ export async function POST(request: NextRequest) {
     if (tipoPension === 'sobrevivencia') {
       y -= 12;
       drawText(page, 'PENSION DE SOBREVIVENCIA: PORCENTAJES SEGUN ART. 58 DL 3500.', 50, y, { size: 7, font: fontRegular });
+    }
+
+    for (const pagina of pdfDoc.getPages()) {
+      drawText(pagina, 'Orientacion independiente. Sin conexion con SCOMP. No es oferta de AFP o aseguradora.', 50, 18, { size: 7, font: fontRegular });
     }
 
     // Guardar PDF

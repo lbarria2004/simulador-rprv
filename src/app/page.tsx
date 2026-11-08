@@ -20,6 +20,9 @@ import {
 } from '@/components/simulador/types';
 import {
   calcularRetiroProgramado,
+  AVISO_SIMULACION,
+  ESCENARIOS_RENTABILIDAD_RP,
+  type EscenarioRentabilidadRP,
   calcularRVInmediata,
   calcularRVPeriodoGarantizado,
   calcularRVAumentoTemporal,
@@ -140,6 +143,7 @@ export default function SimuladorPage() {
   const [cotizacionResultados, setCotizacionResultados] = useState<CotizacionItemResultado[]>([]);
 
   // Tasas de Interés de Cálculo Actuarial (en porcentaje %, ej. 3.67 para 3.67%)
+  const [escenarioRP, setEscenarioRP] = useState<EscenarioRentabilidadRP>('base');
   const [tasaRP, setTasaRP] = useState<number>(3.67);
   const [tasaRV, setTasaRV] = useState<number>(2.99);
 
@@ -428,6 +432,7 @@ export default function SimuladorPage() {
             pensionAnual: 0,
             cnu: 0,
             tasaInteres: tasaRVEfectiva,
+            expectativaVida: 0,
             advertencias: [
               'Cláusula de Aumento Temporal no permitida en Sobrevivencia según normativa CMF/SP.',
               'El Aumento Temporal es exclusivo de pensiones de Vejez e Invalidez.',
@@ -437,7 +442,9 @@ export default function SimuladorPage() {
         }
       }
     } else if (mod.tipo === 'retiro_programado') {
-      resultado = calcularRetiroProgramado(fondosRP, edad, sexo, tasaRPActuarial, beneficiarios, esInvalido);
+      resultado = calcularRetiroProgramado(fondosRP, edad, sexo, tasaRPActuarial, beneficiarios, esInvalido, {
+        rentabilidadRealAnual: ESCENARIOS_RENTABILIDAD_RP[escenarioRP].rentabilidadRealAnual
+      });
     } else if (mod.tipo === 'renta_vitalicia_simple') {
       resultado = calcularRVInmediata(fondosRV, edad, sexo, tasaRVEfectiva, beneficiarios, esInvalido);
       if (mod.esTasaEspecial || (mod.tasaEspecialRV !== undefined && mod.tasaEspecialRV > 0)) {
@@ -531,7 +538,7 @@ export default function SimuladorPage() {
       totalConBeneficiosCLP: Math.round(totalCLP),
       totalConBeneficiosUF: Number(totalUF.toFixed(2))
     };
-  }, [afiliado.anosCotizados, afiliado.sexo, afiliado.cubiertoSIS, valorUF]);
+  }, [afiliado.anosCotizados, afiliado.sexo, afiliado.cubiertoSIS, valorUF, escenarioRP]);
 
   // Desglose actuarial de financiamiento para Pensión de Invalidez (D.L. 3.500)
   const financiamientoInvalidez = useMemo<InvalidezFinanciamientoInfo | undefined>(() => {
@@ -710,11 +717,11 @@ export default function SimuladorPage() {
 
     const ranking: CompaniasRankingItem[] = [];
     for (const [key, item] of Object.entries(TASAS_RENTA_VITALICIA?.companias || {})) {
-      let tasaAplicable = item.vejez;
+      let tasaAplicable: number = item.vejez;
       if (esInvalido) {
         tasaAplicable = (afiliado.gradoInvalidez === 'parcial' ? item.invalidez_parcial : item.invalidez_total) || item.vejez;
       } else if (esSobrevivencia) {
-        tasaAplicable = item.sobrevivencia || item.vejez;
+        tasaAplicable = item.sobrevivencia;
       }
       if (!tasaAplicable || tasaAplicable <= 0) continue;
 
@@ -749,7 +756,7 @@ export default function SimuladorPage() {
     return ranking;
   }, [afiliado, financiamientoInvalidez, financiamientoSobrevivencia, valorUF]);
 
-  // Descarga del Informe PDF Oficial con todas las modalidades cotizadas
+  // Descarga del Informe PDF Orientativo con todas las modalidades cotizadas
   const handleGenerarPDF = async () => {
     setIsGeneratingPDF(true);
     try {
@@ -780,6 +787,7 @@ export default function SimuladorPage() {
           parametros: {
             uf: valorUF,
             tasaRP: (tasaRP || 3.67) / 100,
+            rentabilidadRealAnualRP: afiliado.tipoPension === 'sobrevivencia' ? undefined : ESCENARIOS_RENTABILIDAD_RP[escenarioRP].rentabilidadRealAnual,
             tasaRV: (tasaRV || 2.99) / 100,
             incluirPGU: clausulas.incluirPGU,
             incluirBAC: clausulas.incluirBAC,
@@ -794,8 +802,7 @@ export default function SimuladorPage() {
               meses: r.config.mesesAumento,
               porcentaje: r.config.porcentajeAumento || 1,
               pensionAumentada: r.resultado.pensionMensual,
-              pensionFinal: r.resultado.aumentoTemporal?.pensionFinal 
-                || r.resultado.proyeccion?.find(p => p.fase === 'normal' || p.fase === 'vitalicia')?.pensionMensual 
+              pensionFinal: r.resultado.proyeccion?.find(p => p.fase === 'normal' || p.fase === 'vitalicia')?.pensionMensual
                 || r.resultado.pensionMensual
             } : undefined)
           })),
@@ -841,10 +848,10 @@ export default function SimuladorPage() {
             </div>
             <div>
               <h1 className="text-base font-bold text-slate-900 tracking-tight leading-none">
-                Simulador Actuarial de Pensiones SCOMP
+                Simulador de Orientación Previsional
               </h1>
               <span className="text-[11px] text-slate-500 font-medium">
-                Tablas TM-2020 Oficiales • SII • CMF • Multi-Cotización en Lote
+                Comparación ilustrativa de Retiro Programado y Renta Vitalicia
               </span>
             </div>
           </div>
@@ -1027,6 +1034,9 @@ export default function SimuladorPage() {
 
       {/* Contenido Principal */}
       <main className="max-w-7xl mx-auto px-4 py-5">
+        <p role="note" className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
+          {AVISO_SIMULACION}
+        </p>
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
           {/* Barra Lateral Izquierda (4 columnas en LG) */}
           <div className="lg:col-span-4">
@@ -1048,6 +1058,21 @@ export default function SimuladorPage() {
 
           {/* Panel Principal (8 columnas en LG) */}
           <div className="lg:col-span-8 space-y-5">
+            {afiliado.tipoPension !== 'sobrevivencia' && (
+              <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-2">
+                <label htmlFor="escenario-rp" className="block text-sm font-semibold">Rentabilidad real hipotética del fondo AFP</label>
+                <select id="escenario-rp" value={escenarioRP}
+                  onChange={event => setEscenarioRP(event.target.value as EscenarioRentabilidadRP)}
+                  className="w-full rounded-md border border-slate-300 p-2 text-sm">
+                  {(Object.keys(ESCENARIOS_RENTABILIDAD_RP) as EscenarioRentabilidadRP[]).map(clave => (
+                    <option key={clave} value={clave}>
+                      {ESCENARIOS_RENTABILIDAD_RP[clave].nombre}: {ESCENARIOS_RENTABILIDAD_RP[clave].rentabilidadRealAnual * 100}% real anual
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-slate-600">Supuestos constantes ilustrativos. Cambian la trayectoria del saldo y la pensión futura; la tasa técnica del CNU se ajusta por separado. Año base actuarial: 2026.</p>
+              </div>
+            )}
             {/* 1. Selector y Constructor de Modalidades a Cotizar */}
             <ModalitiesSelector
               modalidades={modalidades}
@@ -1088,7 +1113,7 @@ export default function SimuladorPage() {
 
                 <TabsTrigger value="ranking" className="text-xs font-semibold gap-1.5 data-[state=active]:bg-blue-50 data-[state=active]:text-blue-900">
                   <Layers className="w-3.5 h-3.5" />
-                  <span>Ranking Aseguradoras CMF</span>
+                  <span>Referencias de RV</span>
                 </TabsTrigger>
 
                 <TabsTrigger value="sliders" className="text-xs font-semibold gap-1.5 data-[state=active]:bg-blue-50 data-[state=active]:text-blue-900">

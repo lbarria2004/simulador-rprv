@@ -1,6 +1,7 @@
 /**
  * Simulador de Pensiones - Sistema Chileno AFP
- * Basado en normativa oficial de Superintendencia de Pensiones y CMF
+ * Herramienta independiente de orientación; no constituye una oferta de AFP o aseguradora.
+ * Sin conexión con SCOMP. Las referencias normativas requieren validación actuarial.
  * Fórmulas según Nota Técnica N°5 del Compendio de Pensiones
  * 
  * Referencias:
@@ -104,6 +105,9 @@ export interface ResultadoEscenario {
   pensionAnual: number;
   cnu: number;
   tasaInteres: number;
+  tasaTecnicaCNU?: number;
+  rentabilidadRealAnual?: number;
+  anoCalculo?: number;
   expectativaVida: number;
   periodoGarantizado?: number;
   aumentoTemporal?: {
@@ -116,6 +120,7 @@ export interface ResultadoEscenario {
     tipo: string;
     porcentaje: number;
     pensionMensual: number;
+    pensionPosterior?: number;
   }[];
   gradoInvalidez?: GradoInvalidez;
   ingresoBase?: number;
@@ -132,8 +137,42 @@ export interface ProyeccionAnual {
   pensionMensual: number;
   saldoAcumulado: number;
   retiroAcumulado: number;
-  fase?: 'aumento' | 'normal' | 'decreciente';
+  fase?: 'aumento' | 'normal' | 'decreciente' | 'aumentada' | 'vitalicia';
 }
+
+export interface OpcionesProyeccionRP {
+  /** Rentabilidad real anual hipotética, en decimal; independiente del descuento del CNU. */
+  rentabilidadRealAnual?: number;
+  /** Año base explícito para reproducir la mortalidad generacional. */
+  anoCalculo?: number;
+}
+
+export interface ProyeccionRetiroProgramado extends ProyeccionAnual {
+  anoCalendario: number;
+  cnu: number;
+  beneficiarios: BeneficiarioPension[];
+  /** Flujos sin redondear para auditar la evolución del saldo. */
+  retiroAnual: number;
+  saldoFinal: number;
+}
+
+export interface ResultadoRetiroProgramado extends ResultadoEscenario {
+  tasaTecnicaCNU: number;
+  rentabilidadRealAnual: number;
+  anoCalculo: number;
+  proyeccion: ProyeccionRetiroProgramado[];
+}
+
+/** Supuestos ilustrativos reales, constantes; no son pronósticos ni tasas ofrecidas. */
+export const ESCENARIOS_RENTABILIDAD_RP = {
+  conservador: { nombre: 'Conservador', rentabilidadRealAnual: 0 },
+  base: { nombre: 'Base', rentabilidadRealAnual: 0.02 },
+  optimista: { nombre: 'Optimista', rentabilidadRealAnual: 0.04 }
+} as const;
+
+export type EscenarioRentabilidadRP = keyof typeof ESCENARIOS_RENTABILIDAD_RP;
+
+export const AVISO_SIMULACION = 'Estimación orientativa independiente, sin conexión con SCOMP. No constituye una oferta oficial de AFP o aseguradora ni garantiza rentabilidad o pensión.';
 
 // ==========================================
 // CONSTANTES DEL SISTEMA
@@ -274,9 +313,9 @@ export {
 };
 
 /**
- * Calcula el Capital Necesario Unitario (CNU) - Versión oficial del Sistema de Pensiones
+ * Aproxima el Capital Necesario Unitario (CNU) mediante una suma anual.
  * 
- * FÓRMULA OFICIAL GENERACIONAL (Nota Técnica N°5 SP y NCG Conjunta SP N° 2.164 / CMF N° 2.272):
+ * Modelo generacional con descuento a mitad de año (no certificado como cálculo oficial):
  * CNU = Σ [ _t p_x ] × [ 1 / (1+i)^(t+0.5) ] × 12
  * Donde _t p_x = Π_{k=0}^{t-1} [ 1 - q(x+k, año + k) ]
  */
@@ -304,10 +343,8 @@ export function calcularCNU(
   // Agregar CNU de beneficiarios (para vejez con cargas)
   if (beneficiarios && beneficiarios.length > 0) {
     const porcentajes = calcularPorcentajesBeneficiarios(beneficiarios);
-    for (let i = 0; i < beneficiarios.length; i++) {
-      const ben = beneficiarios[i];
-      const pInfo = porcentajes[i];
-      const pct = pInfo ? pInfo.porcentaje : (ben.porcentajePension || 0.60);
+    for (const ben of porcentajes) {
+      const pct = ben.porcentaje;
       if (pct <= 0) continue;
 
       const cnuBen = calcularCNUSobrevivenciaBeneficiario(
@@ -456,23 +493,52 @@ export function calcularRetiroProgramado(
   fondos: number,
   edad: number,
   sexo: Sexo,
-  tasaInteres: number = TASAS_INTERES.RETIRO_PROGRAMADO,
+  tasaTecnicaCNU: number = TASAS_INTERES.RETIRO_PROGRAMADO,
   beneficiarios?: BeneficiarioPension[],
-  esInvalido: boolean = false
-): ResultadoEscenario {
-  const cnu = calcularCNU(edad, sexo, tasaInteres, beneficiarios, esInvalido, 'retiro_programado');
-  const pensionMensual = fondos / cnu;
-  const expectativaVida = calcularExpectativaVida(edad, sexo, esInvalido, 'retiro_programado');
+  esInvalido: boolean = false,
+  opciones: OpcionesProyeccionRP = {}
+): ResultadoRetiroProgramado {
+  const {
+    rentabilidadRealAnual = ESCENARIOS_RENTABILIDAD_RP.base.rentabilidadRealAnual,
+    anoCalculo = 2026
+  } = opciones;
+  if (!Number.isFinite(fondos) || fondos < 0) throw new RangeError('Fondos deben ser finitos y no negativos');
+  if (!Number.isInteger(edad) || edad < 0 || edad > 110) throw new RangeError('Edad debe ser entera entre 0 y 110');
+  if (sexo !== 'M' && sexo !== 'F') throw new RangeError('Sexo debe ser M o F');
+  for (const tasa of [tasaTecnicaCNU, rentabilidadRealAnual]) {
+    if (!Number.isFinite(tasa) || tasa <= -1) throw new RangeError('Las tasas deben ser finitas y mayores que -1');
+  }
+  if (!Number.isInteger(anoCalculo) || anoCalculo < 2020 || anoCalculo > 9999) {
+    throw new RangeError('Año de cálculo debe ser entero entre 2020 y 9999');
+  }
+  for (const ben of beneficiarios ?? []) {
+    if (!Number.isInteger(ben.edad) || ben.edad < 0 || ben.edad > 110) {
+      throw new RangeError('Edad de beneficiario debe ser entera entre 0 y 110');
+    }
+    if (ben.sexo !== 'M' && ben.sexo !== 'F') throw new RangeError('Sexo de beneficiario debe ser M o F');
+    if (!Number.isFinite(ben.porcentajePension) || ben.porcentajePension < 0 || ben.porcentajePension > 1) {
+      throw new RangeError('Porcentaje de beneficiario debe estar entre 0 y 1');
+    }
+  }
+  const cnu = calcularCNU(edad, sexo, tasaTecnicaCNU, beneficiarios, esInvalido, 'retiro_programado', anoCalculo);
+  const pensionMensual = Math.min(fondos / cnu, fondos / 12);
+  const expectativaVida = calcularExpectativaVida(edad, sexo, esInvalido, 'retiro_programado', anoCalculo);
   
-  const proyeccion: ProyeccionAnual[] = [];
+  const proyeccion: ProyeccionRetiroProgramado[] = [];
   let saldo = fondos;
   let retiroAcumulado = 0;
   
   for (let año = 0; año <= Math.min(45, 110 - edad); año++) {
     const edadActual = edad + año;
-    const cnuAnual = calcularCNU(edadActual, sexo, tasaInteres, undefined, esInvalido, 'retiro_programado', 2026 + año);
-    const pensionAnual = saldo / cnuAnual * 12;
+    // Copiar desde el estado inicial evita mutar entradas o acumular incrementos de edad.
+    const beneficiariosActuales = (beneficiarios ?? []).map(ben => ({ ...ben, edad: ben.edad + año }));
+    const cnuAnual = calcularCNU(edadActual, sexo, tasaTecnicaCNU, beneficiariosActuales, esInvalido, 'retiro_programado', anoCalculo + año);
+    if (!Number.isFinite(cnuAnual) || cnuAnual <= 0) throw new RangeError('CNU fuera del dominio numérico de la proyección');
+    const pensionAnual = Math.min(saldo, saldo / cnuAnual * 12);
     const pensionMes = pensionAnual / 12;
+    // Convención simplificada: retiro anual al inicio, retorno real sobre el remanente.
+    const saldoFinal = Math.max(0, (saldo - pensionAnual) * (1 + rentabilidadRealAnual));
+    if (!Number.isFinite(saldoFinal)) throw new RangeError('Saldo fuera del dominio numérico de la proyección');
     
     proyeccion.push({
       año: año + 1,
@@ -480,10 +546,15 @@ export function calcularRetiroProgramado(
       pensionMensual: Math.round(pensionMes),
       saldoAcumulado: Math.round(saldo),
       retiroAcumulado: Math.round(retiroAcumulado),
-      fase: 'decreciente'
+      fase: 'normal',
+      anoCalendario: anoCalculo + año,
+      cnu: cnuAnual,
+      beneficiarios: beneficiariosActuales,
+      retiroAnual: pensionAnual,
+      saldoFinal
     });
     
-    saldo = Math.max(0, (saldo - pensionAnual) * (1 + tasaInteres));
+    saldo = saldoFinal;
     retiroAcumulado += pensionAnual;
     
     if (saldo <= 0) break;
@@ -495,10 +566,31 @@ export function calcularRetiroProgramado(
     pensionEnUF: pensionMensual / UF_ACTUAL,
     pensionAnual: pensionMensual * 12,
     cnu,
-    tasaInteres,
+    tasaInteres: tasaTecnicaCNU, // Alias histórico: representa solo el descuento del CNU.
+    tasaTecnicaCNU,
+    rentabilidadRealAnual,
+    anoCalculo,
     expectativaVida,
-    proyeccion
+    proyeccion,
+    advertencias: [AVISO_SIMULACION, 'Rentabilidad real hipotética constante. CNU aproximado, recálculo anual y retiros limitados al saldo disponible.']
   };
+}
+
+/** Mismos datos y tasa técnica; solo cambia la rentabilidad real del fondo. */
+export function calcularEscenariosRetiroProgramado(
+  fondos: number,
+  edad: number,
+  sexo: Sexo,
+  tasaTecnicaCNU: number = TASAS_INTERES.RETIRO_PROGRAMADO,
+  beneficiarios?: BeneficiarioPension[],
+  esInvalido: boolean = false,
+  anoCalculo: number = 2026
+): Record<EscenarioRentabilidadRP, ResultadoRetiroProgramado> {
+  const calcular = (escenario: EscenarioRentabilidadRP) => calcularRetiroProgramado(
+    fondos, edad, sexo, tasaTecnicaCNU, beneficiarios, esInvalido,
+    { ...ESCENARIOS_RENTABILIDAD_RP[escenario], anoCalculo }
+  );
+  return { conservador: calcular('conservador'), base: calcular('base'), optimista: calcular('optimista') };
 }
 
 export function calcularRVInmediata(
@@ -813,49 +905,10 @@ export function calcularRetiroProgramadoInvalidez(
   edad: number,
   sexo: Sexo,
   tasaInteres: number = TASAS_INTERES.RETIRO_PROGRAMADO,
-  beneficiarios?: BeneficiarioPension[]
-): ResultadoEscenario {
-  const cnu = calcularCNU(edad, sexo, tasaInteres, beneficiarios, true);
-  const pensionMensual = fondos / cnu;
-  const expectativaVida = calcularExpectativaVida(edad, sexo, true);
-  
-  const proyeccion: ProyeccionAnual[] = [];
-  let saldo = fondos;
-  let retiroAcumulado = 0;
-  const maxAnos = Math.min(45, 81 - edad);
-  
-  for (let año = 0; año <= maxAnos; año++) {
-    const edadActual = edad + año;
-    const cnuAnual = calcularCNU(edadActual, sexo, tasaInteres, undefined, true);
-    const pensionAnual = saldo / cnuAnual * 12;
-    const pensionMes = pensionAnual / 12;
-    
-    proyeccion.push({
-      año: año + 1,
-      edad: edadActual,
-      pensionMensual: Math.round(pensionMes),
-      saldoAcumulado: Math.round(saldo),
-      retiroAcumulado: Math.round(retiroAcumulado),
-      fase: 'decreciente'
-    });
-    
-    saldo = Math.max(0, (saldo - pensionAnual) * (1 + tasaInteres));
-    retiroAcumulado += pensionAnual;
-    
-    if (saldo <= 0) break;
-  }
-  
-  return {
-    nombre: 'Retiro Programado (Invalidez)',
-    pensionMensual: Math.round(pensionMensual),
-    pensionEnUF: pensionMensual / UF_ACTUAL,
-    pensionAnual: pensionMensual * 12,
-    cnu,
-    tasaInteres,
-    expectativaVida,
-    proyeccion,
-    advertencias: ['Usa tabla de mortalidad de inválidos (I-H/I-M-2020)', 'Pensión decrece en el tiempo']
-  };
+  beneficiarios?: BeneficiarioPension[],
+  opciones: OpcionesProyeccionRP = {}
+): ResultadoRetiroProgramado {
+  return calcularRetiroProgramado(fondos, edad, sexo, tasaInteres, beneficiarios, true, opciones);
 }
 
 // ==========================================
@@ -1116,8 +1169,8 @@ export function calcularRVConAmbasClausulasInvalidez(
  */
 export function calcularPorcentajesBeneficiarios(
   beneficiarios: BeneficiarioPension[]
-): { tipo: string; porcentaje: number; porcentajeOriginal: number; edad: number; sexo: Sexo; factorProrrateo: number }[] {
-  const resultados: { tipo: string; porcentaje: number; porcentajeOriginal: number; edad: number; sexo: Sexo; factorProrrateo: number }[] = [];
+): (BeneficiarioPension & { porcentaje: number; porcentajeOriginal: number; factorProrrateo: number })[] {
+  const resultados: (BeneficiarioPension & { porcentaje: number; porcentajeOriginal: number; factorProrrateo: number })[] = [];
   
   // Un hijo tiene derecho si es < 18, o < 24 si es estudiante, o inválido de cualquier edad
   const tieneHijosConDerecho = beneficiarios.some(
@@ -1183,6 +1236,7 @@ export function calcularPorcentajesBeneficiarios(
     
     if (porcentajeOriginal > 0) {
       resultados.push({
+        ...ben,
         tipo: ben.tipo,
         porcentaje: porcentajeOriginal,
         porcentajeOriginal,
@@ -1232,7 +1286,7 @@ export function calcularCNUSobrevivencia(
   
   for (let i = 0; i < porcentajes.length; i++) {
     const ben = porcentajes[i];
-    const benOrig = beneficiarios[i] || ben;
+    const benOrig = ben;
     const esHijo = ben.tipo === 'hijo';
     const esEstudiante = !!benOrig.esEstudiante;
     const esInvalido = !!benOrig.esInvalido;
@@ -2502,7 +2556,7 @@ export function calcularRVAumentoTemporalSobrevivencia(
   let cnuTemporalSobrevivencia = 0;
   for (let i = 0; i < porcentajes.length; i++) {
     const ben = porcentajes[i];
-    const benOrig = beneficiarios[i] || ben;
+    const benOrig = ben;
     const esInvalido = !!benOrig.esInvalido;
     const cnuTempInd = calcularCNUTemporal(
       ben.edad,

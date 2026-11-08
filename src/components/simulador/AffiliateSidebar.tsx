@@ -426,7 +426,7 @@ export function AffiliateSidebar({
                     )}
 
                     <div className="flex justify-between text-indigo-950 font-bold border-t border-amber-200 pt-1">
-                      <span>Saldo Total para SCOMP:</span>
+                      <span>Saldo para simulación:</span>
                       <span className="text-emerald-700">${invalidezInfo.saldoTotalFinanciamientoCLP.toLocaleString('es-CL')} ({invalidezInfo.saldoTotalFinanciamientoUF} UF)</span>
                     </div>
                   </div>
@@ -530,7 +530,7 @@ export function AffiliateSidebar({
                     )}
 
                     <div className="flex justify-between text-indigo-950 font-bold border-t border-purple-200 pt-1">
-                      <span>Saldo Total para SCOMP:</span>
+                      <span>Saldo para simulación:</span>
                       <span className="text-emerald-700">${sobrevivenciaInfo.saldoTotalFinanciamientoCLP.toLocaleString('es-CL')} ({sobrevivenciaInfo.saldoTotalFinanciamientoUF} UF)</span>
                     </div>
 
@@ -580,7 +580,7 @@ export function AffiliateSidebar({
                 <span>Asesor Previsional</span>
               </div>
               <p className="text-[10px] text-indigo-700/80 leading-tight">
-                Aplica comisiones SCOMP: 1,5% RV y 1,2% RP
+                Supuestos de comisión de asesoría: 1,5% RV y 1,2% RP
               </p>
             </div>
             <Switch

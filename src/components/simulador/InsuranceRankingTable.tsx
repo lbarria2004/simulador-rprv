@@ -36,10 +36,10 @@ export function InsuranceRankingTable({ items, valorUF, tipoPension = 'vejez' }:
             </div>
             <div>
               <CardTitle className="text-base font-semibold text-slate-900">
-                Ranking de Ofertas por Compañía de Seguros (CMF / SCOMP)
+                Estimaciones con tasas de referencia de RV
               </CardTitle>
               <CardDescription className="text-xs text-slate-500">
-                Basado en las tasas oficiales de colocación reportadas por la CMF
+                Datos locales de referencia; no son ofertas ni tasas personalizadas de las compañías
               </CardDescription>
             </div>
           </div>
@@ -84,7 +84,7 @@ export function InsuranceRankingTable({ items, valorUF, tipoPension = 'vejez' }:
                     <span>{item.nombre}</span>
                     {idx === 0 && (
                       <Badge className="bg-emerald-600 text-white text-[9px] py-0 px-1.5 h-4">
-                        Mejor Oferta
+                        Mayor estimación
                       </Badge>
                     )}
                   </TableCell>

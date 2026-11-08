@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge';
 import {
   ResponsiveContainer,
-  AreaChart,
+  ComposedChart,
   Area,
   Line,
   XAxis,
@@ -37,10 +37,10 @@ export function TrajectoryChart({
     const data: Array<{
       año: number;
       edad: number;
-      retiroProgramado: number;
+      retiroProgramado: number | null;
       rentaVitalicia: number;
       rvConAumento: number;
-      retiroProgramadoUF: number;
+      retiroProgramadoUF: number | null;
       rentaVitaliciaUF: number;
       rvConAumentoUF: number;
     }> = [];
@@ -56,7 +56,7 @@ export function TrajectoryChart({
     for (let año = 1; año <= 25; año++) {
       const edadActual = edadInicial + año - 1;
       const puntoRP = proyeccionRP?.[año - 1];
-      const rpCLP = puntoRP?.pensionMensual || Math.round(rvSimpleCLP * Math.pow(0.965, año));
+      const rpCLP = puntoRP?.pensionMensual ?? null;
 
       const rvAumentoActualCLP = año <= anosAumento ? aumentoCLP : finalCLP;
 
@@ -66,7 +66,7 @@ export function TrajectoryChart({
         retiroProgramado: rpCLP,
         rentaVitalicia: rvSimpleCLP,
         rvConAumento: rvAumentoActualCLP,
-        retiroProgramadoUF: valorUF > 0 ? Math.round((rpCLP / valorUF) * 100) / 100 : 0,
+        retiroProgramadoUF: rpCLP === null ? null : valorUF > 0 ? Math.round((rpCLP / valorUF) * 100) / 100 : 0,
         rentaVitaliciaUF: rvSimpleUF,
         rvConAumentoUF: valorUF > 0 ? Math.round((rvAumentoActualCLP / valorUF) * 100) / 100 : 0
       });
@@ -88,13 +88,13 @@ export function TrajectoryChart({
                 Trayectoria Comparativa de Pensión (Proyección a 25 Años)
               </CardTitle>
               <CardDescription className="text-xs text-slate-500">
-                Evolución del ingreso mensual según la modalidad contratada
+                Estimaciones de ingreso mensual; RP se muestra solo dentro del horizonte calculado
               </CardDescription>
             </div>
           </div>
           <div className="flex items-center gap-2 text-xs">
             <Badge variant="outline" className="text-blue-800 bg-blue-50 border-blue-200 font-medium">
-              Valores Reajustables en UF
+              Pesos de poder adquisitivo constante
             </Badge>
           </div>
         </div>
@@ -103,7 +103,7 @@ export function TrajectoryChart({
       <CardContent className="px-2 pb-4">
         <div className="h-[280px] w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={chartData} margin={{ top: 10, right: 20, left: 10, bottom: 0 }}>
+            <ComposedChart data={chartData} margin={{ top: 10, right: 20, left: 10, bottom: 0 }}>
               <defs>
                 {/* Gradiente Renta Vitalicia Simple */}
                 <linearGradient id="colorRV" x1="0" y1="0" x2="0" y2="1">
@@ -159,7 +159,7 @@ export function TrajectoryChart({
                         <div className="text-amber-300 flex justify-between gap-4">
                           <span>Retiro Programado:</span>
                           <span className="font-mono font-bold">
-                            {dataPoint.retiroProgramadoUF} UF (${dataPoint.retiroProgramado.toLocaleString('es-CL')})
+                            {dataPoint.retiroProgramado === null ? 'Sin proyección' : `${dataPoint.retiroProgramadoUF} UF ($${dataPoint.retiroProgramado.toLocaleString('es-CL')})`}
                           </span>
                         </div>
                       </div>
@@ -177,7 +177,7 @@ export function TrajectoryChart({
                 formatter={(value) => {
                   if (value === 'rvConAumento') return 'RV con Aumento Temporal (Verde)';
                   if (value === 'rentaVitalicia') return 'Renta Vitalicia Fija (Azul)';
-                  if (value === 'retiroProgramado') return 'Retiro Programado Decreciente (Naranja)';
+                  if (value === 'retiroProgramado') return 'Retiro Programado Simulado (Naranja)';
                   return value;
                 }}
               />
@@ -214,7 +214,7 @@ export function TrajectoryChart({
                 dot={false}
                 name="retiroProgramado"
               />
-            </AreaChart>
+            </ComposedChart>
           </ResponsiveContainer>
         </div>
       </CardContent>

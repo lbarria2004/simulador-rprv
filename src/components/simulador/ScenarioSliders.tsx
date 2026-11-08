@@ -84,7 +84,7 @@ export function ScenarioSliders({
             <span>0a</span>
             <span>5a</span>
             <span>10a</span>
-            <span className="text-indigo-600 font-bold">15a (SCOMP)</span>
+            <span className="text-indigo-600 font-bold">15a (ejemplo)</span>
             <span>20a</span>
             <span>25a</span>
           </div>
@@ -178,13 +178,13 @@ export function ScenarioSliders({
           </div>
         </div>
 
-        {/* 4. Slider Sensibilidad: Tasa Retiro Programado (TRP) */}
+        {/* 4. Slider Sensibilidad: Tasa técnica CNU de RP */}
         {setTasaRP && (
           <div className="space-y-3 p-3 bg-blue-50/50 rounded-xl border border-blue-200/70">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5">
                 <Landmark className="w-4 h-4 text-blue-600" />
-                <Label className="text-xs font-semibold text-slate-800">Tasa Retiro Programado (TRP)</Label>
+                <Label className="text-xs font-semibold text-slate-800">Tasa técnica CNU de RP</Label>
               </div>
               <Badge className="bg-blue-600 text-white font-mono text-xs">
                 {tasaRP.toFixed(2)}% anual
@@ -203,7 +203,7 @@ export function ScenarioSliders({
             <div className="flex justify-between text-[10px] text-slate-400 font-medium">
               <span>1.5%</span>
               <span>2.5%</span>
-              <span className="text-blue-700 font-bold">3.67% (SP)</span>
+              <span className="text-blue-700 font-bold">3.67% (referencia)</span>
               <span>4.5%</span>
               <span>6.0%</span>
             </div>
@@ -245,7 +245,7 @@ export function ScenarioSliders({
             </div>
 
             <p className="text-[11px] text-slate-500 leading-tight">
-              Tasa de descuento de la aseguradora. Una tasa mayor eleva la renta vitalicia mensual en UF garantizada.
+              Tasa hipotética de descuento para estimar RV. El resultado no es una renta ofrecida ni garantizada.
             </p>
           </div>
         )}
