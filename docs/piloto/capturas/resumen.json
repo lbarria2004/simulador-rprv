@@ -1,0 +1,17 @@
+{
+  "resultado": "Navegador del piloto aprobado",
+  "casos": [
+    "inicio sin resultados",
+    "RP/RV y tres escenarios",
+    "UF y PDF coherentes",
+    "datos obsoletos bloqueados",
+    "saldo cero y campo vacío",
+    "familia sin curvas",
+    "estudios y grupo restringido",
+    "fallo sin respaldo",
+    "móvil 390px"
+  ],
+  "errores_JS": [],
+  "solicitudes_externas": [],
+  "solicitudes_SCOMP": 0
+}

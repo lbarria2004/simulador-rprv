@@ -4,6 +4,14 @@ Herramienta independiente para comparar estimaciones de Retiro Programado y Rent
 
 Stack: Next.js, React, TypeScript y tablas de mortalidad locales. No requiere servicios de pago para ejecutar el motor.
 
+## Versión actual: piloto interno con datos ficticios
+
+La pantalla y las API están restringidas a **RP simple y RV inmediata teórica**, con una política compartida y resultados estimativos pendientes de validación especializada. Las cláusulas, ofertas comerciales, beneficios y proyecciones familiares futuras están deshabilitados. Con beneficiarios se muestra solo la comparación inicial; las curvas RP requieren ahorro positivo, ausencia de beneficiarios y comprobación financiera.
+
+Consultar el [informe del piloto, verificaciones y limitaciones](docs/piloto-resultados.md), las [decisiones basadas en la matriz de 27 componentes](docs/piloto-decisiones.md) y las [capturas y PDF ficticios](docs/piloto/capturas/). `npm run dev` y `npm run start` escuchan en `127.0.0.1`; no hay autenticación ni autorización para uso con datos personales reales.
+
+Verificación de esta versión: `npm test`, `npm run typecheck`, `npm run lint`, `npm run build -- --webpack`. Con producción local iniciada: `node scripts/verificar-piloto-http.mjs` y `python scripts/verificar-piloto-navegador.py`. Las secciones siguientes conservan el historial de fases; sus modalidades y contratos HTTP anteriores no están habilitados en el piloto.
+
 ## Desarrollo local
 
 ```bash

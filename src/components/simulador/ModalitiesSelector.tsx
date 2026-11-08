@@ -56,7 +56,7 @@ export function ModalitiesSelector({
   onRestablecerTasas
 }: ModalitiesSelectorProps) {
   // Estado local para el constructor de cláusulas adicionales y ofertas especiales
-  const [tipoClausula, setTipoClausula] = useState<'garantizada' | 'aumento' | 'combinada' | 'tasa_especial'>('garantizada');
+  const [tipoClausulaElegida, setTipoClausula] = useState<'garantizada' | 'aumento' | 'combinada' | 'tasa_especial'>('garantizada');
   const [mesesGarantizados, setMesesGarantizados] = useState<number>(180); // 15 años
   const [mesesAumento, setMesesAumento] = useState<number>(36); // 3 años
   const [porcentajeAumento, setPorcentajeAumento] = useState<number>(1.0); // +100%
@@ -65,12 +65,9 @@ export function ModalitiesSelector({
   const [aplicarTasaEspecialEnClausula, setAplicarTasaEspecialEnClausula] = useState<boolean>(false);
   const [modoTasaEspecialGlobal, setModoTasaEspecialGlobal] = useState<boolean>(false);
 
-  // La interfaz limita las cláusulas explorables de sobrevivencia; no certifica su admisibilidad.
-  React.useEffect(() => {
-    if (tipoPension === 'sobrevivencia' && tipoClausula !== 'garantizada' && tipoClausula !== 'tasa_especial') {
-      setTipoClausula('garantizada');
-    }
-  }, [tipoPension, tipoClausula]);
+  // Vista histórica no montada por el piloto: deriva la selección admisible sin efecto de estado.
+  const tipoClausula = tipoPension === 'sobrevivencia' && !['garantizada', 'tasa_especial'].includes(tipoClausulaElegida)
+    ? 'garantizada' : tipoClausulaElegida;
 
   // Cantidad de modalidades activas para cotizar (en sobrevivencia excluye aumento temporal y combinada)
   const modalidadesActivas = modalidades.filter(m => {

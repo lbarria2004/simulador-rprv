@@ -120,3 +120,18 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Piloto: jerarquía sobria, controles explícitos y estados de cálculo visibles. */
+.pilot-root { background: #f3f6f8; color: #172c40; }
+.pilot-panel { border: 1px solid #e1e7ec; border-radius: 14px; background: white; box-shadow: 0 2px 6px #132d4010; }
+.pilot-section-title { display: flex; align-items: center; gap: 9px; margin-bottom: 20px; font-size: 13px; font-weight: 600; }
+.pilot-step { display: inline-flex; align-items: center; justify-content: center; width: 25px; height: 25px; border-radius: 7px; background: #edf4f3; color: #13776d; font-size: 10px; }
+.pilot-label { display: block; margin-bottom: 7px; font-size: 11px; font-weight: 500; color: #566778; }
+.pilot-input { display: block; width: 100%; min-width: 0; height: 40px; border: 1px solid #dce3e9; border-radius: 8px; background: #fff; padding: 8px 11px; font-size: 13px; color: #1e3447; transition: border-color .15s, box-shadow .15s; }
+.pilot-input:focus { outline: none; border-color: #158578; box-shadow: 0 0 0 3px #15857816; }
+.pilot-small-button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; border: 1px solid #dce3e9; border-radius: 8px; background: white; padding: 8px 9px; color: #456173; font-size: 11px; font-weight: 500; }
+.pilot-small-button:hover:not(:disabled) { border-color: #138276; color: #0d766b; background: #f4faf8; }
+.pilot-small-button:disabled { color: #a7b1bb; cursor: not-allowed; background: #f8fafb; }
+.pilot-eyebrow { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .12em; color: #138276; }
+.pilot-root button:focus-visible, .pilot-root summary:focus-visible, .pilot-root a:focus-visible { outline: 2px solid #0e8175; outline-offset: 3px; }
+.pilot-root label:has(input[type=radio]:focus-visible) { outline: 2px solid #0e8175; outline-offset: 2px; }
