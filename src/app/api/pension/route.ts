@@ -313,8 +313,8 @@ export async function GET() {
       },
       gradosInvalidez: [
         { value: 'total', label: 'Total (70%)', descripcion: 'Invalidez total - 70% del ingreso base' },
-        { value: 'total_2_3', label: 'Total 2/3 (50%)', descripcion: 'Invalidez total 2/3 - 50% del ingreso base' },
-        { value: 'parcial', label: 'Parcial (35%)', descripcion: 'Invalidez parcial - 35% del ingreso base' }
+        { value: 'total_2_3', label: 'Convención heredada (50%)', descripcion: 'No es categoría legal acreditada; requiere revisión especializada' },
+        { value: 'parcial', label: 'Parcial (50%)', descripcion: 'Referencia art.56 sujeta a requisitos y dictamen; capital estimativo' }
       ],
       porcentajesSobrevivencia: {
         conyugeSinHijos: '60%',
@@ -333,7 +333,7 @@ export async function GET() {
         porcentajesAumento: [0.10, 0.20, 0.30, 0.40, 0.50, 0.60, 0.70, 0.80, 0.90, 1.00]
       },
       fechaRevision: '2026-11-08',
-      estadoTasas: 'Supuestos ilustrativos sin circular primaria de vigencia acreditada',
+      estadoTasas: 'Supuestos ilustrativos configurables. RP 3,67% documentado en Circular SP 2425 desde 01-10-2026; no se selecciona circular por fecha ni se acredita su aplicación a cada caso. RV sin tasa normativa de tarificación acreditada',
       estadoCalculo: 'Estimativo, sin certificación normativa'
     }
   });

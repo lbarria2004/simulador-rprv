@@ -423,7 +423,7 @@ export function AffiliateSidebar({
 
                     {invalidezInfo.cubiertoSIS && (
                       <div className="flex justify-between text-emerald-800 bg-emerald-100/80 px-1.5 py-0.5 rounded font-semibold">
-                        <span>Aporte Adicional SIS (+AA):</span>
+                        <span>Aporte SIS hipotético (+AA):</span>
                         <span>+${invalidezInfo.aporteAdicionalSISCLP.toLocaleString('es-CL')}</span>
                       </div>
                     )}
@@ -465,7 +465,7 @@ export function AffiliateSidebar({
                   </div>
                   <p className="text-[10px] text-slate-600 leading-tight">
                     {(afiliado.cubiertoSIS ?? true)
-                      ? 'Trabajador activo o cesante protegido: La aseguradora del SIS aporta el Aporte Adicional ($AA) si el saldo en AFP no cubre el Capital Necesario.'
+                      ? 'Trabajador activo o cesante protegido: El modelo supone un aporte SIS si el saldo no cubre el capital estimado; no verifica la cobertura ni el monto exigible.'
                       : 'Sin cobertura SIS: La pensión familiar se financia exclusivamente con el saldo individual acumulado en AFP.'}
                   </p>
                 </div>
@@ -527,7 +527,7 @@ export function AffiliateSidebar({
 
                     {sobrevivenciaInfo.cubiertoSIS && (
                       <div className="flex justify-between text-emerald-800 bg-emerald-100/80 px-1.5 py-0.5 rounded font-semibold">
-                        <span>Aporte Adicional SIS (+AA):</span>
+                        <span>Aporte SIS hipotético (+AA):</span>
                         <span>+${sobrevivenciaInfo.aporteAdicionalSISCLP.toLocaleString('es-CL')}</span>
                       </div>
                     )}
@@ -539,7 +539,7 @@ export function AffiliateSidebar({
 
                     {sobrevivenciaInfo.factorProrrateo < 1 && (
                       <div className="text-[10px] text-amber-800 bg-amber-50 p-1.5 rounded border border-amber-200">
-                        ⚠️ Prorrateo legal: suma de porcentajes {(sobrevivenciaInfo.sumaPorcentajesOriginales * 100).toFixed(0)}% ajustada a 100% (factor {(sobrevivenciaInfo.factorProrrateo * 100).toFixed(1)}%).
+                        ⚠️ Ajuste manual heredado, sin acreditación normativa: suma de porcentajes {(sobrevivenciaInfo.sumaPorcentajesOriginales * 100).toFixed(0)}% ajustada a 100% (factor {(sobrevivenciaInfo.factorProrrateo * 100).toFixed(1)}%).
                       </div>
                     )}
                   </div>

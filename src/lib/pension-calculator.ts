@@ -191,7 +191,9 @@ export const ESCENARIOS_RENTABILIDAD_RP = {
 
 export type EscenarioRentabilidadRP = keyof typeof ESCENARIOS_RENTABILIDAD_RP;
 
-export const AVISO_SIMULACION = 'Estimación orientativa independiente, sin conexión con SCOMP. No constituye una oferta oficial de AFP o aseguradora ni garantiza rentabilidad o pensión.';
+export const AVISO_VALIDACION_ACTUARIAL = 'CNU: aproximación documentada. Montos de pensión, aplicación de tasas, factores de garantía y derechos futuros: pendientes de validación especializada. No acredita conformidad normativa ni cobertura SIS.';
+
+export const AVISO_SIMULACION = 'Estimación orientativa independiente, sin conexión con SCOMP. No constituye una oferta oficial de AFP o aseguradora ni garantiza rentabilidad o pensión. CNU aproximado; montos pendientes de validación especializada.';
 
 // ==========================================
 // CONSTANTES DEL SISTEMA
@@ -291,7 +293,7 @@ export type TipoBeneficiarioExtendido =
 export const PORCENTAJES_INVALIDEZ: Record<GradoInvalidez, number> = {
   total: 0.70,
   total_2_3: 0.50,
-  parcial: 0.35
+  parcial: 0.50
 } as const;
 
 // PGU (Pensión Garantizada Universal)
@@ -546,7 +548,7 @@ export function calcularRetiroProgramado(
   for (let año = 0; año <= Math.min(45, 110 - edad); año++) {
     const edadActual = edad + año;
     // Copiar desde el estado inicial evita mutar entradas o acumular incrementos de edad.
-    const beneficiariosActuales = (beneficiarios ?? []).map(ben => ({ ...ben, edad: ben.edad + año }));
+    const beneficiariosActuales = (beneficiarios ?? []).map(ben => ({ ...ben, edad: ben.edad + año })).filter(ben => ben.edad <= 110);
     const cnuAnual = calcularCNU(edadActual, sexo, tasaTecnicaCNU, beneficiariosActuales, esInvalido, 'retiro_programado', anoCalculo + año);
     if (!Number.isFinite(cnuAnual) || cnuAnual <= 0) throw new RangeError('CNU fuera del dominio numérico de la proyección');
     const pensionAnual = Math.min(saldo, saldo / cnuAnual * 12);
@@ -673,14 +675,14 @@ export function calcularRVPeriodoGarantizado(
     pensionMensual: Math.round(pensionAjustada),
     pensionEnUF: clpAUf(Math.round(pensionAjustada), referenciaUF),
     pensionAnual: pensionAjustada * 12,
-    cnu: rvBase.cnu,
+    cnu: rvBase.cnu / factorAjuste,
     tasaInteres,
     expectativaVida: rvBase.expectativaVida,
     periodoGarantizado: mesesGarantizados,
     advertencias: [
       `Período garantizado: ${nombreMeses} (${mesesGarantizados} meses)`,
       `Si fallece antes, beneficiarios reciben el 100% de la pensión`,
-      `Factor aplicado: ${(factorAjuste * 100).toFixed(1)}%`
+      `Factor ilustrativo aplicado: ${(factorAjuste * 100).toFixed(1)}%`
     ]
   };
 }
@@ -818,7 +820,7 @@ export function calcularRVConAmbasClausulas(
  * Grados:
  * - Total: 70% del ingreso base
  * - Total 2/3: 50% del ingreso base  
- * - Parcial: 35% del ingreso base
+ * - Parcial: 50% del ingreso base (art.56, sujeto a requisitos)
  */
 export function calcularPensionInvalidez(
   fondos: number,
@@ -843,7 +845,7 @@ export function calcularPensionInvalidez(
   let capitalSIS = 0;
   
   if (cubiertoSIS) {
-    // Capital necesario para financiar la pensión de referencia
+    // Capital estimativo: no acredita cobertura ni obligación de aporte SIS
     const capitalNecesario = pensionReferencia * cnu;
     
     if (fondos >= capitalNecesario) {
@@ -878,8 +880,8 @@ export function calcularPensionInvalidez(
   
   const gradoLabels: Record<GradoInvalidez, string> = {
     total: 'Total (70%)',
-    total_2_3: 'Total 2/3 (50%)',
-    parcial: 'Parcial (35%)'
+    total_2_3: 'Convención heredada (50%, sin categoría legal acreditada)',
+    parcial: 'Parcial (50%)'
   };
   
   const advertencias = [
@@ -888,6 +890,8 @@ export function calcularPensionInvalidez(
     `Pensión de referencia: ${formatearPesos(pensionReferencia)}`
   ];
   
+  if (gradoInvalidez === 'total_2_3') advertencias.push('Convención heredada: total_2_3 no acredita una categoría legal de invalidez. Requiere revisión del dictamen.');
+
   if (capitalSIS > 0) {
     advertencias.push(`Aporte SIS: ${formatearPesos(capitalSIS)}`);
   }
@@ -1002,14 +1006,14 @@ export function calcularRVPeriodoGarantizadoInvalidez(
     pensionMensual: Math.round(pensionAjustada),
     pensionEnUF: clpAUf(Math.round(pensionAjustada), referenciaUF),
     pensionAnual: pensionAjustada * 12,
-    cnu: rvBase.cnu,
+    cnu: rvBase.cnu / factorAjuste,
     tasaInteres,
     expectativaVida: rvBase.expectativaVida,
     periodoGarantizado: mesesGarantizados,
     advertencias: [
       `Período garantizado: ${nombreMeses} (${mesesGarantizados} meses)`,
       `Si fallece antes, beneficiarios reciben el 100% de la pensión`,
-      `Factor aplicado: ${(factorAjuste * 100).toFixed(1)}%`,
+      `Factor ilustrativo aplicado: ${(factorAjuste * 100).toFixed(1)}%`,
       'Usa tabla de mortalidad de inválidos (I-H/I-M-2020)'
     ]
   };
@@ -1357,6 +1361,7 @@ export function calcularRVGarantizadoSobrevivencia(
     unidadMonetaria: 'CLP_REALES',
     nombre: `RV Sobrevivencia Garantía ${nombreMeses}`,
     pensionBaseReparto: pensionAjustada,
+    cnu: rvBase.cnu / factorAjuste,
     pensionMensual: Math.round(pensionAjustada),
     pensionEnUF: clpAUf(Math.round(pensionAjustada), referenciaUF),
     pensionAnual: pensionAjustada * 12,
@@ -1365,7 +1370,7 @@ export function calcularRVGarantizadoSobrevivencia(
     advertencias: [
       ...(rvBase.advertencias ?? []),
       `Período garantizado: ${nombreMeses}`,
-      `Factor aplicado: ${(factorAjuste * 100).toFixed(1)}%`,
+      `Factor ilustrativo aplicado: ${(factorAjuste * 100).toFixed(1)}%`,
       'Distribución según Art. 58 DL 3500'
     ]
   });
@@ -1436,7 +1441,7 @@ export function calcularRetiroProgramadoSobrevivencia(
   let retiroAcumulado = 0;
   // Base de reparto B y pago agregado G son magnitudes diferentes. Ver fundamento de fase 2.
   for (let ano = 0; ano <= 45; ano++) {
-    const grupo = beneficiarios.map(ben => ({ ...ben, edad: ben.edad + ano }));
+    const grupo = beneficiarios.map(ben => ({ ...ben, edad: ben.edad + ano })).filter(ben => ben.edad <= 110);
     const porcentajes = calcularPorcentajesBeneficiarios(grupo);
     const suma = porcentajes.reduce((total, ben) => total + ben.porcentaje, 0);
     const { cnuTotal } = calcularCNUSobrevivencia(grupo, tasaInteres, 'retiro_programado', anoCalculo + ano);
@@ -1785,7 +1790,7 @@ export function calcularPensionReferenciaInvalidez(
  * aplicando la transcripción local de tablas de invalidez (MI-H-2020 / MI-M-2020)
  * y contemplando a los beneficiarios legales de sobrevivencia.
  * 
- * FÓRMULA (Anexo 7 Compendio SP):
+ * Relación estimativa de capital (CNU local aproximado; comparación en matriz de fase 4):
  * CN = Pensión_Referencia × CNU_MI(edad, sexo, tasa, beneficiarios)
  */
 export function calcularCapitalNecesarioInvalidez(
@@ -1832,7 +1837,7 @@ export interface DesgloseFinanciamientoInvalidez {
 }
 
 /**
- * Calcula el financiamiento integral de la Pensión de Invalidez bajo normativa SP / CMF
+ * Estima financiamiento de invalidez; no reproduce íntegramente el cálculo reglamentario.
  */
 export function calcularFinanciamientoInvalidez(
   saldoPropioCLP: number,
@@ -1905,7 +1910,7 @@ export function calcularPensionReferenciaCausante(ingresoBaseCausanteCLP: number
 
 /**
  * Calcula el Capital Necesario (CN) actuarial de sobrevivencia
- * FÓRMULA (Compendio de Pensiones SP Libro III, Anexo 7):
+ * Relación estimativa de capital; no implementación íntegra del Anexo 7:
  * CN_sob = Σ [ Pensión_Referencia_Beneficiario_i × CNU_sob_i ] = Pensión_Ref_Causante × CNU_sob_total
  */
 export function calcularCapitalNecesarioSobrevivencia(
@@ -2259,6 +2264,6 @@ export function etiquetarResultadoActuarial(resultado: ResultadoEscenario, benef
   return { ...resultado, reglasSobrevivencia: reglas,
     validacionActuarial: { estado: 'estimativo', fechaRevision: '2026-11-08',
       fuenteTablas: 'https://www.cmfchile.cl/normativa/ncg_495_2023.pdf', cnuVitalicio: 'aproximacion_anual_no_certificada' },
-    advertencias: [...new Set([AVISO_SIMULACION, ...limites, ...(resultado.advertencias ?? []), ...reglas.flatMap(b => b.advertenciasRegla)])]
+    advertencias: [...new Set([AVISO_SIMULACION, AVISO_VALIDACION_ACTUARIAL, ...limites, ...(resultado.advertencias ?? []), ...reglas.flatMap(b => b.advertenciasRegla)])]
   };
 }

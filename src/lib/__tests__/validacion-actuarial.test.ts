@@ -6,7 +6,7 @@ import * as tablas from '../tablas-mortalidad-oficiales.ts';
 import { getQx, calcularLx, calcularExpectativaVida } from '../tablas-mortalidad.ts';
 import { proyectarCapitalTemporalMensual, crearTrayectoriaTemporal } from '../actuaria-mensual.ts';
 import { determinarPorcentajes } from '../reglas-sobrevivencia.ts';
-import { calcularRVAumentoTemporal, calcularRVAumentoTemporalSobrevivencia, calcularCNU, calcularCNUTemporal, calcularRVAumentoTemporalInvalidez, calcularRVSobrevivenciaGarantizada, calcularRVInmediataSobrevivencia, etiquetarResultadoActuarial } from '../pension-calculator.ts';
+import { calcularRVAumentoTemporal, calcularRVAumentoTemporalSobrevivencia, calcularCNU, calcularCNUTemporal, calcularRVAumentoTemporalInvalidez, calcularRVSobrevivenciaGarantizada, calcularRVInmediataSobrevivencia, etiquetarResultadoActuarial, calcularRetiroProgramado, calcularRetiroProgramadoSobrevivencia, calcularPensionInvalidez, calcularPensionReferenciaInvalidez, calcularRVPeriodoGarantizado, calcularRVPeriodoGarantizadoInvalidez, calcularRVGarantizadoSobrevivencia } from '../pension-calculator.ts';
 import type { BeneficiarioPension } from '../pension-calculator.ts';
 
 function cerca(actual: number, esperado: number, tolerancia = 1e-11) {
@@ -228,5 +228,60 @@ describe('Art.58: porcentaje legal, vínculos y participación familiar distinto
     assert.equal(r.validacionActuarial?.estado, 'estimativo');
     assert.match(r.validacionActuarial!.fuenteTablas, /ncg_495_2023/);
     assert.ok(r.advertencias?.some(a => a.includes('No constituye una oferta oficial')));
+  });
+});
+
+
+describe('Auditoría final: defectos reproducidos en 147c78b', () => {
+  it('RP conserva la proyección cuando la edad futura del cónyuge supera el soporte', () => {
+    const grupo = [ben('conyuge', { edad: 85 })];
+    const copia = structuredClone(grupo);
+    const r = calcularRetiroProgramado(80000000, 65, 'M', .03, grupo, false, {}, uf);
+    assert.ok(r.proyeccion.some(p => p.edad > 90));
+    assert.ok(r.proyeccion.every(p => p.beneficiarios.every(b => b.edad <= 110)));
+    assert.deepEqual(grupo, copia);
+    assert.throws(() => calcularRetiroProgramado(80000000, 65, 'M', .03, [ben('conyuge', { edad: 111 })]), RangeError);
+  });
+  it('RP sobrevivencia continúa para el hijo inválido tras el límite tabular de otro beneficiario', () => {
+    const grupo = [ben('conyuge', { edad: 85 }), ben('hijo', { edad: 30, sexo: 'M', esInvalido: true, gradoInvalidez: 'total' })];
+    const r = calcularRetiroProgramadoSobrevivencia(80000000, 65, 'M', grupo, undefined, undefined, .03, uf);
+    assert.ok(r.proyeccion.length > 27);
+    assert.ok(r.proyeccion[26].beneficiarios.every(b => b.edad <= 110));
+    assert.equal(r.proyeccion[26].pensionPorBeneficiario?.length, 1);
+    assert.equal(grupo[0].edad, 85);
+  });
+  it('Anexo 7 p.1: tres cónyuges con hijos tienen 16,67% cada uno sin renormalizar el redondeo', () => {
+    const adultos = [0, 1, 2].map(i => ben('conyuge', { id: `c${i}`, idsHijosComunes: ['hijo'] }));
+    const r = determinarPorcentajes([...adultos, ben('hijo')]);
+    r.slice(0, 3).forEach(b => assert.equal(b.porcentajeLegal, .1667));
+    cerca(r.slice(0, 3).reduce((s, b) => s + b.porcentajeLegal, 0), .5001);
+    cerca(r.reduce((s, b) => s + b.participacionFamiliar, 0), 1);
+  });
+  it('Anexo 7 p.1: dos cónyuges, uno sin hijos comunes y otro con ellos: 30% y 25%', () => {
+    const r = determinarPorcentajes([ben('conyuge', { id: 'c1', idsHijosComunes: [] }), ben('conyuge', { id: 'c2', idsHijosComunes: ['hijo'] }), ben('hijo')]);
+    assert.equal(r[0].porcentajeLegal, .3);
+    assert.equal(r[1].porcentajeLegal, .25);
+  });
+  it('art.56: ambas rutas de referencia parcial entregan 50% bajo la hipótesis SIS', () => {
+    const r = calcularPensionInvalidez(0, 55, 'M', 'parcial', 1200000, .03, [], true, uf);
+    assert.equal(r.porcentajeInvalidez, .5);
+    assert.equal(r.pensionReferencia, 600000);
+    assert.equal(r.pensionReferencia, calcularPensionReferenciaInvalidez(1200000, 'parcial'));
+    assert.equal(r.pensionMensual, 600000);
+  });
+  it('la garantía informa el divisor efectivo sin alterar el pago ilustrativo', () => {
+    const fondos = 80000000;
+    const vejez = calcularRVPeriodoGarantizado(fondos, 65, 'M', 180, .03, [], false, uf);
+    const invalidez = calcularRVPeriodoGarantizadoInvalidez(fondos, 65, 'M', 180, .03, [], uf);
+    for (const r of [vejez, invalidez]) assert.ok(Math.abs(r.pensionMensual - fondos / r.cnu) <= 1);
+    const grupo = [ben('conyuge')];
+    const s = calcularRVGarantizadoSobrevivencia(fondos, 65, 'M', grupo, 180, undefined, undefined, .03, uf);
+    cerca(s.pensionBaseReparto!, fondos / s.cnu, 1e-8);
+    assert.equal(s.pensionMensual, Math.round(s.pensionBaseReparto! * .6));
+  });
+  it('la convención heredada total_2_3 no se afirma como categoría legal', () => {
+    const r = calcularPensionInvalidez(0, 55, 'M', 'total_2_3', 1200000, .03, [], true, uf);
+    assert.match(r.nombre, /sin categoría legal acreditada/);
+    assert.ok(r.advertencias?.some(a => a.includes('no acredita una categoría legal')));
   });
 });

@@ -191,8 +191,8 @@ const TIPO_BENEFICIARIO_LABELS: Record<string, string> = {
 // Etiquetas para grado de invalidez
 const GRADO_INVALIDEZ_LABELS: Record<string, string> = {
   total: 'Total (70%)',
-  total_2_3: 'Total 2/3 (50%)',
-  parcial: 'Parcial (35%)'
+  total_2_3: 'Convencion heredada (50%, pendiente de validacion)',
+  parcial: 'Parcial (50%)'
 };
 
 export interface DatosReporte {
@@ -420,7 +420,7 @@ export async function generarReportePDF(body: DatosReporte): Promise<Uint8Array>
           color: { r: 0.122, g: 0.306, b: 0.475 }
         });
         y -= 15;
-        drawText(page, `Si fallece antes del periodo, beneficiarios reciben el 100% de la pension`, 50, y, { size: 9, font: fontRegular });
+        drawText(page, `Garantia ilustrativa: verificar asegurados, beneficiarios y condiciones contractuales.`, 50, y, { size: 9, font: fontRegular });
         y -= 20;
 
         const pensionBruto = rv.pensionMensual;
@@ -832,6 +832,7 @@ export async function generarReportePDF(body: DatosReporte): Promise<Uint8Array>
     }
 
     for (const pagina of pdfDoc.getPages()) {
+      drawText(pagina, 'Montos, tasas aplicadas, garantias y derechos futuros: pendientes de validacion especializada.', 50, 51, { size: 6, font: fontRegular });
       drawText(pagina, 'TM-2020 cotejada con SP/CMF. CNU anual y complemento mensual estimativos; sin certificacion.', 50, 29, { size: 6, font: fontRegular });
       drawText(pagina, 'Orientacion independiente. Sin conexion con SCOMP. No es oferta de AFP o aseguradora.', 50, 18, { size: 7, font: fontRegular });
     }

@@ -1,0 +1,29 @@
+{
+  "consulta": "2026-11-08",
+  "documentos": [
+    {
+      "id": "SP-2407",
+      "url": "https://www.spensiones.cl/apps/GetFile.php?id=001&namefile=CAFP2407.pdf",
+      "sha256": "9ea9edb704a1096107c1ee84bf14974e3b81b677e00947c907d990bff8c159fc",
+      "paginas": 8
+    },
+    {
+      "id": "SP-2417",
+      "url": "https://www.spensiones.cl/apps/GetFile.php?id=001&namefile=CAFP2417.pdf",
+      "sha256": "85b8fff93480b1965b581c3be6200fa834ec3fe1df2069a8476bd010efdf91e9",
+      "paginas": 8
+    },
+    {
+      "id": "SP-2425",
+      "url": "https://www.spensiones.cl/apps/GetFile.php?id=001&namefile=CAFP2425.pdf",
+      "sha256": "83cdf44f6ddad4eb86ffa96d89ad87200e5c73c9ee9ec9c712c73d36d31fb907",
+      "paginas": 8
+    },
+    {
+      "id": "SP-Anexo7",
+      "url": "https://www.spensiones.cl/portal/compendio/596/fo-article-7253.pdf",
+      "sha256": "bb8a52cf61fb21e3bd84c5e0d25b08f5e4a19ac8269976b8849c27ddfd8e0700",
+      "paginas": 11
+    }
+  ]
+}

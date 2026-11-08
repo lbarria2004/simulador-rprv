@@ -46,3 +46,9 @@ Con la app local iniciada, `node scripts/verificar-integracion.mjs` ejecuta regr
 Las tablas TM-2020 se cotejaron con los originales SP/CMF: se corrigieron cuatro discrepancias y se retiraron edades RV-M sin respaldo. Los aumentos temporales usan exactamente los meses solicitados con una hipótesis mensual documentada; el CNU vitalicio sigue siendo una aproximación anual. Porcentajes legales, incrementos, ajustes manuales y participación familiar se informan por separado.
 
 Consultar [fundamentos y fuentes](docs/fase-3-fundamentos.md) e [informe de verificaciones y limitaciones](docs/fase-3-resultados.md). No se afirma conformidad normativa. `node scripts/auditar-tm2020.mjs` verifica la transcripción local y `node scripts/auditar-tm2020.mjs d1c7ef3` reproduce las diferencias de esta fase. Las tasas y garantías siguen siendo supuestos sin vigencia primaria acreditada; los escenarios de pantalla se presentan sin atribución a compañías.
+
+## Auditoría final de trazabilidad
+
+La [matriz por componente y caso del Anexo 7](docs/fase-4-matriz-trazabilidad.md) y el [informe de riesgos y recomendaciones para clientes](docs/fase-4-riesgos-y-resultados.md) actualizan las conclusiones de fase 3. Se documentó la Circular SP 2425: el 3,67% tiene respaldo desde 01-10-2026; su aplicación a otras fechas no es automática ni certificada. Los montos finales siguen siendo aproximaciones o pendientes de validación especializada.
+
+Esta fase corrige únicamente defectos demostrados y mensajes de certeza sin respaldo; conserva tasas, tablas y metodología del CNU vitalicio. Consultar el [fundamento de cada corrección](docs/fase-4-cambios-fundamentados.md). Con la app local iniciada, las comprobaciones HTTP siguen disponibles en `node scripts/verificar-integracion.mjs`; la auditoría de pantalla está en `python scripts/verificar-presentacion.py` y requiere Python/Playwright/Chromium ya instalados.

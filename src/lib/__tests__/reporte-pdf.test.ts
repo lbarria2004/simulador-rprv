@@ -73,7 +73,10 @@ describe('Regresión del documento PDF', () => {
     for (let i = 0; i < 10; i++) body.resultados.push({ ...body.resultados[0], nombre: `RV Inmediata Garantizada ${i}`, periodoGarantizado: 60 + i * 12 });
     const paginas = await textosPDF(await generarReportePDF(body));
     assert.ok(paginas.length > 1);
-    for (const texto of paginas) assert.ok(texto.includes('Sin conexion con SCOMP. No es oferta de AFP o aseguradora.'));
+    for (const texto of paginas) {
+      assert.ok(texto.includes('Sin conexion con SCOMP. No es oferta de AFP o aseguradora.'));
+      assert.ok(texto.includes('Montos, tasas aplicadas, garantias y derechos futuros: pendientes de validacion especializada.'));
+    }
   });
   it('distingue en el PDF regla legal, incremento, porcentaje aplicado y participación familiar', async () => {
     const body = entrada();

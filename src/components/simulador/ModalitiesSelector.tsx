@@ -115,7 +115,7 @@ export function ModalitiesSelector({
           ? `RV Sobrevivencia Garantizada ${mesesGarantizados}m (${anos}a)${sufijoTasa}`
           : `RV Garantizada ${mesesGarantizados} meses (${anos}a)${sufijoTasa}`,
         descripcion: tipoPension === 'sobrevivencia'
-          ? `Pensión familiar en UF con garantía legal de pago por ${mesesGarantizados} meses (${anos} años) transferible a beneficiarios o herederos designados.${esEspecialOpt ? ` Tasa especial: ${tasaEspecialManual.toFixed(2)}%.` : ''}`
+          ? `Estimación familiar en UF con factor ilustrativo de garantía por ${mesesGarantizados} meses (${anos} años) ; requiere identificar asegurados y revisar el contrato.${esEspecialOpt ? ` Tasa especial: ${tasaEspecialManual.toFixed(2)}%.` : ''}`
           : `Pensión vitalicia fija en UF con garantía de pago por ${mesesGarantizados} meses (${anos} años) a beneficiarios o herederos.${esEspecialOpt ? ` Tasa especial: ${tasaEspecialManual.toFixed(2)}%.` : ''}`,
         mesesGarantizados,
         tasaEspecialRV: tasaEspecialOpt,

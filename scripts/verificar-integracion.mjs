@@ -27,10 +27,14 @@ assert.equal(opciones[0].rentabilidadRealAnual, .04);
 for (const r of opciones) {
   assert.deepEqual(r.referenciaUF, uf);
   assert.equal(r.validacionActuarial.estado, 'estimativo');
+  assert.ok(r.advertencias.some(a => a.includes('pendientes de validación especializada')));
   assert.equal(r.reglasSobrevivencia[0].estadoRegla, 'requiere_datos');
 }
 const escenarios = (await (await post('escenarios_rp')).json()).resultados;
-for (const r of Object.values(escenarios)) assert.equal(r.validacionActuarial.estado, 'estimativo');
+for (const r of Object.values(escenarios)) {
+  assert.equal(r.validacionActuarial.estado, 'estimativo');
+  assert.ok(r.advertencias.some(a => a.includes('No acredita conformidad normativa')));
+}
 for (const tipo of ['aumento_temporal', 'invalidez_rv_aumento', 'sobrevivencia_rv_aumento']) {
   const r = (await (await post(tipo, { mesesAumento: 13, porcentajeAumento: .5 })).json()).resultado;
   assert.equal(r.metodologiaTemporal, 'mensual_fuerza_constante_v1');
@@ -49,6 +53,13 @@ assert.equal(reglas[1].porcentajeLegal, .15);
 const metadata = (await (await fetch(`${base}/api/pension`)).json()).parametros;
 assert.match(metadata.porcentajesSobrevivencia.padreMadre, /50%/);
 assert.match(metadata.estadoTasas, /ilustrativos/);
+assert.match(metadata.estadoTasas, /2425 desde 01-10-2026/);
+assert.equal(metadata.gradosInvalidez.find(g => g.value === 'parcial').label, 'Parcial (50%)');
+const parcial = (await (await post('invalidez', { fondos: 0, edad: 55, ingresoBase: 1200000, gradoInvalidez: 'parcial', cubiertoSIS: true })).json()).resultado;
+assert.equal(parcial.pensionReferencia, 600000);
+const mayor = (await (await post('retiro_programado', { beneficiarios: [{ ...datos.beneficiarios[0], edad: 85 }] })).json()).resultado;
+assert.ok(mayor.proyeccion.length > 27);
+assert.ok(mayor.proyeccion.every(p => p.beneficiarios.every(b => b.edad <= 110)));
 for (const cambios of [{ referenciaUF: { ...uf, valor: 0 } }, { referenciaUF: { ...uf, fecha: '2026-02-30' } }, { unidadMonetaria: 'UF' }, { uf: 38500 }, { beneficiarios: [{ ...datos.beneficiarios[0], edad: -1 }] }, { beneficiarios: [{ ...datos.beneficiarios[0], idsHijosComunes: 'h' }] }]) {
   assert.equal((await post('retiro_programado', cambios)).status, 400);
 }

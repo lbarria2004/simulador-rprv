@@ -45,7 +45,8 @@ export function determinarPorcentajes(beneficiarios: BeneficiarioPension[]): Por
     let incrementoLegal = 0;
     if (adultos.includes(b)) {
       if (hijos.length && b.idsHijosComunes === undefined) avisos.push('No se informaron hijos comunes: se asumen comunes para el modelo; requiere verificación.');
-      porcentajeLegal = porcentajeAdulto(b) / adultos.filter(a => a.tipo === b.tipo).length;
+      // Anexo 7 p.1: porcentajes divididos con dos decimales porcentuales.
+      porcentajeLegal = Math.round(porcentajeAdulto(b) / adultos.filter(a => a.tipo === b.tipo).length * 10000) / 10000;
       if (adultos.filter(a => a.tipo !== b.tipo).length) avisos.push('Concurrencia de categorías adultas: revisar acreditación y acrecimientos con especialista.');
     } else if (b.tipo === 'hijo') {
       porcentajeLegal = b.esInvalido && b.gradoInvalidez === 'parcial' && b.edad >= 24 ? .11 : .15;

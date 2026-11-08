@@ -121,7 +121,7 @@ export function MultiQuotationResults({
                 Invalidez {invalidezInfo.grado === 'total' ? 'Total (70% IB)' : 'Parcial (50% IB)'}
               </Badge>
               <Badge variant="outline" className={`text-xs font-semibold ${invalidezInfo.cubiertoSIS ? 'bg-emerald-50 text-emerald-800 border-emerald-300' : 'bg-slate-100 text-slate-700 border-slate-300'}`}>
-                {invalidezInfo.cubiertoSIS ? '✓ Cubierto por Seguro SIS' : '✗ Sin Cobertura SIS'}
+                {invalidezInfo.cubiertoSIS ? 'Hipótesis: con SIS' : 'Hipótesis: sin SIS'}
               </Badge>
               <Badge variant="outline" className="text-xs bg-white text-slate-700 border-slate-300 font-mono">
                 Tabla MI-2020
@@ -130,8 +130,8 @@ export function MultiQuotationResults({
             <p className="text-xs text-amber-950 leading-relaxed">
               {invalidezInfo.cubiertoSIS ? (
                 <>
-                  Pensión de Referencia por Ley: <strong>{formatCLP(invalidezInfo.pensionReferenciaCLP)} / mes</strong> ({formatUF(invalidezInfo.pensionReferenciaUF)}). 
-                  La compañía del SIS integra un Aporte Adicional de <strong>+{formatCLP(invalidezInfo.aporteAdicionalSISCLP)}</strong> a su saldo en AFP para enterar el Capital Necesario actuarial ({formatCLP(invalidezInfo.capitalNecesarioCLP)}).
+                  Pensión de referencia estimada (requisitos sin acreditar): <strong>{formatCLP(invalidezInfo.pensionReferenciaCLP)} / mes</strong> ({formatUF(invalidezInfo.pensionReferenciaUF)}).
+                  El modelo supone un aporte SIS de <strong>+{formatCLP(invalidezInfo.aporteAdicionalSISCLP)}</strong> a su saldo en AFP para enterar el Capital Necesario actuarial ({formatCLP(invalidezInfo.capitalNecesarioCLP)}).
                 </>
               ) : (
                 <>
@@ -142,7 +142,7 @@ export function MultiQuotationResults({
           </div>
 
           <div className="bg-white p-2.5 rounded-lg border border-amber-200 shrink-0 text-right space-y-0.5 min-w-[180px]">
-            <div className="text-[10px] text-slate-500 font-medium">Saldo Total para Cotizar</div>
+            <div className="text-[10px] text-slate-500 font-medium">Saldo hipotético para simular</div>
             <div className="text-sm font-extrabold text-indigo-950">{formatCLP(invalidezInfo.saldoTotalFinanciamientoCLP)}</div>
             <div className="text-[10px] font-semibold text-emerald-700">{formatUF(invalidezInfo.saldoTotalFinanciamientoUF)}</div>
           </div>
@@ -158,7 +158,7 @@ export function MultiQuotationResults({
                 <span>🕊️</span> Sobrevivencia Legal (Art. 58 DL 3500)
               </Badge>
               <Badge variant="outline" className={`text-xs font-semibold ${sobrevivenciaInfo.cubiertoSIS ? 'bg-emerald-50 text-emerald-800 border-emerald-300' : 'bg-slate-100 text-slate-700 border-slate-300'}`}>
-                {sobrevivenciaInfo.cubiertoSIS ? '✓ Cubierto por Seguro SIS' : '✗ Sin Cobertura SIS'}
+                {sobrevivenciaInfo.cubiertoSIS ? 'Hipótesis: con SIS' : 'Hipótesis: sin SIS'}
               </Badge>
               <Badge variant="outline" className="text-xs bg-white text-slate-700 border-slate-300 font-mono">
                 Tablas B-2020 / MI
@@ -168,7 +168,7 @@ export function MultiQuotationResults({
               {sobrevivenciaInfo.cubiertoSIS ? (
                 <>
                   Pensión Referencia Causante (70% IB): <strong>{formatCLP(sobrevivenciaInfo.pensionReferenciaCausanteCLP)} / mes</strong> ({formatUF(sobrevivenciaInfo.pensionReferenciaCausanteUF)}). 
-                  La aseguradora del SIS entera un Aporte Adicional de <strong>+{formatCLP(sobrevivenciaInfo.aporteAdicionalSISCLP)}</strong> al saldo AFP para constituir el Capital Necesario familiar ({formatCLP(sobrevivenciaInfo.capitalNecesarioCLP)}).
+                  El modelo supone un aporte SIS de <strong>+{formatCLP(sobrevivenciaInfo.aporteAdicionalSISCLP)}</strong> al saldo AFP para constituir el Capital Necesario familiar ({formatCLP(sobrevivenciaInfo.capitalNecesarioCLP)}).
                 </>
               ) : (
                 <>
@@ -178,7 +178,7 @@ export function MultiQuotationResults({
             </p>
             {sobrevivenciaInfo.beneficiarios.length > 0 && (
               <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-purple-200/80">
-                <span className="text-[11px] font-semibold text-purple-900 mr-1">Beneficiarios con Derecho:</span>
+                <span className="text-[11px] font-semibold text-purple-900 mr-1">Beneficiarios declarados:</span>
                 {sobrevivenciaInfo.beneficiarios.map((ben, bIdx) => (
                   <Badge key={bIdx} variant="secondary" className="text-[10px] bg-white text-purple-900 border border-purple-200">
                     {ben.nombre || (ben.tipo === 'conyuge' ? 'Cónyuge' : 'Hijo/a')} ({(ben.porcentaje * 100).toFixed(0)}%): {formatCLP(ben.pensionReferenciaCLP)}
@@ -494,7 +494,7 @@ export function MultiQuotationResults({
                   <div className="space-y-0.5">
                     <span className="text-[10px] text-slate-400 block">Herencia</span>
                     <span className="font-medium text-slate-700">
-                      {isRP ? 'Constituye herencia' : (item.config.mesesGarantizados ? 'Garantía traspasable' : 'Sin herencia')}
+                      {isRP ? 'Constituye herencia' : (item.config.mesesGarantizados ? 'Garantía por revisar' : 'Sin herencia')}
                     </span>
                   </div>
                   <div className="space-y-0.5">
@@ -602,7 +602,7 @@ export function MultiQuotationResults({
                       ) : item.config.mesesGarantizados ? (
                         <span className="text-amber-700 font-medium">{Math.round(item.config.mesesGarantizados/12)} años garantizados</span>
                       ) : (
-                        <span className="text-slate-400">Pensión de sobrevivencia legal</span>
+                        <span className="text-slate-400">Sobrevivencia estimativa</span>
                       )}
                     </td>
                   </tr>

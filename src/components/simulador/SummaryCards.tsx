@@ -79,7 +79,7 @@ export function SummaryCards({
               </Badge>
             </div>
             <p className="text-xs text-slate-300">
-              Se suman directamente a la pensión seleccionada si cumple los requisitos legales
+              Simulación de complementos con supuestos heredados; no acredita montos vigentes ni derecho a beneficios
             </p>
           </div>
         </div>
