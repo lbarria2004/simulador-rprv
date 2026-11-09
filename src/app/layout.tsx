@@ -18,7 +18,6 @@ export const metadata: Metadata = {
   description: "Simulador actuarial de Retiro Programado y Renta Vitalicia para orientación independiente en Chile. Estimaciones sin conexión con SCOMP; no constituyen ofertas oficiales",
   robots: { index: false, follow: false },
   keywords: ["Jubilación", "Pensión", "Retiro Programado", "Renta Vitalicia", "AFP", "Chile"],
-  authors: [{ name: "Luis Barria" }],
   openGraph: {
     title: "RP / RV · Piloto interno",
     description: "Prueba interna con datos ficticios. Estimaciones sin certificación normativa ni ofertas comerciales.",

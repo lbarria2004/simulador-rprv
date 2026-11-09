@@ -62,3 +62,7 @@ server.log
 /Caddyfile
 /mini-services/
 /db/*.db
+
+# Paquetes de cierre y cachés de herramientas
+/entregables/
+__pycache__/

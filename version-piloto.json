@@ -1,0 +1,21 @@
+{
+  "version": "piloto-interno-2dae5e0",
+  "commit_piloto": "2dae5e018f55557bd8a0bad5c85939ec4fb475bd",
+  "rama": "codex/desarrollo",
+  "master_preservada": "d1c619ec335eba88c85871b443d288e72ab89df9",
+  "fecha_cierre": "2026-11-09",
+  "fecha_revision_actuarial": "2026-11-08",
+  "perfil": "piloto_interno_v1",
+  "solo_datos_ficticios": true,
+  "certificacion_normativa": false,
+  "publicacion_autorizada": false,
+  "binarios_ficticios_aprobados_sha256": {
+    "docs/piloto/capturas/01-inicio-escritorio.png": "ff82534d0ebffb7bf32f3c15637d33d0102ed8680249c6d0071911df31d030a4",
+    "docs/piloto/capturas/02-comparacion-escritorio.png": "aa1c5d99bb9ab4e32dd902e62459c484bc8046eb45457e54becaac529d92a16e",
+    "docs/piloto/capturas/03-familia-restringida.png": "7c3b7aa255bc49bd723f267cb23b90a7e7824ad1651a3c3ab17ad51f0ea2ac4c",
+    "docs/piloto/capturas/04-inicio-movil.png": "743c4c796510a5977b628b13c894303d7ddfbf5c568371da66882dc534f529f3",
+    "docs/piloto/capturas/05-comparacion-movil.png": "333423aec27a5ce984500e877324037994b826b1723205a25af104711ea6cc2e",
+    "docs/piloto/capturas/informe-familia-ficticia.pdf": "78d2f4eafbb8459a172aadeec090206f6dfed2bb316c396d7c04ad3ede0df878",
+    "docs/piloto/capturas/informe-piloto-ficticio.pdf": "d55c36684f3d310bc12bddc4e716011509d6d9ea9ed9728b58130c159dc610ed"
+  }
+}
