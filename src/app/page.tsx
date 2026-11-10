@@ -6,6 +6,7 @@ import { AVISO_PILOTO, FECHA_REVISION_PILOTO, FUENTES_PILOTO, LIMITACION_CNU, RE
 import { TASAS_INTERES } from '@/lib/pension-calculator';
 import { clpAUf } from '@/lib/moneda';
 import { ProjectionCharts } from '@/components/piloto/ProjectionCharts';
+import { ScenarioBuilder } from '@/components/escenarios/ScenarioBuilder';
 
 interface BeneficiarioFormulario { id: string; tipo: 'conyuge' | 'hijo'; edad: string; sexo: 'M' | 'F'; esEstudiante: boolean }
 const dinero = (n: number) => `$${Math.round(n).toLocaleString('es-CL')}`;
@@ -30,6 +31,7 @@ export default function Home() {
   const [error, setError] = useState('');
   const [estudio, setEstudio] = useState<{ firma: string; resultado: ResultadoPiloto } | null>(null);
   const siguienteId = useRef(1);
+  const formularioRef = useRef<HTMLFormElement>(null);
   const hayConyuge = beneficiarios.some(b => b.tipo === 'conyuge');
   const hijos = beneficiarios.filter(b => b.tipo === 'hijo');
   const composicionValida = !beneficiarios.length || (hayConyuge && (!hijos.length || vinculos));
@@ -81,7 +83,7 @@ export default function Home() {
           <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#123a42] text-white"><BarChart3 size={22} /></span>
           <span><span className="block text-lg font-bold leading-5 tracking-tight">RP <span className="font-normal text-slate-300">/</span> RV</span><span className="text-[10px] font-semibold uppercase tracking-[.18em] text-slate-500">Mesa de asesoría</span></span>
         </a>
-        <div className="flex items-center gap-3 text-xs text-slate-500"><span className="hidden sm:inline">Chile · Orientación previsional</span><span className="rounded-full border border-teal-200 bg-teal-50 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wide text-teal-800">Piloto interno</span></div>
+        <div className="flex items-center gap-3 text-xs text-slate-500"><a href="#constructor-escenarios" className="font-semibold text-teal-800 underline decoration-teal-200 underline-offset-4">Escenarios</a><span className="hidden sm:inline">Chile · Orientación previsional</span><span className="rounded-full border border-teal-200 bg-teal-50 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wide text-teal-800">Piloto interno</span></div>
       </div>
     </header>
 
@@ -96,7 +98,7 @@ export default function Home() {
       <div className="mb-7 flex items-start gap-3 rounded-xl border border-amber-200/80 bg-[#fffaf0] px-4 py-3.5 text-xs leading-5 text-amber-950" role="note"><Info className="mt-0.5 shrink-0" size={17} /><p><strong>Uso interno con datos ficticios.</strong> No es oferta comercial ni cálculo normativamente certificado. El CNU es aproximado y los montos requieren validación especializada. Sin conexión con SCOMP.</p></div>
 
       <div className="grid items-start gap-6 lg:grid-cols-[350px_minmax(0,1fr)] xl:gap-8">
-        <form onSubmit={calcular} className="space-y-5" aria-label="Datos y supuestos del estudio">
+        <form id="datos-estudio" ref={formularioRef} onSubmit={calcular} className="scroll-mt-5 space-y-5" aria-label="Datos y supuestos del estudio">
           <section className="pilot-panel p-5">
             <div className="pilot-section-title"><span className="pilot-step">01</span><h2>Afiliado y ahorro propio</h2><UserRound size={16} className="ml-auto text-slate-400" /></div>
             <label className="pilot-label" htmlFor="caso">Identificador del caso ficticio</label>
@@ -186,6 +188,7 @@ export default function Home() {
           <details className="pilot-panel p-5 text-xs"><summary className="cursor-pointer font-semibold text-slate-700">Fuentes y metodología del piloto</summary><p className="mt-4 leading-6 text-slate-500">{LIMITACION_CNU} La misma política limita pantalla, API y PDF; el servidor recalcula el informe desde los datos, sin aceptar importes precalculados.</p><ul className="mt-4 space-y-3">{FUENTES_PILOTO.map(f => <li key={f.url}><a href={f.url} target="_blank" rel="noreferrer" className="font-medium text-teal-800 underline decoration-teal-200 underline-offset-4">{f.titulo}</a><p className="mt-1 leading-5 text-slate-500">{f.alcance}</p></li>)}</ul><p className="mt-4 border-t border-slate-100 pt-3 leading-5 text-slate-400">Referencia interna: docs/fase-4-matriz-trazabilidad.md · M01–M27. Revisión de fuentes {FECHA_REVISION_PILOTO}; no acredita vigencia para otras fechas.</p></details>
         </div>
       </div>
+      <ScenarioBuilder datos={datos} firmaDatos={firma} habilitado={confirmado && composicionValida} validarDatosFormulario={() => formularioRef.current?.reportValidity() === true} />
       <footer className="mt-10 flex flex-col justify-between gap-3 border-t border-slate-200 pt-5 text-[10px] leading-5 text-slate-400 sm:flex-row"><span>RP / RV · Herramienta de orientación para la mesa de asesoría</span><span className="max-w-xl sm:text-right">{AVISO_PILOTO}</span></footer>
     </main>
   </div>;

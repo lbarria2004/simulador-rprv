@@ -4,6 +4,12 @@ Herramienta independiente para comparar estimaciones de Retiro Programado y Rent
 
 Stack: Next.js, React, TypeScript y tablas de mortalidad locales. No requiere servicios de pago para ejecutar el motor.
 
+## Trabajo actual: constructor de escenarios
+
+La rama local `codex/constructor-escenarios`, basada en `318f57f`, añade un catálogo de cinco modalidades y permite agregar, duplicar, editar, eliminar y comparar configuraciones. Solo RP simple y RV inmediata teórica producen estimaciones; garantías, aumentos y combinaciones permanecen sin cálculo ni PDF. Las tasas de sensibilidad se distinguen de la referencia técnica y no son ofertas comerciales.
+
+Consultar [funcionamiento, pruebas, contratos y requisitos actuariales pendientes](docs/constructor-escenarios.md). Esta fase no publica código ni despliega hosting. El cierre histórico siguiente y su paquete permanecen preservados.
+
 ## Versión actual: piloto interno con datos ficticios
 
 **Cierre preservado:** referencia funcional `2dae5e0`, etiqueta local `piloto-rprv-2dae5e0`. Consultar el [informe final de cierre](docs/piloto/cierre.md), la [instalación y demostración privada](docs/piloto/instalacion-y-demostracion.md), el [checklist de seguridad](docs/piloto/seguridad-y-privacidad.md) y los [pasos de una PR futura, aún no publicada](docs/piloto/publicacion-posterior.md). La identidad está en `version-piloto.json`; el paquete usa fuentes versionadas, inventario SHA-256 y dependencias fijadas.
