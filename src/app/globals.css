@@ -133,5 +133,5 @@
 .pilot-small-button:hover:not(:disabled) { border-color: #138276; color: #0d766b; background: #f4faf8; }
 .pilot-small-button:disabled { color: #a7b1bb; cursor: not-allowed; background: #f8fafb; }
 .pilot-eyebrow { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .12em; color: #138276; }
-.pilot-root button:focus-visible, .pilot-root summary:focus-visible, .pilot-root a:focus-visible { outline: 2px solid #0e8175; outline-offset: 3px; }
+.pilot-root button:focus-visible, .pilot-root summary:focus-visible, .pilot-root a:focus-visible, .pilot-root [tabindex]:focus-visible { outline: 2px solid #0e8175; outline-offset: 3px; }
 .pilot-root label:has(input[type=radio]:focus-visible) { outline: 2px solid #0e8175; outline-offset: 2px; }

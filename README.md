@@ -8,7 +8,9 @@ Stack: Next.js, React, TypeScript y tablas de mortalidad locales. No requiere se
 
 **Cierre preservado:** referencia funcional `2dae5e0`, etiqueta local `piloto-rprv-2dae5e0`. Consultar el [informe final de cierre](docs/piloto/cierre.md), la [instalación y demostración privada](docs/piloto/instalacion-y-demostracion.md), el [checklist de seguridad](docs/piloto/seguridad-y-privacidad.md) y los [pasos de una PR futura, aún no publicada](docs/piloto/publicacion-posterior.md). La identidad está en `version-piloto.json`; el paquete usa fuentes versionadas, inventario SHA-256 y dependencias fijadas.
 
-La pantalla y las API están restringidas a **RP simple y RV inmediata teórica**, con una política compartida y resultados estimativos pendientes de validación especializada. Las cláusulas, ofertas comerciales, beneficios y proyecciones familiares futuras están deshabilitados. Con beneficiarios se muestra solo la comparación inicial; las curvas RP requieren ahorro positivo, ausencia de beneficiarios y comprobación financiera.
+El cálculo en pantalla, API y PDF está restringido a **RP simple y RV inmediata teórica**, con una política compartida y resultados estimativos pendientes de validación especializada. El constructor permite preparar y comparar las cinco modalidades, incluidas cláusulas pendientes, sin valorarlas. El cálculo de cláusulas, las ofertas comerciales, los beneficios y las proyecciones familiares futuras permanecen deshabilitados. Con beneficiarios se muestra solo la comparación inicial; las curvas RP requieren ahorro positivo, ausencia de beneficiarios y comprobación financiera.
+
+La ampliación en `codex/escenarios-multimodalidad`, desde `318f57f`, incorpora escenarios editables y duplicables, selección y comparación responsive. Consultar el [informe del constructor y pruebas](docs/escenarios-resultados.md) y los [requisitos pendientes por modalidad](docs/escenarios-validacion-pendiente.md). Con producción local: `node scripts/verificar-escenarios-http.mjs` y `python scripts/verificar-escenarios-navegador.py`.
 
 Consultar el [informe del piloto, verificaciones y limitaciones](docs/piloto-resultados.md), las [decisiones basadas en la matriz de 27 componentes](docs/piloto-decisiones.md) y las [capturas y PDF ficticios](docs/piloto/capturas/). `npm run dev` y `npm run start` escuchan en `127.0.0.1`; no hay autenticación ni autorización para uso con datos personales reales.
 
@@ -17,8 +19,8 @@ Verificación de esta versión: `npm test`, `npm run typecheck`, `npm run lint`,
 ## Desarrollo local
 
 ```bash
-# Trabajar exclusivamente en la rama de desarrollo preparada
-git switch codex/desarrollo
+# Trabajar en la rama local del constructor
+git switch codex/escenarios-multimodalidad
 npm ci --legacy-peer-deps --ignore-scripts --no-audit --no-fund
 npm run db:generate
 npm test

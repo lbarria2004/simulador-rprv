@@ -2,6 +2,7 @@
 import { PDFDocument, StandardFonts, rgb, type PDFPage, type PDFFont } from 'pdf-lib';
 import { calcularPiloto, leerSolicitudPiloto, LIMITACION_CNU, AVISO_TASA_RP_HISTORICA, type PuntoPiloto } from './piloto.ts';
 import { clpAUf } from './moneda.ts';
+import { calcularComparacionEscenarios } from './escenarios.ts';
 
 const navy = rgb(.075, .16, .24), teal = rgb(.035, .42, .39), slate = rgb(.32, .39, .46), light = rgb(.94, .96, .97);
 const colores = [rgb(.49, .56, .65), teal, rgb(.23, .40, .77)];
@@ -9,7 +10,8 @@ const pesos = (n: number) => `$${Math.round(n).toLocaleString('es-CL')}`;
 const porcentaje = (n: number) => `${(n * 100).toFixed(2)}%`;
 
 export async function generarReportePilotoPDF(body: unknown): Promise<Uint8Array> {
-  const resultado = calcularPiloto(leerSolicitudPiloto(body, true));
+  const escenarios = body && typeof body === 'object' && 'escenarios' in body ? calcularComparacionEscenarios(body, true) : null;
+  const resultado = escenarios?.piloto ?? calcularPiloto(leerSolicitudPiloto(body, true));
   const { datos: d, comparacion } = resultado;
   const pdf = await PDFDocument.create();
   pdf.setTitle(`RP / RV · Piloto interno · ${d.caso}`);
@@ -53,7 +55,7 @@ export async function generarReportePilotoPDF(body: unknown): Promise<Uint8Array
   const tabla = (filas: string[][], anchos: number[]) => {
     const altoTotal = filas.reduce((suma, fila, i) => suma + Math.max(...fila.map((c, j) => lineas(c, anchos[j] - 14, 8.5, i ? normal : bold).length)) * 12 + 12, 0);
     if (y - altoTotal < 83) nueva('Detalle del estudio', `Caso ${d.caso} · Valoración ${d.fechaValoracion}`);
-    filas.forEach((fila, i) => {
+    const dibujar = (fila: string[], i: number) => {
       let x = 42;
       const contenido = fila.map((celda, c) => lineas(celda, anchos[c] - 14, 8.5, i ? normal : bold));
       const alto = Math.max(...contenido.map(c => c.length)) * 12 + 12;
@@ -62,6 +64,14 @@ export async function generarReportePilotoPDF(body: unknown): Promise<Uint8Array
         ls.forEach((l, j) => texto(l, x + 7, y - 9 - j * 12, 8.5, i ? normal : bold, i ? navy : rgb(1, 1, 1)));
         x += anchos[c];
       }); y -= alto;
+    };
+    filas.forEach((fila, i) => {
+      const alto = Math.max(...fila.map((c, j) => lineas(c, anchos[j] - 14, 8.5, i ? normal : bold).length)) * 12 + 12;
+      if (y - alto < 83) {
+        nueva('Detalle del estudio', `Caso ${d.caso} · Valoración ${d.fechaValoracion}`);
+        if (i) dibujar(filas[0], 0);
+      }
+      dibujar(fila, i);
     }); y -= 12;
   };
   nueva('Comparación previsional orientativa', `Caso ${d.caso}  |  Valoración ${d.fechaValoracion}  |  Perfil ${resultado.perfil}`);
@@ -79,7 +89,13 @@ export async function generarReportePilotoPDF(body: unknown): Promise<Uint8Array
     ['Retorno AFP seleccionado', `${d.escenarioRP}: ${porcentaje(resultado.escenarios.find(e => e.id === d.escenarioRP)!.rentabilidadRealAnual)} real anual hipotético`]
   ], [160, 351]);
   titulo('Comparación inicial · montos brutos');
-  tabla([
+  if (escenarios) {
+    titulo('Escenarios seleccionados · estimaciones');
+    parrafo('Configuraciones sin cláusulas. Mismos datos y descuentos técnicos para todos los escenarios. Tasas comerciales: no disponibles. Los nombres son etiquetas ficticias, no ofertas.');
+    tabla([['Escenario / modelo', 'CLP / mes', 'UF / mes', 'CNU aprox.'], ...escenarios.cotizaciones.map(({ config, monto }) => [
+      `${config.nombre} / ${config.modalidad === 'retiro_programado' ? 'RP simple' : 'RV inmediata teórica'}`, pesos(monto.pensionMensual), monto.pensionEnUF.toFixed(2), monto.cnu.toFixed(4)
+    ])], [211, 110, 90, 100]);
+  } else tabla([
     ['Modelo estimativo', 'CLP / mes', 'UF / mes', 'CNU aprox.'],
     ['Retiro Programado simple', pesos(comparacion.rp.pensionMensual), comparacion.rp.pensionEnUF.toFixed(2), comparacion.rp.cnu.toFixed(4)],
     ['RV inmediata teórica, sin aseguradora', pesos(comparacion.rv.pensionMensual), comparacion.rv.pensionEnUF.toFixed(2), comparacion.rv.cnu.toFixed(4)]
@@ -93,9 +109,9 @@ export async function generarReportePilotoPDF(body: unknown): Promise<Uint8Array
   }
 
   nueva('Escenarios y alcance de la proyección', 'Rentabilidad real AFP separada de la tasa de descuento del CNU');
-  tabla([['Escenario RP', 'Retorno real anual', 'Pensión inicial (CLP)'], ...resultado.escenarios.map(e => [e.nombre, porcentaje(e.rentabilidadRealAnual), pesos(e.pensionInicial)])], [180, 160, 171]);
-  parrafo(resultado.proyecciones.motivo);
-  if (resultado.proyecciones.disponibles) {
+  if (!escenarios || escenarios.cotizaciones.some(e => e.config.modalidad === 'retiro_programado')) tabla([['Escenario RP', 'Retorno real anual', 'Pensión inicial (CLP)'], ...resultado.escenarios.map(e => [e.nombre, porcentaje(e.rentabilidadRealAnual), pesos(e.pensionInicial)])], [180, 160, 171]);
+  parrafo(escenarios && !escenarios.cotizaciones.some(e => e.config.modalidad === 'retiro_programado') ? 'No se seleccionó RP; sin curvas ni sensibilidad AFP en este informe.' : resultado.proyecciones.motivo);
+  if (resultado.proyecciones.disponibles && (!escenarios || escenarios.cotizaciones.some(e => e.config.modalidad === 'retiro_programado'))) {
     const puntos = resultado.proyecciones.puntos;
     const grafico = (nombre: string, campos: (keyof PuntoPiloto)[]) => {
       if (y < 290) nueva('Evolución financiera RP', `Caso ${d.caso} · Flujos calculados, sin proyección familiar`);

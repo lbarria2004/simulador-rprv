@@ -87,7 +87,8 @@ with sync_playwright() as p:
     with page.expect_request('**/api/reporte') as peticion, page.expect_download() as descarga:
         pdf.click()
     payload = peticion.value.post_data_json
-    assert set(payload) == {'datos'}
+    assert set(payload) == {'datos', 'escenarios'}
+    assert [e['modalidad'] for e in payload['escenarios']] == ['retiro_programado', 'renta_vitalicia_simple']
     assert payload['datos'] == r2['datos']
     descarga.value.save_as(str(salida / 'informe-piloto-ficticio.pdf'))
 

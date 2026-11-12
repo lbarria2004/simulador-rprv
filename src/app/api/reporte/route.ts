@@ -9,6 +9,6 @@ export async function POST(request: NextRequest) {
     } });
   } catch (error) {
     return NextResponse.json({ success: false, codigo: error instanceof ErrorPiloto ? error.codigo : 'DATOS_INVALIDOS', error: error instanceof Error ? error.message : 'No fue posible generar el informe.' },
-      { status: error instanceof ErrorPiloto ? error.status : 400 });
+      { status: error instanceof ErrorPiloto ? error.status : 400, headers: { 'Cache-Control': 'no-store' } });
   }
 }

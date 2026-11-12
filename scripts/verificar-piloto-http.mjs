@@ -20,7 +20,7 @@ async function documentoTexto(bytes) {
 }
 const metadata = await (await fetch(`${base}/api/pension`)).json(); peticiones++;
 assert.equal(metadata.perfil, 'piloto_interno_v1');
-assert.deepEqual(metadata.tiposHabilitados, ['comparacion_piloto']);
+assert.deepEqual(metadata.tiposHabilitados, ['comparacion_piloto', 'comparacion_escenarios']);
 assert.equal(metadata.restricciones.length, 5);
 assert.match(metadata.aviso, /sin certificación normativa/);
 assert.equal((await fetch(`${base}/api/tasas-rv`)).status, 403); peticiones++;
